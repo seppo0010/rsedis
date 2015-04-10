@@ -1,0 +1,9 @@
+[package]
+
+name = "rsedis"
+version = "0.0.1"
+authors = [ "Sebastian Waisbrot <seppo0010@gmail.com>" ]
+
+[[bin]]
+
+name = "rsedis"
