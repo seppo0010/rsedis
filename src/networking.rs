@@ -1,7 +1,8 @@
 use std::net::{TcpListener, TcpStream};
 use std::io::Read;
-use std::str::from_utf8;
 use std::thread;
+
+use super::protocol::parse;
 
 pub struct Client {
     pub stream: TcpStream
@@ -22,11 +23,24 @@ impl Client {
     pub fn read(&mut self) {
         let mut buffer = [0u8; 512];
         loop {
-            let usize = self.stream.read(&mut buffer).unwrap();
-            if usize == 0 {
+            let result = self.stream.read(&mut buffer);
+            if result.is_err() {
                 break;
             }
-            println!("{} {}", from_utf8(&buffer).unwrap(), usize);
+            let len = result.unwrap();
+            println!("gonna print {}", len);
+            if len == 0 {
+                break;
+            }
+            let try_parser = parse(&buffer, len);
+            if try_parser.is_err() {
+                break;
+            }
+            let parser = try_parser.unwrap();
+            println!("{}", parser.argc);
+            for i in 0..parser.argc {
+                println!("{}", parser.get_str(i).unwrap())
+            }
         };
     }
 }
@@ -57,7 +71,7 @@ impl Server {
                     // connection succeeded
                     self.handle_client(stream)
                 }
-                Err(e) => { println!("{}", e); }
+                Err(e) => { println!("error {}", e); }
             }
         }
         // close the socket server
