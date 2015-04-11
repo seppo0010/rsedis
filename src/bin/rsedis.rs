@@ -1,7 +1,6 @@
-use self::networking::Server;
+extern crate rsedis;
 
-pub mod networking;
-pub mod protocol;
+use rsedis::networking::Server;
 
 fn main() {
     let port: i32 = 6379;
