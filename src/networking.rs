@@ -111,6 +111,10 @@ impl Server {
         });
     }
 
+    pub fn stop(&self) {
+        // TODO
+    }
+
 }
 
 pub fn new_server(ip: &str, port: &i32) -> Server {
