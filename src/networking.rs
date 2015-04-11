@@ -59,6 +59,7 @@ impl Client {
                 if writeres.is_err() {
                     break;
                 }
+                continue;
             }
             println!("{}", parser.argc);
             for i in 0..parser.argc {
