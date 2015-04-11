@@ -68,6 +68,25 @@ impl Client {
     }
 }
 
+fn handle_client(stream: TcpStream) {
+    thread::spawn(move || {
+        let mut client = Client::new(stream);
+        client.read();
+    });
+}
+
+pub fn run(listener: TcpListener) {
+    for stream in listener.incoming() {
+        match stream {
+            Ok(stream) => {
+                handle_client(stream)
+            }
+            Err(e) => { println!("error {}", e); }
+        }
+    }
+    drop(listener);
+}
+
 impl Server {
     pub fn new(ip: &str, port: &i32) -> Server {
         return Server {
@@ -76,27 +95,19 @@ impl Server {
         }
     }
 
-    pub fn handle_client(&mut self, stream: TcpStream) {
-        thread::spawn(move || {
-            let mut client = Client::new(stream);
-            client.read();
-        });
+    fn get_listener(&self) -> TcpListener {
+        let addr: String = format!("{}:{}", self.ip, self.port);
+        return TcpListener::bind(&*addr).unwrap();
+    }
+    pub fn run(&self) {
+        run(self.get_listener());
     }
 
-    pub fn start(&mut self) {
-        let addr: String = format!("{}:{}", self.ip, self.port);
-        let listener = TcpListener::bind(&*addr).unwrap();
-        for stream in listener.incoming() {
-            match stream {
-                Ok(stream) => {
-                    // connection succeeded
-                    self.handle_client(stream)
-                }
-                Err(e) => { println!("error {}", e); }
-            }
-        }
-        // close the socket server
-        drop(listener);
+    pub fn start(&self) {
+        let listener = self.get_listener();
+        thread::spawn(move || {
+            run(listener);
+        });
     }
 
 }
