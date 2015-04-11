@@ -2,7 +2,7 @@ use std::net::{TcpListener, TcpStream};
 use std::io::Read;
 use std::thread;
 
-use super::protocol::parse;
+use super::parser::parse;
 
 pub struct Client {
     pub stream: TcpStream

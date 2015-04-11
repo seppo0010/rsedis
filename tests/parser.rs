@@ -2,7 +2,8 @@ extern crate rsedis;
 
 #[cfg(test)]
 mod test {
-    use rsedis::protocol::parse;
+    use rsedis::parser::parse;
+    use rsedis::parser::ParseError;
 
     #[test]
     fn parse_valid() {
@@ -20,8 +21,10 @@ mod test {
         let message = b"*2\r\n$3\r\nfoo";
         let r = parse(message, message.len());
         assert!(r.is_err());
-        // let e = r.unwrap_err();
-        // assert_eq!(e, 0);
+        match r.unwrap_err() {
+            ParseError::Incomplete => {},
+            _ => assert!(false)
+        }
     }
 
     #[test]
@@ -29,7 +32,9 @@ mod test {
         let message = b"-2\r\n$3\r\nfoo";
         let r = parse(message, message.len());
         assert!(r.is_err());
-        // let e = r.unwrap_err();
-        // assert_eq!(e, 1);
+        match r.unwrap_err() {
+            ParseError::BadProtocol => {},
+            _ => assert!(false)
+        }
     }
 }
