@@ -1,8 +1,10 @@
 use std::net::{TcpListener, TcpStream};
 use std::io::Read;
+use std::io::Write;
 use std::thread;
 
 use super::parser::parse;
+use super::parser::ParseError;
 
 pub struct Client {
     pub stream: TcpStream
@@ -34,9 +36,31 @@ impl Client {
             }
             let try_parser = parse(&buffer, len);
             if try_parser.is_err() {
-                break;
+                let err = try_parser.unwrap_err();
+                match err {
+                    ParseError::BadProtocol => { break; }
+                    ParseError::Incomplete => { continue; }
+                };
             }
             let parser = try_parser.unwrap();
+            if parser.argc == 1 && parser.get_str(0).unwrap() == "exit" {
+                break;
+            }
+            if parser.argc == 2 && parser.get_str(0).unwrap() == "ping" {
+                let response = parser.get_str(1).unwrap();
+                let writeres = self.stream.write(&*format!("${}\r\n", response.len()).as_bytes());
+                if writeres.is_err() {
+                    break;
+                }
+                let writeres = self.stream.write(response.as_bytes());
+                if writeres.is_err() {
+                    break;
+                }
+                let writeres = self.stream.write(b"\r\n");
+                if writeres.is_err() {
+                    break;
+                }
+            }
             println!("{}", parser.argc);
             for i in 0..parser.argc {
                 println!("{}", parser.get_str(i).unwrap())

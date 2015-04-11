@@ -16,4 +16,4 @@ name = "rsedis"
 [[test]]
 
 name = "tests"
-path = "tests/parser.rs"
+path = "tests/tests.rs"
