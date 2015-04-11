@@ -30,7 +30,6 @@ impl Client {
                 break;
             }
             let len = result.unwrap();
-            println!("gonna print {}", len);
             if len == 0 {
                 break;
             }
@@ -78,7 +77,6 @@ impl Server {
     }
 
     pub fn handle_client(&mut self, stream: TcpStream) {
-        println!("Client connected");
         thread::spawn(move || {
             let mut client = Client::new(stream);
             client.read();
@@ -88,7 +86,6 @@ impl Server {
     pub fn start(&mut self) {
         let addr: String = format!("{}:{}", self.ip, self.port);
         let listener = TcpListener::bind(&*addr).unwrap();
-        println!("Listening to new connections on {}", addr);
         for stream in listener.incoming() {
             match stream {
                 Ok(stream) => {
