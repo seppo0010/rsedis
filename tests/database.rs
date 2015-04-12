@@ -19,3 +19,13 @@ fn set_get() {
         _ => assert!(false),
     }
 }
+
+#[test]
+fn get_empty() {
+    let database = Database::new();
+    let key = vec![1u8];
+    match database.get(&key) {
+        None => {},
+        _ => assert!(false),
+    }
+}
