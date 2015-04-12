@@ -47,15 +47,7 @@ impl Client {
             }
             if parser.argc == 2 && parser.get_str(0).unwrap() == "ping" {
                 let response = parser.get_str(1).unwrap();
-                let writeres = self.stream.write(&*format!("${}\r\n", response.len()).as_bytes());
-                if writeres.is_err() {
-                    break;
-                }
-                let writeres = self.stream.write(response.as_bytes());
-                if writeres.is_err() {
-                    break;
-                }
-                let writeres = self.stream.write(b"\r\n");
+                let writeres = self.stream.write(&*format!("${}\r\n{}\r\n", response.len(), response).as_bytes());
                 if writeres.is_err() {
                     break;
                 }
