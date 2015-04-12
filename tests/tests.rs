@@ -1,6 +1,6 @@
 extern crate rsedis;
 
-pub mod commander;
+pub mod command;
 pub mod database;
 pub mod networking;
 pub mod parser;

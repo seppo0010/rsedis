@@ -1,28 +1,33 @@
 use std::net::{TcpListener, TcpStream};
-use std::io::Read;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::thread;
+use std::sync::{Arc, Mutex};
 
+use super::command::command;
+use super::database::Database;
 use super::parser::parse;
 use super::parser::ParseError;
 
 pub struct Client {
-    pub stream: TcpStream
+    pub stream: TcpStream,
+    pub db: Arc<Mutex<Database>>
 }
 
 pub struct Server {
     pub ip: String,
     pub port: i32,
+    pub db: Arc<Mutex<Database>>,
 }
 
 impl Client {
-    pub fn new(stream: TcpStream) -> Client {
+    pub fn new(stream: TcpStream, db: Arc<Mutex<Database>>) -> Client {
         return Client {
-            stream: stream
+            stream: stream,
+            db: db,
         }
     }
 
-    pub fn read(&mut self) {
+    pub fn run(&mut self) {
         let mut buffer = [0u8; 512];
         loop {
             let result = self.stream.read(&mut buffer);
@@ -42,42 +47,14 @@ impl Client {
                 };
             }
             let parser = try_parser.unwrap();
-            if parser.argc == 1 && parser.get_str(0).unwrap() == "exit" {
+            let mut db = self.db.lock().unwrap();
+            let response = command(&parser, &mut *db);
+            let writeres = self.stream.write(&*response.as_bytes());
+            if writeres.is_err() {
                 break;
-            }
-            if parser.argc == 2 && parser.get_str(0).unwrap() == "ping" {
-                let response = parser.get_str(1).unwrap();
-                let writeres = self.stream.write(&*format!("${}\r\n{}\r\n", response.len(), response).as_bytes());
-                if writeres.is_err() {
-                    break;
-                }
-                continue;
-            }
-            println!("{}", parser.argc);
-            for i in 0..parser.argc {
-                println!("{}", parser.get_str(i).unwrap())
             }
         };
     }
-}
-
-fn handle_client(stream: TcpStream) {
-    thread::spawn(move || {
-        let mut client = Client::new(stream);
-        client.read();
-    });
-}
-
-pub fn run(listener: TcpListener) {
-    for stream in listener.incoming() {
-        match stream {
-            Ok(stream) => {
-                handle_client(stream)
-            }
-            Err(e) => { println!("error {}", e); }
-        }
-    }
-    drop(listener);
 }
 
 impl Server {
@@ -85,6 +62,7 @@ impl Server {
         return Server {
             ip: ip.to_string(),
             port: *port,
+            db: Arc::new(Mutex::new(Database::new())),
         }
     }
 
@@ -92,21 +70,34 @@ impl Server {
         let addr: String = format!("{}:{}", self.ip, self.port);
         return TcpListener::bind(&*addr).unwrap();
     }
-    pub fn run(&self) {
-        run(self.get_listener());
+
+    pub fn run(&mut self) {
+        #![allow(unused_must_use)]
+        self.start().join();
     }
 
-    pub fn start(&self) {
+    pub fn start(&mut self) -> thread::JoinHandle {
         let listener = self.get_listener();
-        thread::spawn(move || {
-            run(listener);
+        let db = self.db.clone();
+        return thread::spawn(move || {
+            for stream in listener.incoming() {
+                match stream {
+                    Ok(stream) => {
+                        let db1 = db.clone();
+                        thread::spawn(move || {
+                            let mut client = Client::new(stream, db1);
+                            client.run();
+                        });
+                    }
+                    Err(e) => { println!("error {}", e); }
+                }
+            }
         });
     }
 
     pub fn stop(&self) {
         // TODO
     }
-
 }
 
 pub fn new_server(ip: &str, port: &i32) -> Server {

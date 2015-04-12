@@ -6,8 +6,8 @@ use rsedis::database::Database;
 use rsedis::database::Value;
 use rsedis::parser::Parser;
 use rsedis::parser::Argument;
-use rsedis::commander::run;
-use rsedis::commander::Response;
+use rsedis::command::command;
+use rsedis::command::Response;
 
 fn getstr(database: &Database, key: &[u8]) -> String {
     match database.get(&key.to_vec()) {
@@ -25,7 +25,7 @@ fn getstr(database: &Database, key: &[u8]) -> String {
 fn nocommand() {
     let mut db = Database::new();
     let parser = Parser::new(b"", 0, Vec::new());
-    let response = run(&parser, &mut db);
+    let response = command(&parser, &mut db);
     match response {
         Response::Err(_) => {},
         _ => assert!(false),
@@ -40,7 +40,7 @@ fn set_command() {
                 Argument {pos: 3, len: 3},
                 Argument {pos: 6, len: 5},
                 ));
-    let response = run(&parser, &mut db);
+    let response = command(&parser, &mut db);
     match response {
         Response::Status(msg) => assert_eq!(msg, "OK"),
         _ => assert!(false),
@@ -56,7 +56,7 @@ fn get_command() {
                 Argument {pos: 0, len: 3},
                 Argument {pos: 3, len: 3},
                 ));
-    let response = run(&parser, &mut db);
+    let response = command(&parser, &mut db);
     match response {
         Response::Data(msg) => assert_eq!(msg, b"value"),
         _ => assert!(false),

@@ -10,7 +10,7 @@ use rsedis::networking::Server;
 #[test]
 fn parse_ping() {
     let port: i32 = 6379;
-    let server = Server::new("127.0.0.1", &port);
+    let mut server = Server::new("127.0.0.1", &port);
     server.start();
 
     let addr = format!("127.0.0.1:{}", port);
@@ -31,7 +31,7 @@ fn parse_ping() {
 #[test]
 fn allow_multiwrite() {
     let port: i32 = 6380;
-    let server = Server::new("127.0.0.1", &port);
+    let mut server = Server::new("127.0.0.1", &port);
     server.start();
 
     let addr = format!("127.0.0.1:{}", port);
