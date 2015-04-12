@@ -50,15 +50,25 @@ impl<'a> Parser<'a> {
     }
 
     pub fn get_str(&self, pos: usize) -> Result<&str, i32> {
-        if pos >= self.argc {
-            return Err(0);
-        }
-        let arg = &self.argv[pos];
-        let res = from_utf8(&self.data[arg.pos..arg.pos+arg.len]);
+        let data = try!(self.get_slice(pos));
+        let res = from_utf8(&data);
         if res.is_err() {
             return Err(1);
         }
         return Ok(res.unwrap());
+    }
+
+    pub fn get_vec(&self, pos: usize) -> Result<Vec<u8>, i32> {
+        let data = try!(self.get_slice(pos));
+        return Ok(data.to_vec());
+    }
+
+    pub fn get_slice(&self, pos: usize) -> Result<&[u8], i32> {
+        if pos >= self.argc {
+            return Err(0);
+        }
+        let arg = &self.argv[pos];
+        return Ok(&self.data[arg.pos..arg.pos+arg.len]);
     }
 }
 
