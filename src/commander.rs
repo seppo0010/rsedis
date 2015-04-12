@@ -1,4 +1,5 @@
 use super::database::Database;
+use super::database::Value;
 use super::parser::Parser;
 
 pub enum Response {
@@ -24,6 +25,26 @@ pub fn set(parser: &Parser, db: &mut Database) -> Response {
     return Response::Status("OK".to_string());
 }
 
+pub fn get(parser: &Parser, db: &mut Database) -> Response {
+    if parser.argc != 2 {
+        return Response::Err("Wrong number of parameters".to_string());
+    }
+    let try_key = parser.get_vec(1);
+    if try_key.is_err() {
+        return Response::Err("Invalid key".to_string());
+    }
+    let obj = db.get(&try_key.unwrap());
+    match obj {
+        Some(value) => {
+            match value {
+                &Value::Data(ref data) => return Response::Data(data.clone()),
+            }
+        }
+        None => return Response::Nil,
+    }
+}
+
+
 pub fn run(parser: &Parser, db: &mut Database) -> Response {
     if parser.argc == 0 {
         return Response::Err("Not enough arguments".to_string());
@@ -34,6 +55,7 @@ pub fn run(parser: &Parser, db: &mut Database) -> Response {
     }
     match try_command.unwrap() {
         "set" => return set(parser, db),
+        "get" => return get(parser, db),
         _ => return Response::Err("Uknown command".to_string()),
     };
 }

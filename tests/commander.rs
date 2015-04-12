@@ -27,7 +27,7 @@ fn nocommand() {
     let parser = Parser::new(b"", 0, Vec::new());
     let response = run(&parser, &mut db);
     match response {
-        Response::Err(err) => {},
+        Response::Err(_) => {},
         _ => assert!(false),
     };
 }
@@ -43,6 +43,22 @@ fn set_command() {
     let response = run(&parser, &mut db);
     match response {
         Response::Status(msg) => assert_eq!(msg, "OK"),
+        _ => assert!(false),
+    };
+    assert_eq!("value", getstr(&db, b"key"));
+}
+
+#[test]
+fn get_command() {
+    let mut db = Database::new();
+    db.set(&b"key".to_vec(), b"value".to_vec());
+    let parser = Parser::new(b"getkey", 2, vec!(
+                Argument {pos: 0, len: 3},
+                Argument {pos: 3, len: 3},
+                ));
+    let response = run(&parser, &mut db);
+    match response {
+        Response::Data(msg) => assert_eq!(msg, b"value"),
         _ => assert!(false),
     };
     assert_eq!("value", getstr(&db, b"key"));
