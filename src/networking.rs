@@ -2,6 +2,7 @@ use std::net::{TcpListener, TcpStream};
 use std::io::{Read, Write};
 use std::thread;
 use std::sync::{Arc, Mutex};
+use std::sync::mpsc::{Sender, channel};
 
 use super::command::command;
 use super::database::Database;
@@ -17,6 +18,8 @@ pub struct Server {
     pub ip: String,
     pub port: i32,
     pub db: Arc<Mutex<Database>>,
+    pub listener_channel: Option<Sender<u8>>,
+    pub listener_thread: Option<thread::JoinHandle>,
 }
 
 impl Client {
@@ -63,6 +66,8 @@ impl Server {
             ip: ip.to_string(),
             port: *port,
             db: Arc::new(Mutex::new(Database::new())),
+            listener_channel: None,
+            listener_thread: None,
         }
     }
 
@@ -72,15 +77,29 @@ impl Server {
     }
 
     pub fn run(&mut self) {
-        #![allow(unused_must_use)]
-        self.start().join();
+        self.start();
+        self.join();
     }
 
-    pub fn start(&mut self) -> thread::JoinHandle {
+    pub fn join(&mut self) {
+        #![allow(unused_must_use)]
+        match self.listener_thread.take() {
+            Some(th) => { th.join(); },
+            _ => {},
+        }
+    }
+
+    pub fn start(&mut self) {
         let listener = self.get_listener();
         let db = self.db.clone();
-        return thread::spawn(move || {
+        let (tx, rx) = channel();
+        self.listener_channel = Some(tx);
+        let th =  thread::spawn(move || {
             for stream in listener.incoming() {
+                if rx.try_recv().is_ok() {
+                    // any new message should break
+                    break;
+                }
                 match stream {
                     Ok(stream) => {
                         let db1 = db.clone();
@@ -93,10 +112,19 @@ impl Server {
                 }
             }
         });
+        self.listener_thread = Some(th);
     }
 
-    pub fn stop(&self) {
-        // TODO
+    pub fn stop(&mut self) {
+        #![allow(unused_must_use)]
+        match self.listener_channel {
+            Some(ref sender) => {
+                sender.send(0);
+                TcpStream::connect(&*format!("127.0.0.1:{}", self.port));
+            },
+            _ => {},
+        }
+        self.join();
     }
 }
 

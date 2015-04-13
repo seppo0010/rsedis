@@ -50,3 +50,30 @@ fn allow_multiwrite() {
     assert_eq!(from_utf8(&c).unwrap(), "pong\r\n");
     server.stop();
 }
+
+#[test]
+fn allow_stop() {
+    let port: i32 = 6381;
+    let mut server = Server::new("127.0.0.1", &port);
+    server.start();
+    {
+        let addr = format!("127.0.0.1:{}", port);
+        let streamres = TcpStream::connect(&*addr);
+        assert!(streamres.is_ok());
+    }
+    server.stop();
+
+    {
+        let addr = format!("127.0.0.1:{}", port);
+        let streamres = TcpStream::connect(&*addr);
+        assert!(streamres.is_err());
+    }
+
+    server.start();
+    {
+        let addr = format!("127.0.0.1:{}", port);
+        let streamres = TcpStream::connect(&*addr);
+        assert!(streamres.is_ok());
+    }
+    server.stop();
+}
