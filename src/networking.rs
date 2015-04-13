@@ -1,4 +1,4 @@
-use std::net::{TcpListener, TcpStream};
+use std::net::{Ipv4Addr, TcpListener, TcpStream};
 use std::io::{Read, Write};
 use std::thread;
 use std::sync::{Arc, Mutex};
@@ -15,7 +15,7 @@ pub struct Client {
 }
 
 pub struct Server {
-    pub ip: String,
+    pub ip: Ipv4Addr,
     pub port: u16,
     pub db: Arc<Mutex<Database>>,
     pub listener_channel: Option<Sender<u8>>,
@@ -61,9 +61,9 @@ impl Client {
 }
 
 impl Server {
-    pub fn new(ip: &str, port: u16) -> Server {
+    pub fn new(ip: Ipv4Addr, port: u16) -> Server {
         return Server {
-            ip: ip.to_string(),
+            ip: ip,
             port: port,
             db: Arc::new(Mutex::new(Database::new())),
             listener_channel: None,
@@ -72,8 +72,7 @@ impl Server {
     }
 
     fn get_listener(&self) -> TcpListener {
-        let addr: String = format!("{}:{}", self.ip, self.port);
-        return TcpListener::bind(&*addr).unwrap();
+        return TcpListener::bind((self.ip, self.port)).unwrap();
     }
 
     pub fn run(&mut self) {
@@ -128,6 +127,6 @@ impl Server {
     }
 }
 
-pub fn new_server(ip: &str, port: u16) -> Server {
+pub fn new_server(ip: Ipv4Addr, port: u16) -> Server {
     return Server::new(ip, port);
 }
