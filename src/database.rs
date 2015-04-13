@@ -23,4 +23,18 @@ impl Database {
         self.data.remove(key);
         self.data.insert(Vec::clone(key), Value::Data(value));
     }
+
+    pub fn append(&mut self, key: &Vec<u8>, value: Vec<u8>) -> usize {
+        match self.data.get_mut(key) {
+            Some(oldvalue) => {
+                match oldvalue {
+                    &mut Value::Data(ref mut data) => { data.extend(value); return data.len(); }
+                }
+            }
+            None => {}
+        }
+        let len = value.len();
+        self.set(key, value);
+        return len;
+    }
 }

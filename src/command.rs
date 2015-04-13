@@ -42,6 +42,22 @@ pub fn set(parser: &Parser, db: &mut Database) -> Response {
     return Response::Status("OK".to_string());
 }
 
+pub fn append(parser: &Parser, db: &mut Database) -> Response {
+    if parser.argc != 3 {
+        return Response::Err("Wrong number of parameters".to_string());
+    }
+    let try_key = parser.get_vec(1);
+    if try_key.is_err() {
+        return Response::Err("Invalid key".to_string());
+    }
+    let try_val = parser.get_vec(2);
+    if try_val.is_err() {
+        return Response::Err("Invalid value".to_string());
+    }
+    db.append(&try_key.unwrap(), try_val.unwrap());
+    return Response::Status("OK".to_string());
+}
+
 pub fn get(parser: &Parser, db: &mut Database) -> Response {
     if parser.argc != 2 {
         return Response::Err("Wrong number of parameters".to_string());
@@ -82,6 +98,7 @@ pub fn command(parser: &Parser, db: &mut Database) -> Response {
     }
     match try_command.unwrap() {
         "set" => return set(parser, db),
+        "append" => return append(parser, db),
         "get" => return get(parser, db),
         "ping" => return ping(parser, db),
         _ => return Response::Err("Uknown command".to_string()),
