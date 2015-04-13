@@ -16,7 +16,7 @@ pub struct Client {
 
 pub struct Server {
     pub ip: String,
-    pub port: i32,
+    pub port: u16,
     pub db: Arc<Mutex<Database>>,
     pub listener_channel: Option<Sender<u8>>,
     pub listener_thread: Option<thread::JoinHandle>,
@@ -61,10 +61,10 @@ impl Client {
 }
 
 impl Server {
-    pub fn new(ip: &str, port: &i32) -> Server {
+    pub fn new(ip: &str, port: u16) -> Server {
         return Server {
             ip: ip.to_string(),
-            port: *port,
+            port: port,
             db: Arc::new(Mutex::new(Database::new())),
             listener_channel: None,
             listener_thread: None,
@@ -128,6 +128,6 @@ impl Server {
     }
 }
 
-pub fn new_server(ip: &str, port: &i32) -> Server {
+pub fn new_server(ip: &str, port: u16) -> Server {
     return Server::new(ip, port);
 }
