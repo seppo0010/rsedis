@@ -2,7 +2,6 @@ extern crate rsedis;
 
 use std::str::FromStr;
 use std::str::from_utf8;
-use std::net::Ipv4Addr;
 use std::net::TcpStream;
 use std::io::Write;
 use std::io::Read;
@@ -13,7 +12,7 @@ use rsedis::networking::Server;
 fn parse_ping() {
     let port = 6379;
 
-    let mut server = Server::new(Ipv4Addr::from_str("127.0.0.1").unwrap(), port);
+    let mut server = Server::new(("127.0.0.1", port));
     server.start();
 
     let addr = format!("127.0.0.1:{}", port);
@@ -34,7 +33,7 @@ fn parse_ping() {
 #[test]
 fn allow_multiwrite() {
     let port = 6380;
-    let mut server = Server::new(Ipv4Addr::from_str("127.0.0.1").unwrap(), port);
+    let mut server = Server::new(("127.0.0.1", port));
     server.start();
 
     let addr = format!("127.0.0.1:{}", port);
@@ -57,7 +56,7 @@ fn allow_multiwrite() {
 #[test]
 fn allow_stop() {
     let port = 6381;
-    let mut server = Server::new(Ipv4Addr::from_str("127.0.0.1").unwrap(), port);
+    let mut server = Server::new(("127.0.0.1", port));
     server.start();
     {
         let addr = format!("127.0.0.1:{}", port);

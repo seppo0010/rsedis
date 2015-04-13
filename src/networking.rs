@@ -1,4 +1,4 @@
-use std::net::{Ipv4Addr, TcpListener, TcpStream};
+use std::net::{ToSocketAddrs, TcpListener, TcpStream};
 use std::io::{Read, Write};
 use std::thread;
 use std::sync::{Arc, Mutex};
@@ -14,9 +14,8 @@ pub struct Client {
     pub db: Arc<Mutex<Database>>
 }
 
-pub struct Server {
-    pub ip: Ipv4Addr,
-    pub port: u16,
+pub struct Server<A: ToSocketAddrs + Clone> {
+    pub addr: A,
     pub db: Arc<Mutex<Database>>,
     pub listener_channel: Option<Sender<u8>>,
     pub listener_thread: Option<thread::JoinHandle>,
@@ -60,11 +59,10 @@ impl Client {
     }
 }
 
-impl Server {
-    pub fn new(ip: Ipv4Addr, port: u16) -> Server {
+impl<A: ToSocketAddrs + Clone> Server<A> {
+    pub fn new(addr: A) -> Server<A> {
         return Server {
-            ip: ip,
-            port: port,
+            addr: addr,
             db: Arc::new(Mutex::new(Database::new())),
             listener_channel: None,
             listener_thread: None,
@@ -72,7 +70,7 @@ impl Server {
     }
 
     fn get_listener(&self) -> TcpListener {
-        return TcpListener::bind((self.ip, self.port)).unwrap();
+        return TcpListener::bind(self.addr.clone()).unwrap();
     }
 
     pub fn run(&mut self) {
@@ -119,14 +117,12 @@ impl Server {
         match self.listener_channel {
             Some(ref sender) => {
                 sender.send(0);
-                TcpStream::connect(&*format!("127.0.0.1:{}", self.port));
+                for addrs in self.addr.to_socket_addrs().unwrap() {
+                    TcpStream::connect(addrs);
+                }
             },
             _ => {},
         }
         self.join();
     }
-}
-
-pub fn new_server(ip: Ipv4Addr, port: u16) -> Server {
-    return Server::new(ip, port);
 }
