@@ -26,47 +26,42 @@ impl Response {
     }
 }
 
+macro_rules! validate {
+    ($expr: expr, $err: expr) => (
+        if !($expr) {
+            return Response::Err($err.to_string());
+        }
+    )
+}
+
+macro_rules! try_validate {
+    ($expr: expr, $err: expr) => ({
+        let res = $expr;
+        validate!(res.is_ok(), $err);
+        res.unwrap()
+    })
+}
+
 pub fn set(parser: &Parser, db: &mut Database) -> Response {
-    if parser.argc != 3 {
-        return Response::Err("Wrong number of parameters".to_string());
-    }
-    let try_key = parser.get_vec(1);
-    if try_key.is_err() {
-        return Response::Err("Invalid key".to_string());
-    }
-    let try_val = parser.get_vec(2);
-    if try_val.is_err() {
-        return Response::Err("Invalid value".to_string());
-    }
-    db.set(&try_key.unwrap(), try_val.unwrap());
+    validate!(parser.argc == 3, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let val = try_validate!(parser.get_vec(2), "Invalid value");
+    db.set(&key, val);
     return Response::Status("OK".to_string());
 }
 
 pub fn append(parser: &Parser, db: &mut Database) -> Response {
-    if parser.argc != 3 {
-        return Response::Err("Wrong number of parameters".to_string());
-    }
-    let try_key = parser.get_vec(1);
-    if try_key.is_err() {
-        return Response::Err("Invalid key".to_string());
-    }
-    let try_val = parser.get_vec(2);
-    if try_val.is_err() {
-        return Response::Err("Invalid value".to_string());
-    }
-    db.append(&try_key.unwrap(), try_val.unwrap());
+    validate!(parser.argc == 3, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let val = try_validate!(parser.get_vec(2), "Invalid value");
+    db.append(&key, val);
     return Response::Status("OK".to_string());
 }
 
 pub fn get(parser: &Parser, db: &mut Database) -> Response {
-    if parser.argc != 2 {
-        return Response::Err("Wrong number of parameters".to_string());
-    }
-    let try_key = parser.get_vec(1);
-    if try_key.is_err() {
-        return Response::Err("Invalid key".to_string());
-    }
-    let obj = db.get(&try_key.unwrap());
+    validate!(parser.argc == 2, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let obj = db.get(&key);
     match obj {
         Some(value) => {
             match value {
@@ -79,9 +74,7 @@ pub fn get(parser: &Parser, db: &mut Database) -> Response {
 
 pub fn ping(parser: &Parser, db: &mut Database) -> Response {
     #![allow(unused_variables)]
-    if parser.argc > 2 {
-        return Response::Err("Wrong number of parameters".to_string());
-    }
+    validate!(parser.argc <= 2, "Wrong number of parameters");
     if parser.argc == 2 {
         return Response::Data(parser.get_vec(1).unwrap());
     }
