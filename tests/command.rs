@@ -28,7 +28,7 @@ fn nocommand() {
     let parser = Parser::new(b"", 0, Vec::new());
     let response = command(&parser, &mut db);
     match response {
-        Response::Err(_) => {},
+        Response::Error(_) => {},
         _ => assert!(false),
     };
 }
@@ -63,4 +63,28 @@ fn get_command() {
         _ => assert!(false),
     };
     assert_eq!("value", getstr(&db, b"key"));
+}
+
+#[test]
+fn serialize_status() {
+    let response = Response::Status("OK".to_string());
+    assert_eq!(response.as_bytes(), b"+OK\r\n");
+}
+
+#[test]
+fn serialize_error() {
+    let response = Response::Error("ERR Invalid command".to_string());
+    assert_eq!(response.as_bytes(), b"-ERR Invalid command\r\n");
+}
+
+#[test]
+fn serialize_string() {
+    let response = Response::Data(b"ERR Invalid command".to_vec());
+    assert_eq!(response.as_bytes(), b"$19\r\nERR Invalid command\r\n");
+}
+
+#[test]
+fn serialize_nil() {
+    let response = Response::Nil;
+    assert_eq!(response.as_bytes(), b"$-1\r\n");
 }

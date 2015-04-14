@@ -5,22 +5,22 @@ use super::parser::Parser;
 pub enum Response {
     Nil,
     Data(Vec<u8>),
-    Err(String),
+    Error(String),
     Status(String),
 }
 
 impl Response {
     pub fn as_bytes(&self) -> Vec<u8> {
         match *self {
-            Response::Nil => return b"*-1\r\n".to_vec(),
+            Response::Nil => return b"$-1\r\n".to_vec(),
             Response::Data(ref d) => {
                 return b"$".to_vec() + format!("{}\r\n", d.len()).as_bytes() + d + format!("\r\n").as_bytes();
             }
-            Response::Err(ref d) => {
+            Response::Error(ref d) => {
                 return b"-".to_vec() + (*d).as_bytes() + format!("\r\n").as_bytes();
             }
             Response::Status(ref d) => {
-                return b"+".to_vec() + (*d).as_bytes() + format!("\r\n").as_bytes();
+                return b"+".to_vec() + format!("{}\r\n", d).as_bytes();
             }
         }
     }
@@ -29,7 +29,7 @@ impl Response {
 macro_rules! validate {
     ($expr: expr, $err: expr) => (
         if !($expr) {
-            return Response::Err($err.to_string());
+            return Response::Error($err.to_string());
         }
     )
 }
@@ -84,17 +84,17 @@ pub fn ping(parser: &Parser, db: &mut Database) -> Response {
 
 pub fn command(parser: &Parser, db: &mut Database) -> Response {
     if parser.argc == 0 {
-        return Response::Err("Not enough arguments".to_string());
+        return Response::Error("Not enough arguments".to_string());
     }
     let try_command = parser.get_str(0);
     if try_command.is_err() {
-        return Response::Err("Invalid command".to_string());
+        return Response::Error("Invalid command".to_string());
     }
     match try_command.unwrap() {
         "set" => return set(parser, db),
         "append" => return append(parser, db),
         "get" => return get(parser, db),
         "ping" => return ping(parser, db),
-        _ => return Response::Err("Uknown command".to_string()),
+        _ => return Response::Error("Uknown command".to_string()),
     };
 }
