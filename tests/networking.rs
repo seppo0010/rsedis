@@ -1,6 +1,5 @@
 extern crate rsedis;
 
-use std::str::FromStr;
 use std::str::from_utf8;
 use std::net::TcpStream;
 use std::io::Write;

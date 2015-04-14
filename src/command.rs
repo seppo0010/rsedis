@@ -66,6 +66,7 @@ pub fn get(parser: &Parser, db: &mut Database) -> Response {
         Some(value) => {
             match value {
                 &Value::Data(ref data) => return Response::Data(data.clone()),
+                &Value::Integer(ref int) => return Response::Data(format!("{}", int).into_bytes()),
             }
         }
         None => return Response::Nil,
