@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{Sender, channel};
 
 use super::command::command;
+use super::command::Response;
 use super::database::Database;
 use super::parser::parse;
 use super::parser::ParseError;
@@ -30,6 +31,22 @@ impl Client {
     }
 
     pub fn run(&mut self) {
+        #![allow(unused_must_use)]
+        let (tx, rx) = channel();
+        {
+            let mut stream = self.stream.try_clone().unwrap();
+            thread::spawn(move || {
+                loop {
+                    let try_recv = rx.recv();
+                    if try_recv.is_err() {
+                        break;
+                    }
+                    let msg:Response = try_recv.unwrap();
+                    let resp = msg.as_bytes();
+                    stream.write(&*resp);
+                }
+            });
+        }
         let mut buffer = [0u8; 512];
         loop {
             let result = self.stream.read(&mut buffer);
@@ -51,8 +68,8 @@ impl Client {
             let parser = try_parser.unwrap();
             let mut db = self.db.lock().unwrap();
             let response = command(&parser, &mut *db);
-            let writeres = self.stream.write(&*response.as_bytes());
-            if writeres.is_err() {
+            if tx.send(response).is_err() {
+                // TODO: send a kill signal to the writer thread?
                 break;
             }
         };
