@@ -46,7 +46,7 @@ pub fn set(parser: &Parser, db: &mut Database) -> Response {
     validate!(parser.argc == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let val = try_validate!(parser.get_vec(2), "Invalid value");
-    db.set(&key, val);
+    db.get_or_create(&key).set(val);
     return Response::Status("OK".to_string());
 }
 
@@ -54,7 +54,7 @@ pub fn append(parser: &Parser, db: &mut Database) -> Response {
     validate!(parser.argc == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let val = try_validate!(parser.get_vec(2), "Invalid value");
-    db.append(&key, val);
+    db.get_or_create(&key).set(val);
     return Response::Status("OK".to_string());
 }
 
@@ -67,6 +67,7 @@ pub fn get(parser: &Parser, db: &mut Database) -> Response {
             match value {
                 &Value::Data(ref data) => return Response::Data(data.clone()),
                 &Value::Integer(ref int) => return Response::Data(format!("{}", int).into_bytes()),
+                &Value::Nil => panic!("Should not have a nil"),
             }
         }
         None => return Response::Nil,

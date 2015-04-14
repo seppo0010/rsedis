@@ -15,6 +15,7 @@ fn getstr(database: &Database, key: &[u8]) -> String {
             match val {
                 &Value::Data(ref bytes) => return from_utf8(bytes).unwrap().to_string(),
                 &Value::Integer(i) => return format!("{}", i),
+                &Value::Nil => panic!("Got nil"),
             }
         },
         _ => assert!(false),
@@ -52,7 +53,7 @@ fn set_command() {
 #[test]
 fn get_command() {
     let mut db = Database::new();
-    db.set(&b"key".to_vec(), b"value".to_vec());
+    db.get_or_create(&b"key".to_vec()).set(b"value".to_vec());
     let parser = Parser::new(b"getkey", 2, vec!(
                 Argument {pos: 0, len: 3},
                 Argument {pos: 3, len: 3},

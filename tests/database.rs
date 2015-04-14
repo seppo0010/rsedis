@@ -9,7 +9,7 @@ fn set_get() {
     let key = vec![1u8];
     let value = vec![1u8, 2, 3, 4];
     let expected = Vec::clone(&value);
-    database.set(&key, value);
+    database.get_or_create(&key).set(value);
     match database.get(&key) {
         Some(val) => {
             match val {
@@ -35,10 +35,10 @@ fn get_empty() {
 fn set_set_get() {
     let mut database = Database::new();
     let key = vec![1u8];
-    database.set(&key, vec![0u8, 0, 0]);
+    database.get_or_create(&key).set(vec![0u8, 0, 0]);
     let value = vec![1u8, 2, 3, 4];
     let expected = Vec::clone(&value);
-    database.set(&key, value);
+    database.get_or_create(&key).set(value);
     match database.get(&key) {
         Some(val) => {
             match val {
@@ -54,8 +54,8 @@ fn set_set_get() {
 fn append_append_get() {
     let mut database = Database::new();
     let key = vec![1u8];
-    assert_eq!(database.append(&key, vec![0u8, 0, 0]), 3);
-    assert_eq!(database.append(&key, vec![1u8, 2, 3, 4]), 7);
+    assert_eq!(database.get_or_create(&key).append(vec![0u8, 0, 0]), 3);
+    assert_eq!(database.get_or_create(&key).append(vec![1u8, 2, 3, 4]), 7);
     match database.get(&key) {
         Some(val) => {
             match val {
@@ -72,7 +72,7 @@ fn set_number() {
     let mut database = Database::new();
     let key = vec![1u8];
     let value = b"123".to_vec();
-    database.set(&key, value);
+    database.get_or_create(&key).set(value);
     match database.get(&key) {
         Some(val) => {
             match val {
@@ -89,8 +89,8 @@ fn append_number() {
     let mut database = Database::new();
     let key = vec![1u8];
     let value = b"123".to_vec();
-    database.set(&key, value);
-    assert_eq!(database.append(&key, b"asd".to_vec()), 6);
+    database.get_or_create(&key).set(value);
+    assert_eq!(database.get_or_create(&key).append(b"asd".to_vec()), 6);
     match database.get(&key) {
         Some(val) => {
             match val {
