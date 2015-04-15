@@ -10,16 +10,16 @@ use super::database::Database;
 use super::parser::parse;
 use super::parser::ParseError;
 
-pub struct Client {
-    pub stream: TcpStream,
-    pub db: Arc<Mutex<Database>>
+struct Client {
+    stream: TcpStream,
+    db: Arc<Mutex<Database>>
 }
 
 pub struct Server<A: ToSocketAddrs + Clone> {
-    pub addr: A,
-    pub db: Arc<Mutex<Database>>,
-    pub listener_channel: Option<Sender<u8>>,
-    pub listener_thread: Option<thread::JoinHandle>,
+    addr: A,
+    db: Arc<Mutex<Database>>,
+    listener_channel: Option<Sender<u8>>,
+    listener_thread: Option<thread::JoinHandle>,
 }
 
 impl Client {

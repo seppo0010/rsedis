@@ -8,9 +8,9 @@ pub struct Argument {
 }
 
 pub struct Parser<'a> {
-    pub data: &'a[u8],
+    data: &'a[u8],
     pub argc: usize,
-    pub argv: Vec<Argument>
+    argv: Vec<Argument>
 }
 
 pub enum ParseError {
@@ -91,7 +91,7 @@ impl<'a> Error for Parser<'a> {
     fn cause(&self) -> Option<&Error> { None }
 }
 
-pub fn parse_int(input: &[u8], len: usize) -> Result<(usize, usize), ParseError> {
+fn parse_int(input: &[u8], len: usize) -> Result<(usize, usize), ParseError> {
     let mut i = 0;
     let mut argc = 0;
     while input[i] as char != '\r' {

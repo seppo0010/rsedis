@@ -42,7 +42,7 @@ macro_rules! try_validate {
     })
 }
 
-pub fn set(parser: &Parser, db: &mut Database) -> Response {
+fn set(parser: &Parser, db: &mut Database) -> Response {
     validate!(parser.argc == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let val = try_validate!(parser.get_vec(2), "Invalid value");
@@ -50,7 +50,7 @@ pub fn set(parser: &Parser, db: &mut Database) -> Response {
     return Response::Status("OK".to_string());
 }
 
-pub fn append(parser: &Parser, db: &mut Database) -> Response {
+fn append(parser: &Parser, db: &mut Database) -> Response {
     validate!(parser.argc == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let val = try_validate!(parser.get_vec(2), "Invalid value");
@@ -58,7 +58,7 @@ pub fn append(parser: &Parser, db: &mut Database) -> Response {
     return Response::Status("OK".to_string());
 }
 
-pub fn get(parser: &Parser, db: &mut Database) -> Response {
+fn get(parser: &Parser, db: &mut Database) -> Response {
     validate!(parser.argc == 2, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let obj = db.get(&key);
@@ -74,7 +74,7 @@ pub fn get(parser: &Parser, db: &mut Database) -> Response {
     }
 }
 
-pub fn ping(parser: &Parser, db: &mut Database) -> Response {
+fn ping(parser: &Parser, db: &mut Database) -> Response {
     #![allow(unused_variables)]
     validate!(parser.argc <= 2, "Wrong number of parameters");
     if parser.argc == 2 {
