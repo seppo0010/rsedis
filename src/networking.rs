@@ -19,7 +19,7 @@ pub struct Server<A: ToSocketAddrs + Clone> {
     addr: A,
     db: Arc<Mutex<Database>>,
     listener_channel: Option<Sender<u8>>,
-    listener_thread: Option<thread::JoinHandle>,
+    listener_thread: Option<thread::JoinHandle<()>>,
 }
 
 impl Client {
