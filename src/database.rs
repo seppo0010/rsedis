@@ -55,6 +55,10 @@ impl Database {
         return self.data.get(key);
     }
 
+    pub fn remove(&mut self, key: &Vec<u8>) -> Option<Value> {
+        return self.data.remove(key);
+    }
+
     pub fn get_or_create(&mut self, key: &Vec<u8>) -> &mut Value {
         if self.data.contains_key(key) {
             return self.data.get_mut(key).unwrap();

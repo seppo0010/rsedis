@@ -50,6 +50,16 @@ fn set(parser: &Parser, db: &mut Database) -> Response {
     return Response::Status("OK".to_string());
 }
 
+fn del(parser: &Parser, db: &mut Database) -> Response {
+    validate!(parser.argc == 2, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let val = db.remove(&key);
+    match val {
+        Some(_) => Response::Data(vec![49]),
+        None => Response::Data(vec![48]),
+    }
+}
+
 fn append(parser: &Parser, db: &mut Database) -> Response {
     validate!(parser.argc == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
@@ -93,6 +103,7 @@ pub fn command(parser: &Parser, db: &mut Database) -> Response {
     }
     match try_command.unwrap() {
         "set" => return set(parser, db),
+        "del" => return del(parser, db),
         "append" => return append(parser, db),
         "get" => return get(parser, db),
         "ping" => return ping(parser, db),
