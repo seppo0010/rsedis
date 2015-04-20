@@ -96,6 +96,6 @@ pub fn command(parser: &Parser, db: &mut Database) -> Response {
         "append" => return append(parser, db),
         "get" => return get(parser, db),
         "ping" => return ping(parser, db),
-        _ => return Response::Error("Uknown command".to_string()),
+        _ => return Response::Error("Unknown command".to_string()),
     };
 }
