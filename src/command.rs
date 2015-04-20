@@ -60,6 +60,12 @@ fn del(parser: &Parser, db: &mut Database) -> Response {
     }
 }
 
+fn flushall(parser: &Parser, db: &mut Database) -> Response {
+    validate!(parser.argc == 1, "Wrong number of parameters");
+    db.clear();
+    return Response::Status("OK".to_string());
+}
+
 fn append(parser: &Parser, db: &mut Database) -> Response {
     validate!(parser.argc == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
@@ -107,6 +113,7 @@ pub fn command(parser: &Parser, db: &mut Database) -> Response {
         "append" => return append(parser, db),
         "get" => return get(parser, db),
         "ping" => return ping(parser, db),
+        "flushall" => return flushall(parser, db),
         _ => return Response::Error("Unknown command".to_string()),
     };
 }
