@@ -101,3 +101,19 @@ fn append_number() {
         _ => assert!(false),
     }
 }
+
+#[test]
+fn remove_value() {
+    let mut database = Database::new();
+    let key = vec![1u8];
+    let value = vec![1u8, 2, 3, 4];
+    database.get_or_create(&key).set(value);
+    match database.remove(&key) {
+        Some(_) => {},
+        _ => assert!(false),
+    }
+    match database.remove(&key) {
+        Some(_) => assert!(false),
+        _ => {},
+    }
+}
