@@ -3,7 +3,7 @@ use std::str::from_utf8;
 
 pub enum Value {
     Nil,
-    Integer(u64),
+    Integer(i64),
     Data(Vec<u8>),
 }
 
@@ -12,7 +12,7 @@ impl Value {
         if value.len() < 32 { // ought to be enough!
             let try_utf8 = from_utf8(&*value);
             if try_utf8.is_ok() {
-                let try_parse = try_utf8.unwrap().parse::<u64>();
+                let try_parse = try_utf8.unwrap().parse::<i64>();
                 if try_parse.is_ok() {
                     *self = Value::Integer(try_parse.unwrap());
                     return;
@@ -37,6 +37,37 @@ impl Value {
                 return len;
             },
         }
+    }
+
+    pub fn incr(&mut self, incr: i64) -> Option<i64> {
+        let mut newval:i64;
+        match self {
+            &mut Value::Nil => {
+                newval = incr;
+            },
+            &mut Value::Integer(i) => {
+                // TODO: check for overflow?
+                newval = i + incr;
+            },
+            &mut Value::Data(ref data) => {
+                if data.len() > 32 {
+                    return None;
+                }
+                let res = from_utf8(&data);
+                if res.is_err() {
+                    return None;
+                }
+                let val = res.unwrap().parse::<i64>();
+                if val.is_err() {
+                    return None;
+                }
+                let ival = val.unwrap();
+                // TODO: check for overflow?
+                newval = ival + incr
+            },
+        }
+        *self = Value::Integer(newval);
+        return Some(newval);
     }
 }
 

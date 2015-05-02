@@ -76,7 +76,7 @@ fn set_number() {
     match database.get(&key) {
         Some(val) => {
             match val {
-                &Value::Integer(ref num) => assert_eq!(*num, 123u64),
+                &Value::Integer(ref num) => assert_eq!(*num, 123i64),
                 _ => assert!(false),
             }
         }
@@ -115,5 +115,49 @@ fn remove_value() {
     match database.remove(&key) {
         Some(_) => assert!(false),
         _ => {},
+    }
+}
+
+#[test]
+fn incr_str() {
+    let mut database = Database::new();
+    let key = vec![1u8];
+    let value = b"123".to_vec();
+    database.get_or_create(&key).set(value);
+    assert_eq!(database.get_or_create(&key).incr(1).unwrap(), 124);
+    match database.get(&key) {
+        Some(val) => {
+            match val {
+                &Value::Integer(i) => assert_eq!(i, 124),
+                _ => assert!(false),
+            }
+        }
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn incr_create_update() {
+    let mut database = Database::new();
+    let key = vec![1u8];
+    assert_eq!(database.get_or_create(&key).incr(124).unwrap(), 124);
+    match database.get(&key) {
+        Some(val) => {
+            match val {
+                &Value::Integer(i) => assert_eq!(i, 124),
+                _ => assert!(false),
+            }
+        }
+        _ => assert!(false),
+    }
+    assert_eq!(database.get_or_create(&key).incr(1).unwrap(), 125);
+    match database.get(&key) {
+        Some(val) => {
+            match val {
+                &Value::Integer(i) => assert_eq!(i, 125),
+                _ => assert!(false),
+            }
+        }
+        _ => assert!(false),
     }
 }

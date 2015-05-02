@@ -97,6 +97,15 @@ fn get(parser: &Parser, db: &mut Database) -> Response {
     }
 }
 
+fn incr(parser: &Parser, db: &mut Database) -> Response {
+    validate!(parser.argc == 2, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    match db.get_or_create(&key).incr(1) {
+        Some(val) => Response::Integer(val),
+        None =>  Response::Error("ERR Not an integer".to_string()),
+    }
+}
+
 fn ping(parser: &Parser, db: &mut Database) -> Response {
     #![allow(unused_variables)]
     validate!(parser.argc <= 2, "Wrong number of parameters");
@@ -119,6 +128,7 @@ pub fn command(parser: &Parser, db: &mut Database) -> Response {
         "del" => return del(parser, db),
         "append" => return append(parser, db),
         "get" => return get(parser, db),
+        "incr" => return incr(parser, db),
         "ping" => return ping(parser, db),
         "flushall" => return flushall(parser, db),
         _ => return Response::Error("Unknown command".to_string()),

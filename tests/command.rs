@@ -142,3 +142,20 @@ fn append_command() {
             _ => assert!(false),
     }
 }
+
+#[test]
+fn incr_command() {
+    let mut db = Database::new();
+    let parser = Parser::new(b"incrkey", 2, vec!(
+                Argument {pos: 0, len: 4},
+                Argument {pos: 4, len: 3},
+                ));
+    match command(&parser, &mut db) {
+        Response::Integer(i) => assert_eq!(i, 1),
+        _ => assert!(false),
+    };
+    match command(&parser, &mut db) {
+        Response::Integer(i) => assert_eq!(i, 2),
+        _ => assert!(false),
+    };
+}
