@@ -67,6 +67,22 @@ fn get_command() {
 }
 
 #[test]
+fn del_command() {
+    let mut db = Database::new();
+    db.get_or_create(&b"key".to_vec()).set(b"value".to_vec());
+    let parser = Parser::new(b"delkeykey2", 3, vec!(
+                Argument {pos: 0, len: 3},
+                Argument {pos: 3, len: 3},
+                Argument {pos: 6, len: 4},
+                ));
+    let response = command(&parser, &mut db);
+    match response {
+        Response::Integer(i) => assert_eq!(i, 1),
+        _ => assert!(false),
+    };
+}
+
+#[test]
 fn serialize_status() {
     let response = Response::Status("OK".to_string());
     assert_eq!(response.as_bytes(), b"+OK\r\n");
@@ -88,4 +104,10 @@ fn serialize_string() {
 fn serialize_nil() {
     let response = Response::Nil;
     assert_eq!(response.as_bytes(), b"$-1\r\n");
+}
+
+#[test]
+fn serialize_integer() {
+    let response = Response::Integer(123);
+    assert_eq!(response.as_bytes(), b":123\r\n");
 }

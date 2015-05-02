@@ -4,6 +4,7 @@ use super::parser::Parser;
 
 pub enum Response {
     Nil,
+    Integer(i64),
     Data(Vec<u8>),
     Error(String),
     Status(String),
@@ -15,6 +16,9 @@ impl Response {
             Response::Nil => return b"$-1\r\n".to_vec(),
             Response::Data(ref d) => {
                 return b"$".to_vec() + format!("{}\r\n", d.len()).as_bytes() + d + format!("\r\n").as_bytes();
+            }
+            Response::Integer(ref i) => {
+                return b":".to_vec() + format!("{}\r\n", i).as_bytes();
             }
             Response::Error(ref d) => {
                 return b"-".to_vec() + (*d).as_bytes() + format!("\r\n").as_bytes();
@@ -51,13 +55,16 @@ fn set(parser: &Parser, db: &mut Database) -> Response {
 }
 
 fn del(parser: &Parser, db: &mut Database) -> Response {
-    validate!(parser.argc == 2, "Wrong number of parameters");
-    let key = try_validate!(parser.get_vec(1), "Invalid key");
-    let val = db.remove(&key);
-    match val {
-        Some(_) => Response::Data(vec![49]),
-        None => Response::Data(vec![48]),
+    validate!(parser.argc >= 2, "Wrong number of parameters");
+    let mut c = 0;
+    for i in 1..parser.argc {
+        let key = try_validate!(parser.get_vec(i), "Invalid key");
+        match db.remove(&key) {
+            Some(_) => c += 1,
+            None => {},
+        }
     }
+    return Response::Integer(c);
 }
 
 fn flushall(parser: &Parser, db: &mut Database) -> Response {
