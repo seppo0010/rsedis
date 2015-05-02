@@ -111,3 +111,34 @@ fn serialize_integer() {
     let response = Response::Integer(123);
     assert_eq!(response.as_bytes(), b":123\r\n");
 }
+
+#[test]
+fn append_command() {
+    let mut db = Database::new();
+    let parser = Parser::new(b"appendkeyvalue", 3, vec!(
+                Argument {pos: 0, len: 6},
+                Argument {pos: 6, len: 3},
+                Argument {pos: 9, len: 5},
+                ));
+    let response = command(&parser, &mut db);
+    match response {
+        Response::Integer(i) => assert_eq!(i, 5),
+        _ => assert!(false),
+    };
+
+    let parser = Parser::new(b"appendkeyvalue", 3, vec!(
+                Argument {pos: 0, len: 6},
+                Argument {pos: 6, len: 3},
+                Argument {pos: 9, len: 5},
+                ));
+    let response = command(&parser, &mut db);
+    match response {
+        Response::Integer(i) => assert_eq!(i, 10),
+        _ => assert!(false),
+    };
+
+    match db.get(&b"key".to_vec()).unwrap() {
+        &Value::Data(ref val) => assert_eq!(val, b"valuevalue"),
+            _ => assert!(false),
+    }
+}

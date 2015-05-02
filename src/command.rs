@@ -77,8 +77,8 @@ fn append(parser: &Parser, db: &mut Database) -> Response {
     validate!(parser.argc == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let val = try_validate!(parser.get_vec(2), "Invalid value");
-    db.get_or_create(&key).set(val);
-    return Response::Status("OK".to_string());
+    let len = db.get_or_create(&key).append(val);
+    return Response::Integer(len as i64);
 }
 
 fn get(parser: &Parser, db: &mut Database) -> Response {
