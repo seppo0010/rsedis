@@ -97,13 +97,36 @@ fn get(parser: &Parser, db: &mut Database) -> Response {
     }
 }
 
-fn incr(parser: &Parser, db: &mut Database) -> Response {
-    validate!(parser.argc == 2, "Wrong number of parameters");
+fn generic_incr(parser: &Parser, db: &mut Database, increment: i64) -> Response {
     let key = try_validate!(parser.get_vec(1), "Invalid key");
-    match db.get_or_create(&key).incr(1) {
+    match db.get_or_create(&key).incr(increment) {
         Some(val) => Response::Integer(val),
         None =>  Response::Error("ERR Not an integer".to_string()),
     }
+}
+
+fn incr(parser: &Parser, db: &mut Database) -> Response {
+    validate!(parser.argc == 2, "Wrong number of parameters");
+    return generic_incr(parser, db, 1);
+}
+
+fn decr(parser: &Parser, db: &mut Database) -> Response {
+    validate!(parser.argc == 2, "Wrong number of parameters");
+    return generic_incr(parser, db, -1);
+}
+
+fn incrby(parser: &Parser, db: &mut Database) -> Response {
+    validate!(parser.argc == 3, "Wrong number of parameters");
+    let try_increment = parser.get_i64(2);
+    if try_increment.is_err() { return Response::Error("Invalid increment".to_string()); }
+    return generic_incr(parser, db, try_increment.unwrap());
+}
+
+fn decrby(parser: &Parser, db: &mut Database) -> Response {
+    validate!(parser.argc == 3, "Wrong number of parameters");
+    let try_increment = parser.get_i64(2);
+    if try_increment.is_err() { return Response::Error("Invalid decrement".to_string()); }
+    return generic_incr(parser, db, -try_increment.unwrap());
 }
 
 fn ping(parser: &Parser, db: &mut Database) -> Response {
@@ -129,6 +152,9 @@ pub fn command(parser: &Parser, db: &mut Database) -> Response {
         "append" => return append(parser, db),
         "get" => return get(parser, db),
         "incr" => return incr(parser, db),
+        "decr" => return decr(parser, db),
+        "incrby" => return incrby(parser, db),
+        "decrby" => return decrby(parser, db),
         "ping" => return ping(parser, db),
         "flushall" => return flushall(parser, db),
         _ => return Response::Error("Unknown command".to_string()),

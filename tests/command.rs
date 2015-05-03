@@ -159,3 +159,56 @@ fn incr_command() {
         _ => assert!(false),
     };
 }
+
+#[test]
+fn incrby_command() {
+    let mut db = Database::new();
+    let parser = Parser::new(b"incrbykey5", 3, vec!(
+                Argument {pos: 0, len: 6},
+                Argument {pos: 6, len: 3},
+                Argument {pos: 9, len: 1},
+                ));
+    match command(&parser, &mut db) {
+        Response::Integer(i) => assert_eq!(i, 5),
+        _ => assert!(false),
+    };
+    match command(&parser, &mut db) {
+        Response::Integer(i) => assert_eq!(i, 10),
+        _ => assert!(false),
+    };
+}
+
+#[test]
+fn decr_command() {
+    let mut db = Database::new();
+    let parser = Parser::new(b"decrkey", 2, vec!(
+                Argument {pos: 0, len: 4},
+                Argument {pos: 4, len: 3},
+                ));
+    match command(&parser, &mut db) {
+        Response::Integer(i) => assert_eq!(i, -1),
+        _ => assert!(false),
+    };
+    match command(&parser, &mut db) {
+        Response::Integer(i) => assert_eq!(i, -2),
+        _ => assert!(false),
+    };
+}
+
+#[test]
+fn decrby_command() {
+    let mut db = Database::new();
+    let parser = Parser::new(b"decrbykey5", 3, vec!(
+                Argument {pos: 0, len: 6},
+                Argument {pos: 6, len: 3},
+                Argument {pos: 9, len: 1},
+                ));
+    match command(&parser, &mut db) {
+        Response::Integer(i) => assert_eq!(i, -5),
+        _ => assert!(false),
+    };
+    match command(&parser, &mut db) {
+        Response::Integer(i) => assert_eq!(i, -10),
+        _ => assert!(false),
+    };
+}

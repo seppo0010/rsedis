@@ -49,6 +49,18 @@ impl<'a> Parser<'a> {
         };
     }
 
+    pub fn get_i64(&self, pos: usize) -> Result<i64, i32> {
+        let try_str = self.get_str(pos);
+        if try_str.is_err() {
+            return Err(try_str.unwrap_err());
+        }
+        let val = try_str.unwrap().parse::<i64>();
+        if val.is_err() {
+            return Err(2);
+        }
+        return Ok(val.unwrap());
+    }
+
     pub fn get_str(&self, pos: usize) -> Result<&str, i32> {
         let data = try!(self.get_slice(pos));
         let res = from_utf8(&data);
