@@ -1,5 +1,7 @@
 extern crate rsedis;
 
+use std;
+
 use rsedis::database::Database;
 use rsedis::database::Value;
 
@@ -160,4 +162,13 @@ fn incr_create_update() {
         }
         _ => assert!(false),
     }
+}
+
+#[test]
+fn incr_overflow() {
+    let mut database = Database::new();
+    let key = vec![1u8];
+    let value = format!("{}", std::i64::MAX).into_bytes();
+    database.get_or_create(&key).set(value);
+    assert_eq!(database.get_or_create(&key).incr(1), None);
 }

@@ -46,8 +46,11 @@ impl Value {
                 newval = incr;
             },
             &mut Value::Integer(i) => {
-                // TODO: check for overflow?
-                newval = i + incr;
+                let tmp_newval = i.checked_add(incr);
+                match tmp_newval {
+                    Some(v) => newval = v,
+                    None => return None,
+                }
             },
             &mut Value::Data(ref data) => {
                 if data.len() > 32 {
@@ -62,8 +65,11 @@ impl Value {
                     return None;
                 }
                 let ival = val.unwrap();
-                // TODO: check for overflow?
-                newval = ival + incr
+                let tmp_newval = ival.checked_add(incr);
+                match tmp_newval {
+                    Some(v) => newval = v,
+                    None => return None,
+                }
             },
         }
         *self = Value::Integer(newval);
