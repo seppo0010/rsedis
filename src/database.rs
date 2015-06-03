@@ -185,6 +185,10 @@ impl Database {
         return self.data.get(key);
     }
 
+    pub fn get_mut(&mut self, key: &Vec<u8>) -> Option<&mut Value> {
+        return self.data.get_mut(key);
+    }
+
     pub fn remove(&mut self, key: &Vec<u8>) -> Option<Value> {
         return self.data.remove(key);
     }

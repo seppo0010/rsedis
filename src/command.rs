@@ -154,14 +154,17 @@ fn rpush(parser: &Parser, db: &mut Database) -> Response {
 fn generic_pop(parser: &Parser, db: &mut Database, right: bool) -> Response {
     validate!(parser.argc == 2, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
-    return match db.get_or_create(&key).pop(right) {
-        Ok(el) => {
-            match el {
-                Some(val) => Response::Data(val),
-                None => Response::Nil,
+    return match db.get_mut(&key) {
+        Some(mut list) => match list.pop(right) {
+            Ok(el) => {
+                match el {
+                    Some(val) => Response::Data(val),
+                    None => Response::Nil,
+                }
             }
-        }
-        Err(err) => Response::Error(err.to_string()),
+            Err(err) => Response::Error(err.to_string()),
+        },
+        None => Response::Nil,
     }
 }
 
