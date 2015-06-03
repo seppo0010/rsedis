@@ -149,6 +149,25 @@ impl Value {
         }
         return Ok(el);
     }
+
+    pub fn lindex(&self, _index: i64) -> Result<Option<&Vec<u8>>, OperationError> {
+        return match self {
+            &Value::List(ref list) => {
+                let index;
+                let len = list.len() as i64;
+                if _index < 0 {
+                    index = len + _index;
+                } else {
+                    index = _index;
+                }
+                if index < 0 || index >= len {
+                    return Ok(None);
+                }
+                return Ok(list.iter().nth(index as usize));
+            },
+            _ => Err(OperationError::WrongTypeError),
+        }
+    }
 }
 
 pub struct Database {

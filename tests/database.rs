@@ -228,3 +228,29 @@ fn lpop() {
     let v0 = database.get_or_create(&key).pop(false).unwrap();
     assert_eq!(v0, None);
 }
+
+#[test]
+fn lindex() {
+    let mut database = Database::new();
+    let key = vec![1u8];
+    let value = vec![1u8, 2, 3, 4];
+    let expected = Vec::clone(&value);
+    let value2 = vec![1u8, 5, 6, 7];
+    let expected2 = Vec::clone(&value2);
+    let el = database.get_or_create(&key);
+    assert!(el.push(value, false).is_ok());
+    assert!(el.push(value2, false).is_ok());
+    let v2 = el.lindex(0).unwrap();
+    assert_eq!(v2, Some(&expected2));
+    let v1 = el.lindex(1).unwrap();
+    assert_eq!(v1, Some(&expected));
+    let v0 = el.lindex(2).unwrap();
+    assert_eq!(v0, None);
+
+    let v21 = el.lindex(-2).unwrap();
+    assert_eq!(v21, Some(&expected2));
+    let v11 = el.lindex(-1).unwrap();
+    assert_eq!(v11, Some(&expected));
+    let v01 = el.lindex(-3).unwrap();
+    assert_eq!(v01, None);
+}
