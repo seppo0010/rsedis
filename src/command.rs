@@ -176,6 +176,24 @@ fn rpop(parser: &Parser, db: &mut Database) -> Response {
     return generic_pop(parser, db, true);
 }
 
+fn lindex(parser: &Parser, db: &mut Database) -> Response {
+    validate!(parser.argc == 3, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let index = try_validate!(parser.get_i64(2), "Invalid index");
+    return match db.get(&key) {
+        Some(el) => match el.lindex(index) {
+            Ok(el) => {
+                match el {
+                    Some(val) => Response::Data(val.clone()),
+                    None => Response::Nil,
+                }
+            }
+            Err(err) => Response::Error(err.to_string()),
+        },
+        None => Response::Nil,
+    }
+}
+
 fn ping(parser: &Parser, db: &mut Database) -> Response {
     #![allow(unused_variables)]
     validate!(parser.argc <= 2, "Wrong number of parameters");
@@ -208,6 +226,7 @@ pub fn command(parser: &Parser, db: &mut Database) -> Response {
         "rpush" => return rpush(parser, db),
         "lpop" => return lpop(parser, db),
         "rpop" => return rpop(parser, db),
+        "lindex" => return lindex(parser, db),
         _ => return Response::Error("Unknown command".to_string()),
     };
 }

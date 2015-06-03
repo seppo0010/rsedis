@@ -326,3 +326,35 @@ fn rpop_command() {
         };
     }
 }
+
+#[test]
+fn lindex_command() {
+    let mut db = Database::new();
+    {
+        let parser = Parser::new(b"rpushkeyvalue", 3, vec!(
+                    Argument {pos: 0, len: 5},
+                    Argument {pos: 5, len: 3},
+                    Argument {pos: 8, len: 5},
+                    ));
+        command(&parser, &mut db);
+    }
+    {
+        let parser = Parser::new(b"rpushkeyvaluf", 3, vec!(
+                    Argument {pos: 0, len: 5},
+                    Argument {pos: 5, len: 3},
+                    Argument {pos: 8, len: 5},
+                    ));
+        command(&parser, &mut db);
+    }
+    {
+        let parser = Parser::new(b"lindexkey0", 3, vec!(
+                    Argument {pos: 0, len: 6},
+                    Argument {pos: 6, len: 3},
+                    Argument {pos: 9, len: 1},
+                    ));
+        match command(&parser, &mut db) {
+            Response::Data(d) => assert_eq!(d, "value".to_string().into_bytes()),
+            _ => assert!(false),
+        };
+    }
+}
