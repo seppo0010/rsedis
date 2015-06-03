@@ -15,16 +15,16 @@ impl Response {
         match *self {
             Response::Nil => return b"$-1\r\n".to_vec(),
             Response::Data(ref d) => {
-                return b"$".to_vec() + format!("{}\r\n", d.len()).as_bytes() + d + format!("\r\n").as_bytes();
+                return [&b"$"[..], &format!("{}\r\n", d.len()).into_bytes()[..], &d[..], &"\r\n".to_string().into_bytes()[..]].concat();
             }
             Response::Integer(ref i) => {
-                return b":".to_vec() + format!("{}\r\n", i).as_bytes();
+                return [&b":"[..], &format!("{}\r\n", i).into_bytes()[..]].concat();
             }
             Response::Error(ref d) => {
-                return b"-".to_vec() + (*d).as_bytes() + format!("\r\n").as_bytes();
+                return [&b"-"[..], (*d).as_bytes(), &"\r\n".to_string().into_bytes()[..]].concat();
             }
             Response::Status(ref d) => {
-                return b"+".to_vec() + format!("{}\r\n", d).as_bytes();
+                return [&b"+"[..], (*d).as_bytes(), &"\r\n".to_string().into_bytes()[..]].concat();
             }
         }
     }

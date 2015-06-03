@@ -33,7 +33,7 @@ impl Value {
             &mut Value::Integer(i) => {
                 let oldstr = format!("{}", i);
                 let len = oldstr.len() + value.len();
-                *self = Value::Data(oldstr.into_bytes() + &*value);
+                *self = Value::Data([oldstr.into_bytes(), value].concat());
                 return len;
             },
         }
