@@ -212,3 +212,39 @@ fn decrby_command() {
         _ => assert!(false),
     };
 }
+
+#[test]
+fn lpush_command() {
+    let mut db = Database::new();
+    let parser = Parser::new(b"lpushkeyvalue", 3, vec!(
+                Argument {pos: 0, len: 5},
+                Argument {pos: 5, len: 3},
+                Argument {pos: 8, len: 5},
+                ));
+    match command(&parser, &mut db) {
+        Response::Integer(i) => assert_eq!(i, 1),
+        _ => assert!(false),
+    };
+    match command(&parser, &mut db) {
+        Response::Integer(i) => assert_eq!(i, 2),
+        _ => assert!(false),
+    };
+}
+
+#[test]
+fn rpush_command() {
+    let mut db = Database::new();
+    let parser = Parser::new(b"rpushkeyvalue", 3, vec!(
+                Argument {pos: 0, len: 5},
+                Argument {pos: 5, len: 3},
+                Argument {pos: 8, len: 5},
+                ));
+    match command(&parser, &mut db) {
+        Response::Integer(i) => assert_eq!(i, 1),
+        _ => assert!(false),
+    };
+    match command(&parser, &mut db) {
+        Response::Integer(i) => assert_eq!(i, 2),
+        _ => assert!(false),
+    };
+}

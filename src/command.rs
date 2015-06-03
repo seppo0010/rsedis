@@ -133,6 +133,24 @@ fn decrby(parser: &Parser, db: &mut Database) -> Response {
     return generic_incr(parser, db, -try_increment.unwrap());
 }
 
+fn generic_push(parser: &Parser, db: &mut Database, right: bool) -> Response {
+    validate!(parser.argc == 3, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let val = try_validate!(parser.get_vec(2), "Invalid value");
+    return match db.get_or_create(&key).push(val, right) {
+        Ok(listsize) => Response::Integer(listsize as i64),
+        Err(err) => Response::Error(err.to_string()),
+    }
+}
+
+fn lpush(parser: &Parser, db: &mut Database) -> Response {
+    return generic_push(parser, db, false);
+}
+
+fn rpush(parser: &Parser, db: &mut Database) -> Response {
+    return generic_push(parser, db, true);
+}
+
 fn ping(parser: &Parser, db: &mut Database) -> Response {
     #![allow(unused_variables)]
     validate!(parser.argc <= 2, "Wrong number of parameters");
@@ -161,6 +179,8 @@ pub fn command(parser: &Parser, db: &mut Database) -> Response {
         "decrby" => return decrby(parser, db),
         "ping" => return ping(parser, db),
         "flushall" => return flushall(parser, db),
+        "lpush" => return lpush(parser, db),
+        "rpush" => return rpush(parser, db),
         _ => return Response::Error("Unknown command".to_string()),
     };
 }
