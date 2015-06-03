@@ -15,7 +15,7 @@ fn getstr(database: &Database, key: &[u8]) -> String {
             match val {
                 &Value::Data(ref bytes) => return from_utf8(bytes).unwrap().to_string(),
                 &Value::Integer(i) => return format!("{}", i),
-                &Value::Nil => panic!("Got nil"),
+                _ => panic!("Got non-string"),
             }
         },
         _ => assert!(false),

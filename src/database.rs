@@ -1,6 +1,7 @@
 use std::fmt;
 use std::error::Error;
 use std::collections::HashMap;
+use std::collections::LinkedList;
 use std::str::from_utf8;
 use std::str::Utf8Error;
 use std::num::ParseIntError;
@@ -9,12 +10,14 @@ pub enum Value {
     Nil,
     Integer(i64),
     Data(Vec<u8>),
+    List(LinkedList<Vec<u8>>),
 }
 
 #[derive(Debug)]
 pub enum OperationError {
     OverflowError,
     ValueError,
+    WrongTypeError,
 }
 
 impl fmt::Display for OperationError {
@@ -67,6 +70,7 @@ impl Value {
                 *self = Value::Data([oldstr.into_bytes(), value].concat());
                 return Ok(len);
             },
+            _ => return Err(OperationError::WrongTypeError),
         }
     }
 
@@ -95,9 +99,32 @@ impl Value {
                     None => return Err(OperationError::OverflowError),
                 }
             },
+            _ => return Err(OperationError::WrongTypeError),
         }
         *self = Value::Integer(newval);
         return Ok(newval);
+    }
+
+    pub fn push(&mut self, el: Vec<u8>, right: bool) -> Result<usize, OperationError> {
+        let listsize;
+        match self {
+            &mut Value::Nil => {
+                let mut list = LinkedList::new();
+                list.push_back(el);
+                *self = Value::List(list);
+                listsize = 1;
+            },
+            &mut Value::List(ref mut list) => {
+                if right {
+                    list.push_back(el);
+                } else {
+                    list.push_front(el);
+                }
+                listsize = list.len();
+            }
+            _ => return Err(OperationError::WrongTypeError),
+        }
+        return Ok(listsize);
     }
 }
 

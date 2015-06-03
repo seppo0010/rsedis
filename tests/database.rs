@@ -172,3 +172,41 @@ fn incr_overflow() {
     assert!(database.get_or_create(&key).set(value).is_ok());
     assert!(database.get_or_create(&key).incr(1).is_err());
 }
+
+#[test]
+fn lpush() {
+    let mut database = Database::new();
+    let key = vec![1u8];
+    let value = vec![1u8, 2, 3, 4];
+    let expected = Vec::clone(&value);
+    let value2 = vec![1u8, 5, 6, 7];
+    let expected2 = Vec::clone(&value2);
+    assert!(database.get_or_create(&key).push(value, false).is_ok());
+    match database.get(&key) {
+        Some(val) => {
+            match val {
+                &Value::List(ref list) => {
+                    assert_eq!(list.len(), 1);
+                    assert_eq!(list.front(), Some(&expected));
+                }
+                _ => assert!(false),
+            }
+        }
+        _ => assert!(false),
+    }
+
+    assert!(database.get_or_create(&key).push(value2, false).is_ok());
+    match database.get(&key) {
+        Some(val) => {
+            match val {
+                &Value::List(ref list) => {
+                    assert_eq!(list.len(), 2);
+                    assert_eq!(list.back(), Some(&expected));
+                    assert_eq!(list.front(), Some(&expected2));
+                }
+                _ => assert!(false),
+            }
+        }
+        _ => assert!(false),
+    }
+}

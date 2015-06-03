@@ -94,7 +94,7 @@ fn get(parser: &Parser, db: &mut Database) -> Response {
             match value {
                 &Value::Data(ref data) => return Response::Data(data.clone()),
                 &Value::Integer(ref int) => return Response::Data(format!("{}", int).into_bytes()),
-                &Value::Nil => panic!("Should not have a nil"),
+                _ => panic!("Should be an integer or data"),
             }
         }
         None => return Response::Nil,
