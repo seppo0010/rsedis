@@ -53,7 +53,7 @@ fn set_command() {
 #[test]
 fn get_command() {
     let mut db = Database::new();
-    db.get_or_create(&b"key".to_vec()).set(b"value".to_vec());
+    assert!(db.get_or_create(&b"key".to_vec()).set(b"value".to_vec()).is_ok());
     let parser = Parser::new(b"getkey", 2, vec!(
                 Argument {pos: 0, len: 3},
                 Argument {pos: 3, len: 3},
@@ -69,7 +69,7 @@ fn get_command() {
 #[test]
 fn del_command() {
     let mut db = Database::new();
-    db.get_or_create(&b"key".to_vec()).set(b"value".to_vec());
+    assert!(db.get_or_create(&b"key".to_vec()).set(b"value".to_vec()).is_ok());
     let parser = Parser::new(b"delkeykey2", 3, vec!(
                 Argument {pos: 0, len: 3},
                 Argument {pos: 3, len: 3},

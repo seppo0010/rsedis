@@ -11,7 +11,7 @@ fn set_get() {
     let key = vec![1u8];
     let value = vec![1u8, 2, 3, 4];
     let expected = Vec::clone(&value);
-    database.get_or_create(&key).set(value);
+    assert!(database.get_or_create(&key).set(value).is_ok());
     match database.get(&key) {
         Some(val) => {
             match val {
@@ -37,10 +37,10 @@ fn get_empty() {
 fn set_set_get() {
     let mut database = Database::new();
     let key = vec![1u8];
-    database.get_or_create(&key).set(vec![0u8, 0, 0]);
+    assert!(database.get_or_create(&key).set(vec![0u8, 0, 0]).is_ok());
     let value = vec![1u8, 2, 3, 4];
     let expected = Vec::clone(&value);
-    database.get_or_create(&key).set(value);
+    assert!(database.get_or_create(&key).set(value).is_ok());
     match database.get(&key) {
         Some(val) => {
             match val {
@@ -56,8 +56,8 @@ fn set_set_get() {
 fn append_append_get() {
     let mut database = Database::new();
     let key = vec![1u8];
-    assert_eq!(database.get_or_create(&key).append(vec![0u8, 0, 0]), 3);
-    assert_eq!(database.get_or_create(&key).append(vec![1u8, 2, 3, 4]), 7);
+    assert_eq!(database.get_or_create(&key).append(vec![0u8, 0, 0]).unwrap(), 3);
+    assert_eq!(database.get_or_create(&key).append(vec![1u8, 2, 3, 4]).unwrap(), 7);
     match database.get(&key) {
         Some(val) => {
             match val {
@@ -74,7 +74,7 @@ fn set_number() {
     let mut database = Database::new();
     let key = vec![1u8];
     let value = b"123".to_vec();
-    database.get_or_create(&key).set(value);
+    assert!(database.get_or_create(&key).set(value).is_ok());
     match database.get(&key) {
         Some(val) => {
             match val {
@@ -91,8 +91,8 @@ fn append_number() {
     let mut database = Database::new();
     let key = vec![1u8];
     let value = b"123".to_vec();
-    database.get_or_create(&key).set(value);
-    assert_eq!(database.get_or_create(&key).append(b"asd".to_vec()), 6);
+    assert!(database.get_or_create(&key).set(value).is_ok());
+    assert_eq!(database.get_or_create(&key).append(b"asd".to_vec()).unwrap(), 6);
     match database.get(&key) {
         Some(val) => {
             match val {
@@ -109,7 +109,7 @@ fn remove_value() {
     let mut database = Database::new();
     let key = vec![1u8];
     let value = vec![1u8, 2, 3, 4];
-    database.get_or_create(&key).set(value);
+    assert!(database.get_or_create(&key).set(value).is_ok());
     match database.remove(&key) {
         Some(_) => {},
         _ => assert!(false),
@@ -125,7 +125,7 @@ fn incr_str() {
     let mut database = Database::new();
     let key = vec![1u8];
     let value = b"123".to_vec();
-    database.get_or_create(&key).set(value);
+    assert!(database.get_or_create(&key).set(value).is_ok());
     assert_eq!(database.get_or_create(&key).incr(1).unwrap(), 124);
     match database.get(&key) {
         Some(val) => {
@@ -169,6 +169,6 @@ fn incr_overflow() {
     let mut database = Database::new();
     let key = vec![1u8];
     let value = format!("{}", std::i64::MAX).into_bytes();
-    database.get_or_create(&key).set(value);
-    assert_eq!(database.get_or_create(&key).incr(1), None);
+    assert!(database.get_or_create(&key).set(value).is_ok());
+    assert!(database.get_or_create(&key).incr(1).is_err());
 }

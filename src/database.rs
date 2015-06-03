@@ -1,5 +1,9 @@
+use std::fmt;
+use std::error::Error;
 use std::collections::HashMap;
 use std::str::from_utf8;
+use std::str::Utf8Error;
+use std::num::ParseIntError;
 
 pub enum Value {
     Nil,
@@ -7,39 +11,66 @@ pub enum Value {
     Data(Vec<u8>),
 }
 
+#[derive(Debug)]
+pub enum OperationError {
+    OverflowError,
+    ValueError,
+}
+
+impl fmt::Display for OperationError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.description().fmt(f)
+    }
+}
+
+impl Error for OperationError {
+    fn description(&self) -> &str {
+        return "oops";
+    }
+}
+
+impl From<Utf8Error> for OperationError {
+    fn from(_: Utf8Error) -> OperationError { OperationError::ValueError }
+}
+
+impl From<ParseIntError> for OperationError {
+    fn from(_: ParseIntError) -> OperationError { OperationError::ValueError }
+}
+
 impl Value {
-    pub fn set(&mut self, value: Vec<u8>) {
+    pub fn set(&mut self, value: Vec<u8>) -> Result<(), OperationError> {
         if value.len() < 32 { // ought to be enough!
             let try_utf8 = from_utf8(&*value);
             if try_utf8.is_ok() {
                 let try_parse = try_utf8.unwrap().parse::<i64>();
                 if try_parse.is_ok() {
                     *self = Value::Integer(try_parse.unwrap());
-                    return;
+                    return Ok(());
                 }
             }
         }
         *self = Value::Data(value);
+        return Ok(());
     }
 
-    pub fn append(&mut self, value: Vec<u8>) -> usize {
+    pub fn append(&mut self, value: Vec<u8>) -> Result<usize, OperationError> {
         match self {
             &mut Value::Nil => {
                 let len = value.len();
                 *self = Value::Data(value);
-                return len;
+                return Ok(len);
             },
-            &mut Value::Data(ref mut data) => { data.extend(value); return data.len(); },
+            &mut Value::Data(ref mut data) => { data.extend(value); return Ok(data.len()); },
             &mut Value::Integer(i) => {
                 let oldstr = format!("{}", i);
                 let len = oldstr.len() + value.len();
                 *self = Value::Data([oldstr.into_bytes(), value].concat());
-                return len;
+                return Ok(len);
             },
         }
     }
 
-    pub fn incr(&mut self, incr: i64) -> Option<i64> {
+    pub fn incr(&mut self, incr: i64) -> Result<i64, OperationError> {
         let mut newval:i64;
         match self {
             &mut Value::Nil => {
@@ -49,31 +80,24 @@ impl Value {
                 let tmp_newval = i.checked_add(incr);
                 match tmp_newval {
                     Some(v) => newval = v,
-                    None => return None,
+                    None => return Err(OperationError::OverflowError),
                 }
             },
             &mut Value::Data(ref data) => {
                 if data.len() > 32 {
-                    return None;
+                    return Err(OperationError::OverflowError);
                 }
-                let res = from_utf8(&data);
-                if res.is_err() {
-                    return None;
-                }
-                let val = res.unwrap().parse::<i64>();
-                if val.is_err() {
-                    return None;
-                }
-                let ival = val.unwrap();
+                let res = try!(from_utf8(&data));
+                let ival = try!(res.parse::<i64>());
                 let tmp_newval = ival.checked_add(incr);
                 match tmp_newval {
                     Some(v) => newval = v,
-                    None => return None,
+                    None => return Err(OperationError::OverflowError),
                 }
             },
         }
         *self = Value::Integer(newval);
-        return Some(newval);
+        return Ok(newval);
     }
 }
 

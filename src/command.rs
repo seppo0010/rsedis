@@ -50,8 +50,10 @@ fn set(parser: &Parser, db: &mut Database) -> Response {
     validate!(parser.argc == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let val = try_validate!(parser.get_vec(2), "Invalid value");
-    db.get_or_create(&key).set(val);
-    return Response::Status("OK".to_string());
+    return match db.get_or_create(&key).set(val) {
+        Ok(_) => Response::Status("OK".to_string()),
+        Err(err) => Response::Error(err.to_string()),
+    }
 }
 
 fn del(parser: &Parser, db: &mut Database) -> Response {
@@ -77,8 +79,10 @@ fn append(parser: &Parser, db: &mut Database) -> Response {
     validate!(parser.argc == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let val = try_validate!(parser.get_vec(2), "Invalid value");
-    let len = db.get_or_create(&key).append(val);
-    return Response::Integer(len as i64);
+    return match db.get_or_create(&key).append(val) {
+        Ok(len) => Response::Integer(len as i64),
+        Err(err) => Response::Error(err.to_string()),
+    }
 }
 
 fn get(parser: &Parser, db: &mut Database) -> Response {
@@ -100,8 +104,8 @@ fn get(parser: &Parser, db: &mut Database) -> Response {
 fn generic_incr(parser: &Parser, db: &mut Database, increment: i64) -> Response {
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     match db.get_or_create(&key).incr(increment) {
-        Some(val) => Response::Integer(val),
-        None =>  Response::Error("ERR Not an integer".to_string()),
+        Ok(val) => Response::Integer(val),
+        Err(err) =>  Response::Error(err.to_string()),
     }
 }
 
