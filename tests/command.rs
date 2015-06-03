@@ -248,3 +248,81 @@ fn rpush_command() {
         _ => assert!(false),
     };
 }
+
+#[test]
+fn lpop_command() {
+    let mut db = Database::new();
+    {
+        let parser = Parser::new(b"rpushkeyvalue", 3, vec!(
+                    Argument {pos: 0, len: 5},
+                    Argument {pos: 5, len: 3},
+                    Argument {pos: 8, len: 5},
+                    ));
+        command(&parser, &mut db);
+    }
+    {
+        let parser = Parser::new(b"rpushkeyvaluf", 3, vec!(
+                    Argument {pos: 0, len: 5},
+                    Argument {pos: 5, len: 3},
+                    Argument {pos: 8, len: 5},
+                    ));
+        command(&parser, &mut db);
+    }
+    {
+        let parser = Parser::new(b"lpopkeyvalue", 2, vec!(
+                    Argument {pos: 0, len: 4},
+                    Argument {pos: 4, len: 3},
+                    ));
+        match command(&parser, &mut db) {
+            Response::Data(d) => assert_eq!(d, "value".to_string().into_bytes()),
+            _ => assert!(false),
+        };
+        match command(&parser, &mut db) {
+            Response::Data(d) => assert_eq!(d, "valuf".to_string().into_bytes()),
+            _ => assert!(false),
+        };
+        match command(&parser, &mut db) {
+            Response::Nil => {},
+            _ => assert!(false),
+        };
+    }
+}
+
+#[test]
+fn rpop_command() {
+    let mut db = Database::new();
+    {
+        let parser = Parser::new(b"rpushkeyvalue", 3, vec!(
+                    Argument {pos: 0, len: 5},
+                    Argument {pos: 5, len: 3},
+                    Argument {pos: 8, len: 5},
+                    ));
+        command(&parser, &mut db);
+    }
+    {
+        let parser = Parser::new(b"rpushkeyvaluf", 3, vec!(
+                    Argument {pos: 0, len: 5},
+                    Argument {pos: 5, len: 3},
+                    Argument {pos: 8, len: 5},
+                    ));
+        command(&parser, &mut db);
+    }
+    {
+        let parser = Parser::new(b"rpopkeyvalue", 2, vec!(
+                    Argument {pos: 0, len: 4},
+                    Argument {pos: 4, len: 3},
+                    ));
+        match command(&parser, &mut db) {
+            Response::Data(d) => assert_eq!(d, "valuf".to_string().into_bytes()),
+            _ => assert!(false),
+        };
+        match command(&parser, &mut db) {
+            Response::Data(d) => assert_eq!(d, "value".to_string().into_bytes()),
+            _ => assert!(false),
+        };
+        match command(&parser, &mut db) {
+            Response::Nil => {},
+            _ => assert!(false),
+        };
+    }
+}

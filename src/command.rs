@@ -151,6 +151,28 @@ fn rpush(parser: &Parser, db: &mut Database) -> Response {
     return generic_push(parser, db, true);
 }
 
+fn generic_pop(parser: &Parser, db: &mut Database, right: bool) -> Response {
+    validate!(parser.argc == 2, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    return match db.get_or_create(&key).pop(right) {
+        Ok(el) => {
+            match el {
+                Some(val) => Response::Data(val),
+                None => Response::Nil,
+            }
+        }
+        Err(err) => Response::Error(err.to_string()),
+    }
+}
+
+fn lpop(parser: &Parser, db: &mut Database) -> Response {
+    return generic_pop(parser, db, false);
+}
+
+fn rpop(parser: &Parser, db: &mut Database) -> Response {
+    return generic_pop(parser, db, true);
+}
+
 fn ping(parser: &Parser, db: &mut Database) -> Response {
     #![allow(unused_variables)]
     validate!(parser.argc <= 2, "Wrong number of parameters");
@@ -181,6 +203,8 @@ pub fn command(parser: &Parser, db: &mut Database) -> Response {
         "flushall" => return flushall(parser, db),
         "lpush" => return lpush(parser, db),
         "rpush" => return rpush(parser, db),
+        "lpop" => return lpop(parser, db),
+        "rpop" => return rpop(parser, db),
         _ => return Response::Error("Unknown command".to_string()),
     };
 }
