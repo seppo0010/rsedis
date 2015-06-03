@@ -210,3 +210,21 @@ fn lpush() {
         _ => assert!(false),
     }
 }
+
+#[test]
+fn lpop() {
+    let mut database = Database::new();
+    let key = vec![1u8];
+    let value = vec![1u8, 2, 3, 4];
+    let expected = Vec::clone(&value);
+    let value2 = vec![1u8, 5, 6, 7];
+    let expected2 = Vec::clone(&value2);
+    assert!(database.get_or_create(&key).push(value, false).is_ok());
+    assert!(database.get_or_create(&key).push(value2, false).is_ok());
+    let v2 = database.get_or_create(&key).pop(false).unwrap();
+    assert_eq!(v2, Some(expected2));
+    let v1 = database.get_or_create(&key).pop(false).unwrap();
+    assert_eq!(v1, Some(expected));
+    let v0 = database.get_or_create(&key).pop(false).unwrap();
+    assert_eq!(v0, None);
+}

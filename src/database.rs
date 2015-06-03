@@ -126,6 +126,29 @@ impl Value {
         }
         return Ok(listsize);
     }
+
+    pub fn pop(&mut self, right: bool) -> Result<Option<Vec<u8>>, OperationError> {
+        let el;
+        let mut clear;
+        match self {
+            &mut Value::Nil => {
+                return Ok(None);
+            },
+            &mut Value::List(ref mut list) => {
+                if right {
+                    el = list.pop_back();
+                } else {
+                    el = list.pop_front();
+                }
+                clear = list.len() == 0;
+            }
+            _ => return Err(OperationError::WrongTypeError),
+        }
+        if clear {
+            *self = Value::Nil;
+        }
+        return Ok(el);
+    }
 }
 
 pub struct Database {
