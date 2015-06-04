@@ -135,22 +135,39 @@ fn decrby(parser: &Parser, db: &mut Database) -> Response {
     return generic_incr(parser, db, -try_increment.unwrap());
 }
 
-fn generic_push(parser: &Parser, db: &mut Database, right: bool) -> Response {
+fn generic_push(parser: &Parser, db: &mut Database, right: bool, create: bool) -> Response {
     validate!(parser.argc == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let val = try_validate!(parser.get_vec(2), "Invalid value");
-    return match db.get_or_create(&key).push(val, right) {
+    let el;
+    if create {
+        el = db.get_or_create(&key);
+    } else {
+        match db.get_mut(&key) {
+            Some(_el) => el = _el,
+            None => return Response::Integer(0),
+        }
+    }
+    return match el.push(val, right) {
         Ok(listsize) => Response::Integer(listsize as i64),
         Err(err) => Response::Error(err.to_string()),
     }
 }
 
 fn lpush(parser: &Parser, db: &mut Database) -> Response {
-    return generic_push(parser, db, false);
+    return generic_push(parser, db, false, true);
 }
 
 fn rpush(parser: &Parser, db: &mut Database) -> Response {
-    return generic_push(parser, db, true);
+    return generic_push(parser, db, true, true);
+}
+
+fn lpushx(parser: &Parser, db: &mut Database) -> Response {
+    return generic_push(parser, db, false, false);
+}
+
+fn rpushx(parser: &Parser, db: &mut Database) -> Response {
+    return generic_push(parser, db, true, false);
 }
 
 fn generic_pop(parser: &Parser, db: &mut Database, right: bool) -> Response {
@@ -264,6 +281,8 @@ pub fn command(parser: &Parser, db: &mut Database) -> Response {
         "flushall" => return flushall(parser, db),
         "lpush" => return lpush(parser, db),
         "rpush" => return rpush(parser, db),
+        "lpushx" => return lpushx(parser, db),
+        "rpushx" => return rpushx(parser, db),
         "lpop" => return lpop(parser, db),
         "rpop" => return rpop(parser, db),
         "lindex" => return lindex(parser, db),

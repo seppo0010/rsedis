@@ -416,3 +416,41 @@ fn llen_command() {
         };
     }
 }
+
+#[test]
+fn lpushx_command() {
+    let mut db = Database::new();
+    {
+        let parser = Parser::new(b"lpushxkeyvalue", 3, vec!(
+                    Argument {pos: 0, len: 6},
+                    Argument {pos: 6, len: 3},
+                    Argument {pos: 9, len: 5},
+                    ));
+        match command(&parser, &mut db) {
+            Response::Integer(d) => assert_eq!(d, 0),
+            _ => assert!(false),
+        };
+    }
+    {
+        let parser = Parser::new(b"lpushkeyvalue", 3, vec!(
+                    Argument {pos: 0, len: 5},
+                    Argument {pos: 5, len: 3},
+                    Argument {pos: 8, len: 5},
+                    ));
+        match command(&parser, &mut db) {
+            Response::Integer(d) => assert_eq!(d, 1),
+            _ => assert!(false),
+        };
+    }
+    {
+        let parser = Parser::new(b"lpushxkeyvalue", 3, vec!(
+                    Argument {pos: 0, len: 6},
+                    Argument {pos: 6, len: 3},
+                    Argument {pos: 9, len: 5},
+                    ));
+        match command(&parser, &mut db) {
+            Response::Integer(d) => assert_eq!(d, 2),
+            _ => assert!(false),
+        };
+    }
+}
