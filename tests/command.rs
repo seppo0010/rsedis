@@ -500,3 +500,41 @@ fn lrange_command() {
         };
     }
 }
+
+#[test]
+fn lrem_command() {
+    let mut db = Database::new();
+    {
+        let parser = Parser::new(b"rpushkeyvalue", 3, vec!(
+                    Argument {pos: 0, len: 5},
+                    Argument {pos: 5, len: 3},
+                    Argument {pos: 8, len: 5},
+                    ));
+        command(&parser, &mut db);
+        command(&parser, &mut db);
+        command(&parser, &mut db);
+        command(&parser, &mut db);
+    }
+    {
+        let parser = Parser::new(b"lremkey2value", 4, vec!(
+                    Argument {pos: 0, len: 4},
+                    Argument {pos: 4, len: 3},
+                    Argument {pos: 7, len: 1},
+                    Argument {pos: 8, len: 5},
+                    ));
+        match command(&parser, &mut db) {
+            Response::Integer(d) => assert_eq!(d, 2),
+            _ => assert!(false),
+        };
+    }
+    {
+        let parser = Parser::new(b"llenkey", 2, vec!(
+                    Argument {pos: 0, len: 4},
+                    Argument {pos: 4, len: 3},
+                    ));
+        match command(&parser, &mut db) {
+            Response::Integer(d) => assert_eq!(d, 2),
+            _ => assert!(false),
+        };
+    }
+}

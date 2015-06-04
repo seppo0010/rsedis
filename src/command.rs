@@ -263,6 +263,20 @@ fn lrange(parser: &Parser, db: &mut Database) -> Response {
     }
 }
 
+fn lrem(parser: &Parser, db: &mut Database) -> Response {
+    validate!(parser.argc == 4, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let count = try_validate!(parser.get_i64(2), "Invalid count");
+    let value = try_validate!(parser.get_vec(3), "Invalid value");
+    return match db.get_mut(&key) {
+        Some(ref mut el) => match el.lrem(count < 0, count.abs() as usize, value) {
+            Ok(removed) => Response::Integer(removed as i64),
+            Err(err) => Response::Error(err.to_string()),
+        },
+        None => Response::Array(Vec::new()),
+    }
+}
+
 fn ping(parser: &Parser, db: &mut Database) -> Response {
     #![allow(unused_variables)]
     validate!(parser.argc <= 2, "Wrong number of parameters");
@@ -301,6 +315,7 @@ pub fn command(parser: &Parser, db: &mut Database) -> Response {
         "linsert" => return linsert(parser, db),
         "llen" => return llen(parser, db),
         "lrange" => return lrange(parser, db),
+        "lrem" => return lrem(parser, db),
         _ => return Response::Error("Unknown command".to_string()),
     };
 }
