@@ -293,3 +293,22 @@ fn llen() {
     assert!(el.push(Vec::clone(&value3), true).is_ok());
     assert_eq!(el.llen().unwrap(), 3);
 }
+
+#[test]
+fn lrange() {
+    let mut database = Database::new();
+    let key = vec![1u8];
+    let value = vec![1u8, 2, 3, 4];
+    let value2 = vec![1u8, 5, 6, 7];
+    let value3 = vec![1u8, 8, 9, 10];
+
+    let mut el = database.get_or_create(&key);
+    assert!(el.push(Vec::clone(&value), true).is_ok());
+    assert!(el.push(Vec::clone(&value2), true).is_ok());
+    assert!(el.push(Vec::clone(&value3), true).is_ok());
+
+    assert_eq!(el.lrange(-100, 100).unwrap(), vec![&value, &value2, &value3]);
+    assert_eq!(el.lrange(0, 1).unwrap(), vec![&value, &value2]);
+    assert_eq!(el.lrange(0, 0).unwrap(), vec![&value]);
+    assert_eq!(el.lrange(1, -1).unwrap(), vec![&value2, &value3]);
+}

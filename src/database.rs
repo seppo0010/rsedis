@@ -40,6 +40,21 @@ impl From<ParseIntError> for OperationError {
     fn from(_: ParseIntError) -> OperationError { OperationError::ValueError }
 }
 
+fn normalize_position(position: i64, _len: usize) -> Result<usize, usize> {
+    let len = _len as i64;
+    let mut pos = position;
+    if pos < 0 {
+        pos += len;
+    }
+    if pos < 0 {
+        return Err(0);
+    }
+    if pos > len {
+        return Err(len as usize);
+    }
+    return Ok(pos as usize);
+}
+
 impl Value {
     pub fn set(&mut self, value: Vec<u8>) -> Result<(), OperationError> {
         if value.len() < 32 { // ought to be enough!
@@ -153,16 +168,10 @@ impl Value {
     pub fn lindex(&self, _index: i64) -> Result<Option<&Vec<u8>>, OperationError> {
         return match self {
             &Value::List(ref list) => {
-                let index;
-                let len = list.len() as i64;
-                if _index < 0 {
-                    index = len + _index;
-                } else {
-                    index = _index;
-                }
-                if index < 0 || index >= len {
-                    return Ok(None);
-                }
+                let index = match normalize_position(_index, list.len()) {
+                    Ok(i) => i,
+                    Err(_) => return Ok(None),
+                };
                 return Ok(list.iter().nth(index as usize));
             },
             _ => Err(OperationError::WrongTypeError),
@@ -196,6 +205,24 @@ impl Value {
         match self {
             &Value::List(ref list) => {
                 return Ok(list.len());
+            },
+            _ => return Err(OperationError::WrongTypeError),
+        };
+    }
+
+    pub fn lrange(&self, _start: i64, _stop: i64) -> Result<Vec<&Vec<u8>>, OperationError> {
+        match self {
+            &Value::List(ref list) => {
+                let len = list.len();
+                let start = match normalize_position(_start, len) {
+                    Ok(i) => i,
+                    Err(i) => if i == 0 { 0 } else { return Ok(Vec::new()); },
+                };
+                let stop = match normalize_position(_stop, len) {
+                    Ok(i) => i,
+                    Err(i) => if i == 0 { return Ok(Vec::new()); } else { i },
+                };
+                return Ok(list.iter().skip(start as usize).take(stop as usize - start as usize + 1).collect());
             },
             _ => return Err(OperationError::WrongTypeError),
         };
