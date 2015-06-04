@@ -192,6 +192,15 @@ impl Value {
             _ => return Err(OperationError::WrongTypeError),
         };
     }
+
+    pub fn llen(&self) -> Result<usize, OperationError> {
+        match self {
+            &Value::List(ref list) => {
+                return Ok(list.len());
+            },
+            _ => return Err(OperationError::WrongTypeError),
+        };
+    }
 }
 
 pub struct Database {

@@ -276,3 +276,20 @@ fn linsert() {
 
     assert_eq!(el.linsert(true, vec![], Vec::clone(&inserted)).unwrap(), None);
 }
+
+#[test]
+fn llen() {
+    let mut database = Database::new();
+    let key = vec![1u8];
+    let value = vec![1u8, 2, 3, 4];
+    let value2 = vec![1u8, 5, 6, 7];
+    let value3 = vec![1u8, 8, 9, 10];
+
+    let mut el = database.get_or_create(&key);
+    assert!(el.push(Vec::clone(&value), true).is_ok());
+    assert!(el.push(Vec::clone(&value2), true).is_ok());
+    assert_eq!(el.llen().unwrap(), 2);
+
+    assert!(el.push(Vec::clone(&value3), true).is_ok());
+    assert_eq!(el.llen().unwrap(), 3);
+}
