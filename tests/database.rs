@@ -402,3 +402,23 @@ fn lrem_right_limited() {
     assert_eq!(el.lrem(false, 3, Vec::clone(&value)).unwrap(), 1);
     assert_eq!(el.llen().unwrap(), 1);
 }
+
+#[test]
+fn lset() {
+    let mut database = Database::new();
+    let key = vec![1u8];
+    let value = vec![1u8, 2, 3, 4];
+    let value2 = vec![5u8, 6, 7, 8];
+    let value3 = vec![9u8, 10, 11, 12];
+    let value4 = vec![13u8, 14, 15, 16];
+
+    let mut el = database.get_or_create(&key);
+    assert!(el.push(Vec::clone(&value), true).is_ok());
+    assert!(el.push(Vec::clone(&value2), true).is_ok());
+    assert!(el.push(Vec::clone(&value3), true).is_ok());
+
+    assert_eq!(el.lset(1, Vec::clone(&value4)).unwrap(), ());
+    assert_eq!(el.lrange(0, -1).unwrap(), vec![&value, &value4, &value3]);
+    assert_eq!(el.lset(-1, Vec::clone(&value2)).unwrap(), ());
+    assert_eq!(el.lrange(0, -1).unwrap(), vec![&value, &value4, &value2]);
+}

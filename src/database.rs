@@ -20,6 +20,7 @@ pub enum OperationError {
     OverflowError,
     ValueError,
     WrongTypeError,
+    OutOfBoundsError,
 }
 
 impl fmt::Display for OperationError {
@@ -279,6 +280,21 @@ impl Value {
             *self = Value::List(newlist);
         }
         return Ok(count);
+    }
+
+    pub fn lset(&mut self, index: i64, value: Vec<u8>) -> Result<(), OperationError> {
+        return match self {
+            &mut Value::List(ref mut list) => {
+                let i = match normalize_position(index, list.len()) {
+                    Ok(i) => i,
+                    Err(_) => return Err(OperationError::OutOfBoundsError),
+                };
+                let el = list.iter_mut().skip(i).next().unwrap();
+                *el = value;
+                return Ok(());
+            },
+            _ => return Err(OperationError::WrongTypeError),
+        }
     }
 }
 
