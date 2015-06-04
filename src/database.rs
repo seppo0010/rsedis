@@ -183,7 +183,6 @@ impl Value {
                     },
                     None => return Ok(None),
                 }
-                println!("pos {}", pos);
                 let mut right = list.split_off(pos);
                 list.push_back(value);
                 list.append(&mut right);
