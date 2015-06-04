@@ -295,6 +295,34 @@ impl Value {
             _ => return Err(OperationError::WrongTypeError),
         }
     }
+
+    pub fn ltrim(&mut self, _start: i64, _stop: i64) -> Result<(), OperationError> {
+        let mut newlist;
+        match self {
+            &mut Value::List(ref mut list) => {
+                let len = list.len();
+                let start = match normalize_position(_start, len) {
+                    Ok(i) => i,
+                    Err(i) => if i == 0 { 0 } else {
+                        list.split_off(len);
+                        len
+                    },
+                };
+                let stop = match normalize_position(_stop, len) {
+                    Ok(i) => i,
+                    Err(i) => if i == 0 {
+                        list.split_off(len);
+                        0
+                    } else { i },
+                };
+                list.split_off(stop + 1);
+                newlist = list.split_off(start);
+            },
+            _ => return Err(OperationError::WrongTypeError),
+        }
+        *self = Value::List(newlist);
+        return Ok(());
+    }
 }
 
 pub struct Database {
