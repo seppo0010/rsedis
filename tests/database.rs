@@ -254,3 +254,25 @@ fn lindex() {
     let v01 = el.lindex(-3).unwrap();
     assert_eq!(v01, None);
 }
+
+#[test]
+fn linsert() {
+    let mut database = Database::new();
+    let key = vec![1u8];
+    let value = vec![1u8, 2, 3, 4];
+    let value2 = vec![1u8, 5, 6, 7];
+
+    let mut el = database.get_or_create(&key);
+    assert!(el.push(Vec::clone(&value), true).is_ok());
+    assert!(el.push(Vec::clone(&value2), true).is_ok());
+    assert_eq!(el.lindex(0).unwrap(), Some(&value));
+    assert_eq!(el.lindex(1).unwrap(), Some(&value2));
+
+    let inserted = vec![8u8, 0, 1, 2];
+    assert_eq!(el.linsert(true, Vec::clone(&value2), Vec::clone(&inserted)).unwrap().unwrap(), 3);
+    assert_eq!(el.lindex(0).unwrap(), Some(&value));
+    assert_eq!(el.lindex(1).unwrap(), Some(&inserted));
+    assert_eq!(el.lindex(2).unwrap(), Some(&value2));
+
+    assert_eq!(el.linsert(true, vec![], Vec::clone(&inserted)).unwrap(), None);
+}

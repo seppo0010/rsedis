@@ -168,6 +168,30 @@ impl Value {
             _ => Err(OperationError::WrongTypeError),
         }
     }
+
+    pub fn linsert(&mut self, before: bool, pivot: Vec<u8>, value: Vec<u8>) -> Result<Option<usize>, OperationError> {
+        match self {
+            &mut Value::List(ref mut list) => {
+                let pos;
+                match list.iter().position(|x| x == &pivot) {
+                    Some(_pos) => {
+                        if before {
+                            pos = _pos;
+                        } else {
+                            pos = _pos + 1;
+                        }
+                    },
+                    None => return Ok(None),
+                }
+                println!("pos {}", pos);
+                let mut right = list.split_off(pos);
+                list.push_back(value);
+                list.append(&mut right);
+                return Ok(Some(list.len()));
+            },
+            _ => return Err(OperationError::WrongTypeError),
+        };
+    }
 }
 
 pub struct Database {
