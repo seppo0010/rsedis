@@ -6,6 +6,8 @@ use std::str::from_utf8;
 use std::str::Utf8Error;
 use std::num::ParseIntError;
 
+#[derive(PartialEq)]
+#[derive(Debug)]
 pub enum Value {
     Nil,
     Integer(i64),
@@ -226,6 +228,57 @@ impl Value {
             },
             _ => return Err(OperationError::WrongTypeError),
         };
+    }
+
+    pub fn lrem(&mut self, left: bool, limit: usize, value: Vec<u8>) -> Result<usize, OperationError> {
+        let mut count = 0;
+        let mut newlist = LinkedList::new();
+        match self {
+            &mut Value::List(ref mut list) => {
+                if left {
+                    while limit == 0 || count < limit {
+                        match list.pop_front() {
+                            None => break,
+                            Some(el) => {
+                                if el != value {
+                                    newlist.push_back(el);
+                                } else {
+                                    count += 1;
+                                }
+                            }
+                        }
+                    }
+                    newlist.append(list);
+                } else {
+                    while limit == 0 || count < limit {
+                        match list.pop_back() {
+                            None => break,
+                            Some(el) => {
+                                if el != value {
+                                    newlist.push_front(el);
+                                } else {
+                                    count += 1;
+                                }
+                            }
+                        }
+                    }
+                    // omg, ugly code, let me explain
+                    // append will merge right two lists and clear the parameter
+                    // newlist is the one that will survive after lrem
+                    // but list needs to be at the beginning, so we are merging
+                    // first to list and then to newlist
+                    list.append(&mut newlist);
+                    newlist.append(list);
+                }
+            },
+            _ => return Err(OperationError::WrongTypeError),
+        };
+        if newlist.len() == 0 {
+            *self = Value::Nil;
+        } else {
+            *self = Value::List(newlist);
+        }
+        return Ok(count);
     }
 }
 

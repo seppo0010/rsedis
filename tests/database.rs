@@ -312,3 +312,93 @@ fn lrange() {
     assert_eq!(el.lrange(0, 0).unwrap(), vec![&value]);
     assert_eq!(el.lrange(1, -1).unwrap(), vec![&value2, &value3]);
 }
+
+#[test]
+fn lrem_left_unlimited() {
+    let mut database = Database::new();
+    let key = vec![1u8];
+    let value = vec![1u8, 2, 3, 4];
+    let value2 = vec![1u8, 5, 6, 7];
+    let value3 = vec![1u8, 8, 9, 10];
+
+    let mut el = database.get_or_create(&key);
+    assert!(el.push(Vec::clone(&value), true).is_ok());
+    assert!(el.push(Vec::clone(&value2), true).is_ok());
+    assert!(el.push(Vec::clone(&value3), true).is_ok());
+
+    assert_eq!(el.lrem(true, 0, Vec::clone(&value3)).unwrap(), 1);
+    assert_eq!(el.llen().unwrap(), 2);
+    assert_eq!(el.lrem(true, 0, Vec::clone(&value)).unwrap(), 1);
+    assert_eq!(el.llen().unwrap(), 1);
+    assert_eq!(el.lrem(true, 0, Vec::clone(&value2)).unwrap(), 1);
+    assert_eq!(el, &Value::Nil);
+}
+
+#[test]
+fn lrem_left_limited() {
+    let mut database = Database::new();
+    let key = vec![1u8];
+    let value = vec![1u8, 2, 3, 4];
+    let value2 = vec![5u8, 6, 7, 8];
+
+    let mut el = database.get_or_create(&key);
+    assert!(el.push(Vec::clone(&value), true).is_ok());
+    assert!(el.push(Vec::clone(&value), true).is_ok());
+    assert!(el.push(Vec::clone(&value), true).is_ok());
+    assert!(el.push(Vec::clone(&value2), true).is_ok());
+    assert!(el.push(Vec::clone(&value), true).is_ok());
+
+    assert_eq!(el.lrem(true, 3, Vec::clone(&value)).unwrap(), 3);
+    assert_eq!(el.llen().unwrap(), 2);
+    match el {
+        &mut Value::List(ref list) => assert_eq!(list.front().unwrap(), &value2),
+        _ => panic!(),
+    }
+    assert_eq!(el.lrem(true, 3, Vec::clone(&value)).unwrap(), 1);
+    assert_eq!(el.llen().unwrap(), 1);
+}
+
+#[test]
+fn lrem_right_unlimited() {
+    let mut database = Database::new();
+    let key = vec![1u8];
+    let value = vec![1u8, 2, 3, 4];
+    let value2 = vec![1u8, 5, 6, 7];
+    let value3 = vec![1u8, 8, 9, 10];
+
+    let mut el = database.get_or_create(&key);
+    assert!(el.push(Vec::clone(&value), true).is_ok());
+    assert!(el.push(Vec::clone(&value2), true).is_ok());
+    assert!(el.push(Vec::clone(&value3), true).is_ok());
+
+    assert_eq!(el.lrem(false, 0, Vec::clone(&value3)).unwrap(), 1);
+    assert_eq!(el.llen().unwrap(), 2);
+    assert_eq!(el.lrem(false, 0, Vec::clone(&value)).unwrap(), 1);
+    assert_eq!(el.llen().unwrap(), 1);
+    assert_eq!(el.lrem(false, 0, Vec::clone(&value2)).unwrap(), 1);
+    assert_eq!(el, &Value::Nil);
+}
+
+#[test]
+fn lrem_right_limited() {
+    let mut database = Database::new();
+    let key = vec![1u8];
+    let value = vec![1u8, 2, 3, 4];
+    let value2 = vec![5u8, 6, 7, 8];
+
+    let mut el = database.get_or_create(&key);
+    assert!(el.push(Vec::clone(&value), true).is_ok());
+    assert!(el.push(Vec::clone(&value), true).is_ok());
+    assert!(el.push(Vec::clone(&value), true).is_ok());
+    assert!(el.push(Vec::clone(&value2), true).is_ok());
+    assert!(el.push(Vec::clone(&value), true).is_ok());
+
+    assert_eq!(el.lrem(false, 3, Vec::clone(&value)).unwrap(), 3);
+    assert_eq!(el.llen().unwrap(), 2);
+    match el {
+        &mut Value::List(ref list) => assert_eq!(list.front().unwrap(), &value),
+        _ => panic!(),
+    }
+    assert_eq!(el.lrem(false, 3, Vec::clone(&value)).unwrap(), 1);
+    assert_eq!(el.llen().unwrap(), 1);
+}
