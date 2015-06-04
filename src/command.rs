@@ -277,6 +277,20 @@ fn lrem(parser: &Parser, db: &mut Database) -> Response {
     }
 }
 
+fn lset(parser: &Parser, db: &mut Database) -> Response {
+    validate!(parser.argc == 4, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let index = try_validate!(parser.get_i64(2), "Invalid index");
+    let value = try_validate!(parser.get_vec(3), "Invalid value");
+    return match db.get_mut(&key) {
+        Some(ref mut el) => match el.lset(index, value) {
+            Ok(()) => Response::Status("OK".to_string()),
+            Err(err) => Response::Error(err.to_string()),
+        },
+        None => Response::Error("ERR no such key".to_string()),
+    }
+}
+
 fn ping(parser: &Parser, db: &mut Database) -> Response {
     #![allow(unused_variables)]
     validate!(parser.argc <= 2, "Wrong number of parameters");
@@ -316,6 +330,7 @@ pub fn command(parser: &Parser, db: &mut Database) -> Response {
         "llen" => return llen(parser, db),
         "lrange" => return lrange(parser, db),
         "lrem" => return lrem(parser, db),
+        "lset" => return lset(parser, db),
         _ => return Response::Error("Unknown command".to_string()),
     };
 }

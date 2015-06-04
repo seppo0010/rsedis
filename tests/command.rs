@@ -538,3 +538,46 @@ fn lrem_command() {
         };
     }
 }
+
+#[test]
+fn lset_command() {
+    let mut db = Database::new();
+    {
+        let parser = Parser::new(b"rpushkeyvalue", 3, vec!(
+                    Argument {pos: 0, len: 5},
+                    Argument {pos: 5, len: 3},
+                    Argument {pos: 8, len: 5},
+                    ));
+        command(&parser, &mut db);
+        command(&parser, &mut db);
+        command(&parser, &mut db);
+        command(&parser, &mut db);
+    }
+    {
+        let parser = Parser::new(b"lsetkey2valuf", 4, vec!(
+                    Argument {pos: 0, len: 4},
+                    Argument {pos: 4, len: 3},
+                    Argument {pos: 7, len: 1},
+                    Argument {pos: 8, len: 5},
+                    ));
+        match command(&parser, &mut db) {
+            Response::Status(st) => assert_eq!(st, "OK".to_string()),
+            _ => assert!(false),
+        };
+    }
+    {
+        let parser = Parser::new(b"lrangekey22", 4, vec!(
+                    Argument {pos: 0, len: 6},
+                    Argument {pos: 6, len: 3},
+                    Argument {pos: 9, len: 1},
+                    Argument {pos: 10, len: 1},
+                    ));
+        match command(&parser, &mut db) {
+            Response::Array(ref arr) => {
+                assert_eq!(arr.len(), 1);
+                assert_eq!(arr[0], Response::Data("valuf".to_string().into_bytes()));
+            },
+            _ => assert!(false),
+        };
+    }
+}
