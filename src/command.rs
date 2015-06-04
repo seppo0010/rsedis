@@ -1,3 +1,5 @@
+use std::ascii::AsciiExt;
+
 use super::database::Database;
 use super::database::Value;
 use super::parser::Parser;
@@ -194,6 +196,32 @@ fn lindex(parser: &Parser, db: &mut Database) -> Response {
     }
 }
 
+fn linsert(parser: &Parser, db: &mut Database) -> Response {
+    validate!(parser.argc == 5, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let before_str = try_validate!(parser.get_str(2), "Syntax error");
+    let pivot = try_validate!(parser.get_vec(3), "Invalid pivot");
+    let value = try_validate!(parser.get_vec(4), "Invalid value");
+    let before;
+    match &*before_str.to_ascii_lowercase() {
+        "after" => before = false,
+        "before" => before = true,
+        _ => return Response::Error("ERR Syntax error".to_string()),
+    };
+    return match db.get_mut(&key) {
+        Some(mut el) => match el.linsert(before, pivot, value) {
+            Ok(r) => {
+                match r {
+                    Some(listsize) => Response::Integer(listsize as i64),
+                    None => Response::Integer(-1),
+                }
+            }
+            Err(err) => Response::Error(err.to_string()),
+        },
+        None => Response::Integer(-1),
+    }
+}
+
 fn ping(parser: &Parser, db: &mut Database) -> Response {
     #![allow(unused_variables)]
     validate!(parser.argc <= 2, "Wrong number of parameters");
@@ -227,6 +255,7 @@ pub fn command(parser: &Parser, db: &mut Database) -> Response {
         "lpop" => return lpop(parser, db),
         "rpop" => return rpop(parser, db),
         "lindex" => return lindex(parser, db),
+        "linsert" => return linsert(parser, db),
         _ => return Response::Error("Unknown command".to_string()),
     };
 }
