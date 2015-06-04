@@ -4,30 +4,28 @@ use super::database::Database;
 use super::database::Value;
 use super::parser::Parser;
 
+#[derive(PartialEq)]
+#[derive(Debug)]
 pub enum Response {
     Nil,
     Integer(i64),
     Data(Vec<u8>),
     Error(String),
     Status(String),
+    Array(Vec<Response>),
 }
 
 impl Response {
     pub fn as_bytes(&self) -> Vec<u8> {
-        match *self {
-            Response::Nil => return b"$-1\r\n".to_vec(),
-            Response::Data(ref d) => {
-                return [&b"$"[..], &format!("{}\r\n", d.len()).into_bytes()[..], &d[..], &"\r\n".to_string().into_bytes()[..]].concat();
-            }
-            Response::Integer(ref i) => {
-                return [&b":"[..], &format!("{}\r\n", i).into_bytes()[..]].concat();
-            }
-            Response::Error(ref d) => {
-                return [&b"-"[..], (*d).as_bytes(), &"\r\n".to_string().into_bytes()[..]].concat();
-            }
-            Response::Status(ref d) => {
-                return [&b"+"[..], (*d).as_bytes(), &"\r\n".to_string().into_bytes()[..]].concat();
-            }
+        return match *self {
+            Response::Nil => b"$-1\r\n".to_vec(),
+            Response::Data(ref d) => [&b"$"[..], &format!("{}\r\n", d.len()).into_bytes()[..], &d[..], &"\r\n".to_string().into_bytes()[..]].concat(),
+            Response::Integer(ref i) => [&b":"[..], &format!("{}\r\n", i).into_bytes()[..]].concat(),
+            Response::Error(ref d) => [&b"-"[..], (*d).as_bytes(), &"\r\n".to_string().into_bytes()[..]].concat(),
+            Response::Status(ref d) => [&b"+"[..], (*d).as_bytes(), &"\r\n".to_string().into_bytes()[..]].concat(),
+            Response::Array(ref a) => [&b"*"[..],  &format!("{}\r\n", a.len()).into_bytes()[..],
+                &(a.iter().map(|el| el.as_bytes()).collect::<Vec<_>>()[..].concat())[..]
+                ].concat()
         }
     }
 }
@@ -251,6 +249,20 @@ fn llen(parser: &Parser, db: &mut Database) -> Response {
     }
 }
 
+fn lrange(parser: &Parser, db: &mut Database) -> Response {
+    validate!(parser.argc == 4, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let start = try_validate!(parser.get_i64(2), "Invalid range");
+    let stop  = try_validate!(parser.get_i64(3), "Invalid range");
+    return match db.get(&key) {
+        Some(el) => match el.lrange(start, stop) {
+            Ok(items) => Response::Array(items.iter().map(|i| Response::Data(i.to_vec())).collect()),
+            Err(err) => Response::Error(err.to_string()),
+        },
+        None => Response::Array(Vec::new()),
+    }
+}
+
 fn ping(parser: &Parser, db: &mut Database) -> Response {
     #![allow(unused_variables)]
     validate!(parser.argc <= 2, "Wrong number of parameters");
@@ -288,6 +300,7 @@ pub fn command(parser: &Parser, db: &mut Database) -> Response {
         "lindex" => return lindex(parser, db),
         "linsert" => return linsert(parser, db),
         "llen" => return llen(parser, db),
+        "lrange" => return lrange(parser, db),
         _ => return Response::Error("Unknown command".to_string()),
     };
 }

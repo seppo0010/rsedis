@@ -454,3 +454,49 @@ fn lpushx_command() {
         };
     }
 }
+
+#[test]
+fn lrange_command() {
+    let mut db = Database::new();
+    {
+        let parser = Parser::new(b"rpushkeyvalue", 3, vec!(
+                    Argument {pos: 0, len: 5},
+                    Argument {pos: 5, len: 3},
+                    Argument {pos: 8, len: 5},
+                    ));
+        command(&parser, &mut db);
+    }
+    {
+        let parser = Parser::new(b"rpushkeyvaluf", 3, vec!(
+                    Argument {pos: 0, len: 5},
+                    Argument {pos: 5, len: 3},
+                    Argument {pos: 8, len: 5},
+                    ));
+        command(&parser, &mut db);
+    }
+    {
+        let parser = Parser::new(b"rpushkeyvalug", 3, vec!(
+                    Argument {pos: 0, len: 5},
+                    Argument {pos: 5, len: 3},
+                    Argument {pos: 8, len: 5},
+                    ));
+        command(&parser, &mut db);
+    }
+    {
+        let parser = Parser::new(b"lrange key 0 -1", 4, vec!(
+                    Argument {pos: 0, len: 6},
+                    Argument {pos: 7, len: 3},
+                    Argument {pos: 11, len: 1},
+                    Argument {pos: 13, len: 2},
+                    ));
+        match command(&parser, &mut db) {
+            Response::Array(ref arr) => {
+                assert_eq!(arr.len(), 3);
+                assert_eq!(arr[0], Response::Data("value".to_string().into_bytes()));
+                assert_eq!(arr[1], Response::Data("valuf".to_string().into_bytes()));
+                assert_eq!(arr[2], Response::Data("valug".to_string().into_bytes()));
+            },
+            _ => assert!(false),
+        };
+    }
+}
