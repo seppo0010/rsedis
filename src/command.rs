@@ -330,6 +330,20 @@ fn lset(parser: &Parser, db: &mut Database) -> Response {
     }
 }
 
+fn ltrim(parser: &Parser, db: &mut Database) -> Response {
+    validate!(parser.argc == 4, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let start = try_validate!(parser.get_i64(2), "Invalid start");
+    let stop = try_validate!(parser.get_i64(3), "Invalid stop");
+    return match db.get_mut(&key) {
+        Some(ref mut el) => match el.ltrim(start, stop) {
+            Ok(()) => Response::Status("OK".to_owned()),
+            Err(err) => Response::Error(err.to_string()),
+        },
+        None => Response::Status("OK".to_owned()),
+    }
+}
+
 fn ping(parser: &Parser, db: &mut Database) -> Response {
     #![allow(unused_variables)]
     validate!(parser.argc <= 2, "Wrong number of parameters");
@@ -370,6 +384,7 @@ pub fn command(parser: &Parser, db: &mut Database) -> Response {
         "lrange" => return lrange(parser, db),
         "lrem" => return lrem(parser, db),
         "lset" => return lset(parser, db),
+        "ltrim" => return ltrim(parser, db),
         "rpoplpush" => return rpoplpush(parser, db),
         _ => return Response::Error("Unknown command".to_owned()),
     };

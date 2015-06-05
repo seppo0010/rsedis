@@ -653,3 +653,54 @@ fn rpoplpush_command() {
         assert_eq!(command(&parser, &mut db), Response::Integer(2));
     }
 }
+
+#[test]
+fn ltrim_command() {
+    let mut db = Database::new();
+    {
+        let parser = Parser::new(b"rpushkeyvalue", 3, vec!(
+                    Argument {pos: 0, len: 5},
+                    Argument {pos: 5, len: 3},
+                    Argument {pos: 8, len: 5},
+                    ));
+        command(&parser, &mut db);
+        command(&parser, &mut db);
+    }
+    {
+        let parser = Parser::new(b"rpushkeyvaluf", 3, vec!(
+                    Argument {pos: 0, len: 5},
+                    Argument {pos: 5, len: 3},
+                    Argument {pos: 8, len: 5},
+                    ));
+        command(&parser, &mut db);
+        command(&parser, &mut db);
+    }
+    {
+        let parser = Parser::new(b"ltrimkey1-2", 4, vec!(
+                    Argument {pos: 0, len: 5},
+                    Argument {pos: 5, len: 3},
+                    Argument {pos: 8, len: 1},
+                    Argument {pos: 9, len: 2},
+                    ));
+        match command(&parser, &mut db) {
+            Response::Status(st) => assert_eq!(st, "OK".to_owned()),
+            _ => assert!(false),
+        };
+    }
+    {
+        let parser = Parser::new(b"lrangekey0-1", 4, vec!(
+                    Argument {pos: 0, len: 6},
+                    Argument {pos: 6, len: 3},
+                    Argument {pos: 9, len: 1},
+                    Argument {pos: 10, len: 2},
+                    ));
+        match command(&parser, &mut db) {
+            Response::Array(ref arr) => {
+                assert_eq!(arr.len(), 2);
+                assert_eq!(arr[0], Response::Data("value".to_owned().into_bytes()));
+                assert_eq!(arr[1], Response::Data("valuf".to_owned().into_bytes()));
+            },
+            _ => assert!(false),
+        };
+    }
+}
