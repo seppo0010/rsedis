@@ -205,11 +205,10 @@ impl Value {
     }
 
     pub fn llen(&self) -> Result<usize, OperationError> {
-        match self {
-            &Value::List(ref list) => {
-                return Ok(list.len());
-            },
-            _ => return Err(OperationError::WrongTypeError),
+        return match self {
+            &Value::List(ref list) => Ok(list.len()),
+            &Value::Nil => Ok(0),
+            _ => Err(OperationError::WrongTypeError),
         };
     }
 

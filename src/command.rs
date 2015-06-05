@@ -193,6 +193,45 @@ fn rpop(parser: &Parser, db: &mut Database) -> Response {
     return generic_pop(parser, db, true);
 }
 
+fn rpoplpush(parser: &Parser, db: &mut Database) -> Response {
+    #![allow(unused_must_use)]
+    validate!(parser.argc == 3, "Wrong number of parameters");
+    let source = try_validate!(parser.get_vec(1), "Invalid source");
+    let destination = try_validate!(parser.get_vec(2), "Invalid destination");
+
+    match db.get(&destination) {
+        Some(el) => match el.llen() {
+            Ok(_) => (),
+            Err(_) => return Response::Error("Destination is not a list".to_string()),
+        },
+        None => (),
+    }
+
+    let el = {
+        let sourcelist = match db.get_mut(&source) {
+            Some(sourcelist) => {
+                if sourcelist.llen().is_err() {
+                    return Response::Error("Source is not a list".to_string());
+                }
+                sourcelist
+            },
+            None => return Response::Nil,
+        };
+        match sourcelist.pop(true) {
+            Ok(el) => match el {
+                Some(el) => el,
+                None => return Response::Nil,
+            },
+            Err(err) => return Response::Error(err.to_string()),
+        }
+    };
+
+    let destinationlist = db.get_or_create(&destination);
+    let resp = Response::Data(el.clone());
+    destinationlist.push(el, false);
+    resp
+}
+
 fn lindex(parser: &Parser, db: &mut Database) -> Response {
     validate!(parser.argc == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
@@ -331,6 +370,7 @@ pub fn command(parser: &Parser, db: &mut Database) -> Response {
         "lrange" => return lrange(parser, db),
         "lrem" => return lrem(parser, db),
         "lset" => return lset(parser, db),
+        "rpoplpush" => return rpoplpush(parser, db),
         _ => return Response::Error("Unknown command".to_string()),
     };
 }
