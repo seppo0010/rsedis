@@ -13,7 +13,7 @@ fn getstr(database: &Database, key: &[u8]) -> String {
     match database.get(&key.to_vec()) {
         Some(val) => {
             match val {
-                &Value::Data(ref bytes) => return from_utf8(bytes).unwrap().to_string(),
+                &Value::Data(ref bytes) => return from_utf8(bytes).unwrap().to_owned(),
                 &Value::Integer(i) => return format!("{}", i),
                 _ => panic!("Got non-string"),
             }
@@ -84,13 +84,13 @@ fn del_command() {
 
 #[test]
 fn serialize_status() {
-    let response = Response::Status("OK".to_string());
+    let response = Response::Status("OK".to_owned());
     assert_eq!(response.as_bytes(), b"+OK\r\n");
 }
 
 #[test]
 fn serialize_error() {
-    let response = Response::Error("ERR Invalid command".to_string());
+    let response = Response::Error("ERR Invalid command".to_owned());
     assert_eq!(response.as_bytes(), b"-ERR Invalid command\r\n");
 }
 
@@ -274,11 +274,11 @@ fn lpop_command() {
                     Argument {pos: 4, len: 3},
                     ));
         match command(&parser, &mut db) {
-            Response::Data(d) => assert_eq!(d, "value".to_string().into_bytes()),
+            Response::Data(d) => assert_eq!(d, "value".to_owned().into_bytes()),
             _ => assert!(false),
         };
         match command(&parser, &mut db) {
-            Response::Data(d) => assert_eq!(d, "valuf".to_string().into_bytes()),
+            Response::Data(d) => assert_eq!(d, "valuf".to_owned().into_bytes()),
             _ => assert!(false),
         };
         match command(&parser, &mut db) {
@@ -313,11 +313,11 @@ fn rpop_command() {
                     Argument {pos: 4, len: 3},
                     ));
         match command(&parser, &mut db) {
-            Response::Data(d) => assert_eq!(d, "valuf".to_string().into_bytes()),
+            Response::Data(d) => assert_eq!(d, "valuf".to_owned().into_bytes()),
             _ => assert!(false),
         };
         match command(&parser, &mut db) {
-            Response::Data(d) => assert_eq!(d, "value".to_string().into_bytes()),
+            Response::Data(d) => assert_eq!(d, "value".to_owned().into_bytes()),
             _ => assert!(false),
         };
         match command(&parser, &mut db) {
@@ -353,7 +353,7 @@ fn lindex_command() {
                     Argument {pos: 9, len: 1},
                     ));
         match command(&parser, &mut db) {
-            Response::Data(d) => assert_eq!(d, "value".to_string().into_bytes()),
+            Response::Data(d) => assert_eq!(d, "value".to_owned().into_bytes()),
             _ => assert!(false),
         };
     }
@@ -492,9 +492,9 @@ fn lrange_command() {
         match command(&parser, &mut db) {
             Response::Array(ref arr) => {
                 assert_eq!(arr.len(), 3);
-                assert_eq!(arr[0], Response::Data("value".to_string().into_bytes()));
-                assert_eq!(arr[1], Response::Data("valuf".to_string().into_bytes()));
-                assert_eq!(arr[2], Response::Data("valug".to_string().into_bytes()));
+                assert_eq!(arr[0], Response::Data("value".to_owned().into_bytes()));
+                assert_eq!(arr[1], Response::Data("valuf".to_owned().into_bytes()));
+                assert_eq!(arr[2], Response::Data("valug".to_owned().into_bytes()));
             },
             _ => assert!(false),
         };
@@ -561,7 +561,7 @@ fn lset_command() {
                     Argument {pos: 8, len: 5},
                     ));
         match command(&parser, &mut db) {
-            Response::Status(st) => assert_eq!(st, "OK".to_string()),
+            Response::Status(st) => assert_eq!(st, "OK".to_owned()),
             _ => assert!(false),
         };
     }
@@ -575,7 +575,7 @@ fn lset_command() {
         match command(&parser, &mut db) {
             Response::Array(ref arr) => {
                 assert_eq!(arr.len(), 1);
-                assert_eq!(arr[0], Response::Data("valuf".to_string().into_bytes()));
+                assert_eq!(arr[0], Response::Data("valuf".to_owned().into_bytes()));
             },
             _ => assert!(false),
         };
@@ -614,7 +614,7 @@ fn rpoplpush_command() {
                     Argument {pos: 9, len: 3},
                     Argument {pos: 12, len: 4},
                     ));
-        assert_eq!(command(&parser, &mut db), Response::Data("valuf".to_string().into_bytes()));
+        assert_eq!(command(&parser, &mut db), Response::Data("valuf".to_owned().into_bytes()));
     }
     {
         let parser = Parser::new(b"llenkey", 2, vec!(
@@ -636,7 +636,7 @@ fn rpoplpush_command() {
                     Argument {pos: 9, len: 3},
                     Argument {pos: 12, len: 4},
                     ));
-        assert_eq!(command(&parser, &mut db), Response::Data("value".to_string().into_bytes()));
+        assert_eq!(command(&parser, &mut db), Response::Data("value".to_owned().into_bytes()));
     }
     {
         let parser = Parser::new(b"llenkey", 2, vec!(

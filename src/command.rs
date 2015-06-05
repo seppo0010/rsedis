@@ -19,10 +19,10 @@ impl Response {
     pub fn as_bytes(&self) -> Vec<u8> {
         return match *self {
             Response::Nil => b"$-1\r\n".to_vec(),
-            Response::Data(ref d) => [&b"$"[..], &format!("{}\r\n", d.len()).into_bytes()[..], &d[..], &"\r\n".to_string().into_bytes()[..]].concat(),
+            Response::Data(ref d) => [&b"$"[..], &format!("{}\r\n", d.len()).into_bytes()[..], &d[..], &"\r\n".to_owned().into_bytes()[..]].concat(),
             Response::Integer(ref i) => [&b":"[..], &format!("{}\r\n", i).into_bytes()[..]].concat(),
-            Response::Error(ref d) => [&b"-"[..], (*d).as_bytes(), &"\r\n".to_string().into_bytes()[..]].concat(),
-            Response::Status(ref d) => [&b"+"[..], (*d).as_bytes(), &"\r\n".to_string().into_bytes()[..]].concat(),
+            Response::Error(ref d) => [&b"-"[..], (*d).as_bytes(), &"\r\n".to_owned().into_bytes()[..]].concat(),
+            Response::Status(ref d) => [&b"+"[..], (*d).as_bytes(), &"\r\n".to_owned().into_bytes()[..]].concat(),
             Response::Array(ref a) => [&b"*"[..],  &format!("{}\r\n", a.len()).into_bytes()[..],
                 &(a.iter().map(|el| el.as_bytes()).collect::<Vec<_>>()[..].concat())[..]
                 ].concat()
@@ -51,7 +51,7 @@ fn set(parser: &Parser, db: &mut Database) -> Response {
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let val = try_validate!(parser.get_vec(2), "Invalid value");
     return match db.get_or_create(&key).set(val) {
-        Ok(_) => Response::Status("OK".to_string()),
+        Ok(_) => Response::Status("OK".to_owned()),
         Err(err) => Response::Error(err.to_string()),
     }
 }
@@ -72,7 +72,7 @@ fn del(parser: &Parser, db: &mut Database) -> Response {
 fn flushall(parser: &Parser, db: &mut Database) -> Response {
     validate!(parser.argc == 1, "Wrong number of parameters");
     db.clear();
-    return Response::Status("OK".to_string());
+    return Response::Status("OK".to_owned());
 }
 
 fn append(parser: &Parser, db: &mut Database) -> Response {
@@ -122,14 +122,14 @@ fn decr(parser: &Parser, db: &mut Database) -> Response {
 fn incrby(parser: &Parser, db: &mut Database) -> Response {
     validate!(parser.argc == 3, "Wrong number of parameters");
     let try_increment = parser.get_i64(2);
-    if try_increment.is_err() { return Response::Error("Invalid increment".to_string()); }
+    if try_increment.is_err() { return Response::Error("Invalid increment".to_owned()); }
     return generic_incr(parser, db, try_increment.unwrap());
 }
 
 fn decrby(parser: &Parser, db: &mut Database) -> Response {
     validate!(parser.argc == 3, "Wrong number of parameters");
     let try_increment = parser.get_i64(2);
-    if try_increment.is_err() { return Response::Error("Invalid decrement".to_string()); }
+    if try_increment.is_err() { return Response::Error("Invalid decrement".to_owned()); }
     return generic_incr(parser, db, -try_increment.unwrap());
 }
 
@@ -202,7 +202,7 @@ fn rpoplpush(parser: &Parser, db: &mut Database) -> Response {
     match db.get(&destination) {
         Some(el) => match el.llen() {
             Ok(_) => (),
-            Err(_) => return Response::Error("Destination is not a list".to_string()),
+            Err(_) => return Response::Error("Destination is not a list".to_owned()),
         },
         None => (),
     }
@@ -211,7 +211,7 @@ fn rpoplpush(parser: &Parser, db: &mut Database) -> Response {
         let sourcelist = match db.get_mut(&source) {
             Some(sourcelist) => {
                 if sourcelist.llen().is_err() {
-                    return Response::Error("Source is not a list".to_string());
+                    return Response::Error("Source is not a list".to_owned());
                 }
                 sourcelist
             },
@@ -260,7 +260,7 @@ fn linsert(parser: &Parser, db: &mut Database) -> Response {
     match &*before_str.to_ascii_lowercase() {
         "after" => before = false,
         "before" => before = true,
-        _ => return Response::Error("ERR Syntax error".to_string()),
+        _ => return Response::Error("ERR Syntax error".to_owned()),
     };
     return match db.get_mut(&key) {
         Some(mut el) => match el.linsert(before, pivot, value) {
@@ -323,10 +323,10 @@ fn lset(parser: &Parser, db: &mut Database) -> Response {
     let value = try_validate!(parser.get_vec(3), "Invalid value");
     return match db.get_mut(&key) {
         Some(ref mut el) => match el.lset(index, value) {
-            Ok(()) => Response::Status("OK".to_string()),
+            Ok(()) => Response::Status("OK".to_owned()),
             Err(err) => Response::Error(err.to_string()),
         },
-        None => Response::Error("ERR no such key".to_string()),
+        None => Response::Error("ERR no such key".to_owned()),
     }
 }
 
@@ -341,11 +341,11 @@ fn ping(parser: &Parser, db: &mut Database) -> Response {
 
 pub fn command(parser: &Parser, db: &mut Database) -> Response {
     if parser.argc == 0 {
-        return Response::Error("Not enough arguments".to_string());
+        return Response::Error("Not enough arguments".to_owned());
     }
     let try_command = parser.get_str(0);
     if try_command.is_err() {
-        return Response::Error("Invalid command".to_string());
+        return Response::Error("Invalid command".to_owned());
     }
     match try_command.unwrap() {
         "set" => return set(parser, db),
@@ -371,6 +371,6 @@ pub fn command(parser: &Parser, db: &mut Database) -> Response {
         "lrem" => return lrem(parser, db),
         "lset" => return lset(parser, db),
         "rpoplpush" => return rpoplpush(parser, db),
-        _ => return Response::Error("Unknown command".to_string()),
+        _ => return Response::Error("Unknown command".to_owned()),
     };
 }
