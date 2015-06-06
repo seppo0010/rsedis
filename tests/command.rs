@@ -728,3 +728,25 @@ fn sadd_command() {
         };
     }
 }
+
+#[test]
+fn scard_command() {
+    let mut db = Database::new();
+    {
+        let parser = Parser::new(b"saddkey123", 5, vec!(
+                    Argument {pos: 0, len: 4},
+                    Argument {pos: 4, len: 3},
+                    Argument {pos: 7, len: 1},
+                    Argument {pos: 8, len: 1},
+                    Argument {pos: 9, len: 1},
+                    ));
+        command(&parser, &mut db);
+    }
+    {
+        let parser = Parser::new(b"scardkey", 2, vec!(
+                    Argument {pos: 0, len: 5},
+                    Argument {pos: 5, len: 3},
+                    ));
+        assert_eq!(command(&parser, &mut db), Response::Integer(3));
+    }
+}
