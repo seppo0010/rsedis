@@ -1,6 +1,7 @@
 use std::fmt;
 use std::error::Error;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::collections::LinkedList;
 use std::str::from_utf8;
 use std::str::Utf8Error;
@@ -13,6 +14,7 @@ pub enum Value {
     Integer(i64),
     Data(Vec<u8>),
     List(LinkedList<Vec<u8>>),
+    Set(HashSet<Vec<u8>>),
 }
 
 #[derive(Debug)]
@@ -322,6 +324,19 @@ impl Value {
         }
         *self = Value::List(newlist);
         return Ok(());
+    }
+
+    pub fn sadd(&mut self, el: Vec<u8>) -> Result<bool, OperationError> {
+        match self {
+            &mut Value::Nil => {
+                let mut set = HashSet::new();
+                set.insert(el);
+                *self = Value::Set(set);
+                Ok(true)
+            },
+            &mut Value::Set(ref mut set) => Ok(set.insert(el)),
+            _ => Err(OperationError::WrongTypeError),
+        }
     }
 }
 

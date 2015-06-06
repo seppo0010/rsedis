@@ -442,3 +442,14 @@ fn ltrim() {
     assert_eq!(el.llen().unwrap(), 2);
     assert_eq!(el.lrange(0, -1).unwrap(), vec![&value2, &value3]);
 }
+
+#[test]
+fn sadd() {
+    let mut database = Database::new();
+    let key = vec![1u8];
+    let value = vec![1u8, 2, 3, 4];
+
+    let mut el = database.get_or_create(&key);
+    assert_eq!(el.sadd(Vec::clone(&value)).unwrap(), true);
+    assert_eq!(el.sadd(Vec::clone(&value)).unwrap(), false);
+}
