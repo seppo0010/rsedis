@@ -704,3 +704,27 @@ fn ltrim_command() {
         };
     }
 }
+
+#[test]
+fn sadd_command() {
+    let mut db = Database::new();
+    {
+        let parser = Parser::new(b"saddkey11123", 7, vec!(
+                    Argument {pos: 0, len: 4},
+                    Argument {pos: 4, len: 3},
+                    Argument {pos: 7, len: 1},
+                    Argument {pos: 8, len: 1},
+                    Argument {pos: 9, len: 1},
+                    Argument {pos: 10, len: 1},
+                    Argument {pos: 11, len: 1},
+                    ));
+        match command(&parser, &mut db) {
+            Response::Integer(i) => assert_eq!(i, 3),
+            _ => assert!(false),
+        };
+        match command(&parser, &mut db) {
+            Response::Integer(i) => assert_eq!(i, 0),
+            _ => assert!(false),
+        };
+    }
+}

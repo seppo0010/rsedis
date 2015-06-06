@@ -344,6 +344,20 @@ fn ltrim(parser: &Parser, db: &mut Database) -> Response {
     }
 }
 
+fn sadd(parser: &Parser, db: &mut Database) -> Response {
+    validate!(parser.argc > 2, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let el = db.get_or_create(&key);
+    let mut count = 0;
+    for i in 2..parser.argc {
+        let val = try_validate!(parser.get_vec(i), "Invalid value");
+        match el.sadd(val) {
+            Ok(added) => if added { count += 1 },
+            Err(err) => return Response::Error(err.to_string()),
+        }
+    }
+    return Response::Integer(count);
+}
 fn ping(parser: &Parser, db: &mut Database) -> Response {
     #![allow(unused_variables)]
     validate!(parser.argc <= 2, "Wrong number of parameters");
@@ -386,6 +400,7 @@ pub fn command(parser: &Parser, db: &mut Database) -> Response {
         "lset" => return lset(parser, db),
         "ltrim" => return ltrim(parser, db),
         "rpoplpush" => return rpoplpush(parser, db),
+        "sadd" => return sadd(parser, db),
         _ => return Response::Error("Unknown command".to_owned()),
     };
 }
