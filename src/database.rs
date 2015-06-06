@@ -338,6 +338,14 @@ impl Value {
             _ => Err(OperationError::WrongTypeError),
         }
     }
+
+    pub fn scard(&self) -> Result<usize, OperationError> {
+        match self {
+            &Value::Nil => Ok(0),
+            &Value::Set(ref set) => Ok(set.len()),
+            _ => Err(OperationError::WrongTypeError),
+        }
+    }
 }
 
 pub struct Database {

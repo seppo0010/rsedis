@@ -453,3 +453,15 @@ fn sadd() {
     assert_eq!(el.sadd(Vec::clone(&value)).unwrap(), true);
     assert_eq!(el.sadd(Vec::clone(&value)).unwrap(), false);
 }
+
+#[test]
+fn scard() {
+    let mut database = Database::new();
+    let key = vec![1u8];
+    let value = vec![1u8, 2, 3, 4];
+
+    let mut el = database.get_or_create(&key);
+    assert_eq!(el.scard().unwrap(), 0);
+    assert_eq!(el.sadd(Vec::clone(&value)).unwrap(), true);
+    assert_eq!(el.scard().unwrap(), 1);
+}
