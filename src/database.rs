@@ -346,6 +346,28 @@ impl Value {
             _ => Err(OperationError::WrongTypeError),
         }
     }
+
+    pub fn sdiff(&self, sets: &Vec<&Value>) -> Result<HashSet<Vec<u8>>, OperationError> {
+        match self {
+            &Value::Nil => Ok(HashSet::new()),
+            &Value::Set(ref original_set) => {
+                let mut elements: HashSet<Vec<u8>> = original_set.clone();
+                for value in sets {
+                    match value {
+                        &&Value::Nil => {},
+                        &&Value::Set(ref set) => {
+                            for el in set {
+                                elements.remove(el);
+                            }
+                        },
+                        _ => return Err(OperationError::WrongTypeError),
+                    }
+                }
+                Ok(elements)
+            },
+            _ => Err(OperationError::WrongTypeError),
+        }
+    }
 }
 
 pub struct Database {
