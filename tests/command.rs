@@ -42,11 +42,7 @@ fn set_command() {
                 Argument {pos: 3, len: 3},
                 Argument {pos: 6, len: 5},
                 ));
-    let response = command(&parser, &mut db);
-    match response {
-        Response::Status(msg) => assert_eq!(msg, "OK"),
-        _ => assert!(false),
-    };
+    assert_eq!(command(&parser, &mut db), Response::Status("OK".to_owned()));
     assert_eq!("value", getstr(&db, b"key"));
 }
 
@@ -58,11 +54,7 @@ fn get_command() {
                 Argument {pos: 0, len: 3},
                 Argument {pos: 3, len: 3},
                 ));
-    let response = command(&parser, &mut db);
-    match response {
-        Response::Data(msg) => assert_eq!(msg, b"value"),
-        _ => assert!(false),
-    };
+    assert_eq!(command(&parser, &mut db), Response::Data("value".to_owned().into_bytes()));
     assert_eq!("value", getstr(&db, b"key"));
 }
 
@@ -75,11 +67,7 @@ fn del_command() {
                 Argument {pos: 3, len: 3},
                 Argument {pos: 6, len: 4},
                 ));
-    let response = command(&parser, &mut db);
-    match response {
-        Response::Integer(i) => assert_eq!(i, 1),
-        _ => assert!(false),
-    };
+    assert_eq!(command(&parser, &mut db), Response::Integer(1));
 }
 
 #[test]
@@ -120,27 +108,16 @@ fn append_command() {
                 Argument {pos: 6, len: 3},
                 Argument {pos: 9, len: 5},
                 ));
-    let response = command(&parser, &mut db);
-    match response {
-        Response::Integer(i) => assert_eq!(i, 5),
-        _ => assert!(false),
-    };
+    assert_eq!(command(&parser, &mut db), Response::Integer(5));
 
     let parser = Parser::new(b"appendkeyvalue", 3, vec!(
                 Argument {pos: 0, len: 6},
                 Argument {pos: 6, len: 3},
                 Argument {pos: 9, len: 5},
                 ));
-    let response = command(&parser, &mut db);
-    match response {
-        Response::Integer(i) => assert_eq!(i, 10),
-        _ => assert!(false),
-    };
+    assert_eq!(command(&parser, &mut db), Response::Integer(10));
 
-    match db.get(&b"key".to_vec()).unwrap() {
-        &Value::Data(ref val) => assert_eq!(val, b"valuevalue"),
-            _ => assert!(false),
-    }
+    assert_eq!(db.get(&b"key".to_vec()).unwrap(), &Value::Data(b"valuevalue".to_vec()));
 }
 
 #[test]
@@ -150,14 +127,8 @@ fn incr_command() {
                 Argument {pos: 0, len: 4},
                 Argument {pos: 4, len: 3},
                 ));
-    match command(&parser, &mut db) {
-        Response::Integer(i) => assert_eq!(i, 1),
-        _ => assert!(false),
-    };
-    match command(&parser, &mut db) {
-        Response::Integer(i) => assert_eq!(i, 2),
-        _ => assert!(false),
-    };
+    assert_eq!(command(&parser, &mut db), Response::Integer(1));
+    assert_eq!(command(&parser, &mut db), Response::Integer(2));
 }
 
 #[test]
@@ -168,14 +139,8 @@ fn incrby_command() {
                 Argument {pos: 6, len: 3},
                 Argument {pos: 9, len: 1},
                 ));
-    match command(&parser, &mut db) {
-        Response::Integer(i) => assert_eq!(i, 5),
-        _ => assert!(false),
-    };
-    match command(&parser, &mut db) {
-        Response::Integer(i) => assert_eq!(i, 10),
-        _ => assert!(false),
-    };
+    assert_eq!(command(&parser, &mut db), Response::Integer(5));
+    assert_eq!(command(&parser, &mut db), Response::Integer(10));
 }
 
 #[test]
@@ -185,14 +150,8 @@ fn decr_command() {
                 Argument {pos: 0, len: 4},
                 Argument {pos: 4, len: 3},
                 ));
-    match command(&parser, &mut db) {
-        Response::Integer(i) => assert_eq!(i, -1),
-        _ => assert!(false),
-    };
-    match command(&parser, &mut db) {
-        Response::Integer(i) => assert_eq!(i, -2),
-        _ => assert!(false),
-    };
+    assert_eq!(command(&parser, &mut db), Response::Integer(-1));
+    assert_eq!(command(&parser, &mut db), Response::Integer(-2));
 }
 
 #[test]
@@ -203,14 +162,8 @@ fn decrby_command() {
                 Argument {pos: 6, len: 3},
                 Argument {pos: 9, len: 1},
                 ));
-    match command(&parser, &mut db) {
-        Response::Integer(i) => assert_eq!(i, -5),
-        _ => assert!(false),
-    };
-    match command(&parser, &mut db) {
-        Response::Integer(i) => assert_eq!(i, -10),
-        _ => assert!(false),
-    };
+    assert_eq!(command(&parser, &mut db), Response::Integer(-5));
+    assert_eq!(command(&parser, &mut db), Response::Integer(-10));
 }
 
 #[test]
@@ -221,14 +174,8 @@ fn lpush_command() {
                 Argument {pos: 5, len: 3},
                 Argument {pos: 8, len: 5},
                 ));
-    match command(&parser, &mut db) {
-        Response::Integer(i) => assert_eq!(i, 1),
-        _ => assert!(false),
-    };
-    match command(&parser, &mut db) {
-        Response::Integer(i) => assert_eq!(i, 2),
-        _ => assert!(false),
-    };
+    assert_eq!(command(&parser, &mut db), Response::Integer(1));
+    assert_eq!(command(&parser, &mut db), Response::Integer(2));
 }
 
 #[test]
@@ -239,14 +186,8 @@ fn rpush_command() {
                 Argument {pos: 5, len: 3},
                 Argument {pos: 8, len: 5},
                 ));
-    match command(&parser, &mut db) {
-        Response::Integer(i) => assert_eq!(i, 1),
-        _ => assert!(false),
-    };
-    match command(&parser, &mut db) {
-        Response::Integer(i) => assert_eq!(i, 2),
-        _ => assert!(false),
-    };
+    assert_eq!(command(&parser, &mut db), Response::Integer(1));
+    assert_eq!(command(&parser, &mut db), Response::Integer(2));
 }
 
 #[test]
@@ -273,18 +214,10 @@ fn lpop_command() {
                     Argument {pos: 0, len: 4},
                     Argument {pos: 4, len: 3},
                     ));
-        match command(&parser, &mut db) {
-            Response::Data(d) => assert_eq!(d, "value".to_owned().into_bytes()),
-            _ => assert!(false),
-        };
-        match command(&parser, &mut db) {
-            Response::Data(d) => assert_eq!(d, "valuf".to_owned().into_bytes()),
-            _ => assert!(false),
-        };
-        match command(&parser, &mut db) {
-            Response::Nil => {},
-            _ => assert!(false),
-        };
+
+        assert_eq!(command(&parser, &mut db), Response::Data("value".to_owned().into_bytes()));
+        assert_eq!(command(&parser, &mut db), Response::Data("valuf".to_owned().into_bytes()));
+        assert_eq!(command(&parser, &mut db), Response::Nil);
     }
 }
 
@@ -312,18 +245,9 @@ fn rpop_command() {
                     Argument {pos: 0, len: 4},
                     Argument {pos: 4, len: 3},
                     ));
-        match command(&parser, &mut db) {
-            Response::Data(d) => assert_eq!(d, "valuf".to_owned().into_bytes()),
-            _ => assert!(false),
-        };
-        match command(&parser, &mut db) {
-            Response::Data(d) => assert_eq!(d, "value".to_owned().into_bytes()),
-            _ => assert!(false),
-        };
-        match command(&parser, &mut db) {
-            Response::Nil => {},
-            _ => assert!(false),
-        };
+        assert_eq!(command(&parser, &mut db), Response::Data("valuf".to_owned().into_bytes()));
+        assert_eq!(command(&parser, &mut db), Response::Data("value".to_owned().into_bytes()));
+        assert_eq!(command(&parser, &mut db), Response::Nil);
     }
 }
 
@@ -352,10 +276,7 @@ fn lindex_command() {
                     Argument {pos: 6, len: 3},
                     Argument {pos: 9, len: 1},
                     ));
-        match command(&parser, &mut db) {
-            Response::Data(d) => assert_eq!(d, "value".to_owned().into_bytes()),
-            _ => assert!(false),
-        };
+        assert_eq!(command(&parser, &mut db), Response::Data("value".to_owned().into_bytes()));
     }
 }
 
@@ -386,10 +307,7 @@ fn linsert_command() {
                     Argument {pos: 16, len: 5},
                     Argument {pos: 21, len: 5},
                     ));
-        match command(&parser, &mut db) {
-            Response::Integer(d) => assert_eq!(d, 3),
-            _ => assert!(false),
-        };
+        assert_eq!(command(&parser, &mut db), Response::Integer(3));
     }
 }
 
@@ -410,10 +328,7 @@ fn llen_command() {
                     Argument {pos: 0, len: 4},
                     Argument {pos: 4, len: 3},
                     ));
-        match command(&parser, &mut db) {
-            Response::Integer(d) => assert_eq!(d, 2),
-            _ => assert!(false),
-        };
+        assert_eq!(command(&parser, &mut db), Response::Integer(2));
     }
 }
 
@@ -426,10 +341,7 @@ fn lpushx_command() {
                     Argument {pos: 6, len: 3},
                     Argument {pos: 9, len: 5},
                     ));
-        match command(&parser, &mut db) {
-            Response::Integer(d) => assert_eq!(d, 0),
-            _ => assert!(false),
-        };
+        assert_eq!(command(&parser, &mut db), Response::Integer(0));
     }
     {
         let parser = Parser::new(b"lpushkeyvalue", 3, vec!(
@@ -437,10 +349,7 @@ fn lpushx_command() {
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
                     ));
-        match command(&parser, &mut db) {
-            Response::Integer(d) => assert_eq!(d, 1),
-            _ => assert!(false),
-        };
+        assert_eq!(command(&parser, &mut db), Response::Integer(1));
     }
     {
         let parser = Parser::new(b"lpushxkeyvalue", 3, vec!(
@@ -448,10 +357,7 @@ fn lpushx_command() {
                     Argument {pos: 6, len: 3},
                     Argument {pos: 9, len: 5},
                     ));
-        match command(&parser, &mut db) {
-            Response::Integer(d) => assert_eq!(d, 2),
-            _ => assert!(false),
-        };
+        assert_eq!(command(&parser, &mut db), Response::Integer(2));
     }
 }
 
@@ -489,15 +395,11 @@ fn lrange_command() {
                     Argument {pos: 11, len: 1},
                     Argument {pos: 13, len: 2},
                     ));
-        match command(&parser, &mut db) {
-            Response::Array(ref arr) => {
-                assert_eq!(arr.len(), 3);
-                assert_eq!(arr[0], Response::Data("value".to_owned().into_bytes()));
-                assert_eq!(arr[1], Response::Data("valuf".to_owned().into_bytes()));
-                assert_eq!(arr[2], Response::Data("valug".to_owned().into_bytes()));
-            },
-            _ => assert!(false),
-        };
+        assert_eq!(command(&parser, &mut db), Response::Array(vec![
+                    Response::Data("value".to_owned().into_bytes()),
+                    Response::Data("valuf".to_owned().into_bytes()),
+                    Response::Data("valug".to_owned().into_bytes()),
+                    ]));
     }
 }
 
@@ -522,20 +424,14 @@ fn lrem_command() {
                     Argument {pos: 7, len: 1},
                     Argument {pos: 8, len: 5},
                     ));
-        match command(&parser, &mut db) {
-            Response::Integer(d) => assert_eq!(d, 2),
-            _ => assert!(false),
-        };
+        assert_eq!(command(&parser, &mut db), Response::Integer(2));
     }
     {
         let parser = Parser::new(b"llenkey", 2, vec!(
                     Argument {pos: 0, len: 4},
                     Argument {pos: 4, len: 3},
                     ));
-        match command(&parser, &mut db) {
-            Response::Integer(d) => assert_eq!(d, 2),
-            _ => assert!(false),
-        };
+        assert_eq!(command(&parser, &mut db), Response::Integer(2));
     }
 }
 
@@ -560,10 +456,7 @@ fn lset_command() {
                     Argument {pos: 7, len: 1},
                     Argument {pos: 8, len: 5},
                     ));
-        match command(&parser, &mut db) {
-            Response::Status(st) => assert_eq!(st, "OK".to_owned()),
-            _ => assert!(false),
-        };
+        assert_eq!(command(&parser, &mut db), Response::Status("OK".to_owned()));
     }
     {
         let parser = Parser::new(b"lrangekey22", 4, vec!(
@@ -572,13 +465,9 @@ fn lset_command() {
                     Argument {pos: 9, len: 1},
                     Argument {pos: 10, len: 1},
                     ));
-        match command(&parser, &mut db) {
-            Response::Array(ref arr) => {
-                assert_eq!(arr.len(), 1);
-                assert_eq!(arr[0], Response::Data("valuf".to_owned().into_bytes()));
-            },
-            _ => assert!(false),
-        };
+        assert_eq!(command(&parser, &mut db), Response::Array(vec![
+                    Response::Data("valuf".to_owned().into_bytes()),
+                    ]));
     }
 }
 
@@ -682,10 +571,7 @@ fn ltrim_command() {
                     Argument {pos: 8, len: 1},
                     Argument {pos: 9, len: 2},
                     ));
-        match command(&parser, &mut db) {
-            Response::Status(st) => assert_eq!(st, "OK".to_owned()),
-            _ => assert!(false),
-        };
+        assert_eq!(command(&parser, &mut db), Response::Status("OK".to_owned()));
     }
     {
         let parser = Parser::new(b"lrangekey0-1", 4, vec!(
@@ -694,14 +580,10 @@ fn ltrim_command() {
                     Argument {pos: 9, len: 1},
                     Argument {pos: 10, len: 2},
                     ));
-        match command(&parser, &mut db) {
-            Response::Array(ref arr) => {
-                assert_eq!(arr.len(), 2);
-                assert_eq!(arr[0], Response::Data("value".to_owned().into_bytes()));
-                assert_eq!(arr[1], Response::Data("valuf".to_owned().into_bytes()));
-            },
-            _ => assert!(false),
-        };
+        assert_eq!(command(&parser, &mut db), Response::Array(vec![
+                    Response::Data("value".to_owned().into_bytes()),
+                    Response::Data("valuf".to_owned().into_bytes()),
+                    ]));
     }
 }
 
@@ -718,14 +600,8 @@ fn sadd_command() {
                     Argument {pos: 10, len: 1},
                     Argument {pos: 11, len: 1},
                     ));
-        match command(&parser, &mut db) {
-            Response::Integer(i) => assert_eq!(i, 3),
-            _ => assert!(false),
-        };
-        match command(&parser, &mut db) {
-            Response::Integer(i) => assert_eq!(i, 0),
-            _ => assert!(false),
-        };
+        assert_eq!(command(&parser, &mut db), Response::Integer(3));
+        assert_eq!(command(&parser, &mut db), Response::Integer(0));
     }
 }
 
