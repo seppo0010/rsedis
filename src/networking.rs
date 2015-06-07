@@ -68,10 +68,12 @@ impl Client {
             }
             let parser = try_parser.unwrap();
             let mut db = self.db.lock().unwrap();
-            let response = command(&parser, &mut *db, &mut dbindex);
-            if tx.send(response).is_err() {
-                // TODO: send a kill signal to the writer thread?
-                break;
+            match command(&parser, &mut *db, &mut dbindex) {
+                Some(response) => if tx.send(response).is_err() {
+                    // TODO: send a kill signal to the writer thread?
+                    break;
+                },
+                None => (),
             }
         };
     }

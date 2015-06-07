@@ -30,6 +30,22 @@ impl Response {
     }
 }
 
+macro_rules! opt_validate {
+    ($expr: expr, $err: expr) => (
+        if !($expr) {
+            return Some(Response::Error($err.to_string()));
+        }
+    )
+}
+
+macro_rules! try_opt_validate {
+    ($expr: expr, $err: expr) => ({
+        let res = $expr;
+        opt_validate!(res.is_ok(), $err);
+        res.unwrap()
+    })
+}
+
 macro_rules! validate {
     ($expr: expr, $err: expr) => (
         if !($expr) {
@@ -387,20 +403,20 @@ fn ping(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     return Response::Data(b"PONG".to_vec());
 }
 
-pub fn command(parser: &Parser, db: &mut Database, _dbindex: &mut usize) -> Response {
-    validate!(parser.argc > 0, "Not enough arguments");
-    let command = try_validate!(parser.get_str(0), "Invalid command");
+pub fn command(parser: &Parser, db: &mut Database, _dbindex: &mut usize) -> Option<Response> {
+    opt_validate!(parser.argc > 0, "Not enough arguments");
+    let command = try_opt_validate!(parser.get_str(0), "Invalid command");
     if command == "select" {
-        validate!(parser.argc == 2, "Wrong number of parameters");
-        let dbindex = try_validate!(parser.get_i64(1), "Invalid dbindex") as usize;
+        opt_validate!(parser.argc == 2, "Wrong number of parameters");
+        let dbindex = try_opt_validate!(parser.get_i64(1), "Invalid dbindex") as usize;
         if dbindex > db.size {
-            return Response::Error("dbindex out of range".to_owned());
+            return Some(Response::Error("dbindex out of range".to_owned()));
         }
         *_dbindex = dbindex;
-        return Response::Status("OK".to_owned());
+        return Some(Response::Status("OK".to_owned()));
     }
     let dbindex = _dbindex.clone();
-    return match command {
+    return Some(match command {
         "set" => set(parser, db, dbindex),
         "del" => del(parser, db, dbindex),
         "append" => append(parser, db, dbindex),
@@ -429,5 +445,5 @@ pub fn command(parser: &Parser, db: &mut Database, _dbindex: &mut usize) -> Resp
         "sadd" => sadd(parser, db, dbindex),
         "scard" => scard(parser, db, dbindex),
         _ => Response::Error("Unknown command".to_owned()),
-    };
+    });
 }
