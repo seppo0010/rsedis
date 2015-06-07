@@ -69,6 +69,12 @@ fn del(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     return Response::Integer(c);
 }
 
+fn flushdb(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    validate!(parser.argc == 1, "Wrong number of parameters");
+    db.clear(dbindex);
+    return Response::Status("OK".to_owned());
+}
+
 fn flushall(parser: &Parser, db: &mut Database, _: usize) -> Response {
     validate!(parser.argc == 1, "Wrong number of parameters");
     db.clearall();
@@ -404,6 +410,7 @@ pub fn command(parser: &Parser, db: &mut Database, _dbindex: &mut usize) -> Resp
         "incrby" => return incrby(parser, db, dbindex),
         "decrby" => return decrby(parser, db, dbindex),
         "ping" => return ping(parser, db, dbindex),
+        "flushdb" => return flushdb(parser, db, dbindex),
         "flushall" => return flushall(parser, db, dbindex),
         "lpush" => return lpush(parser, db, dbindex),
         "rpush" => return rpush(parser, db, dbindex),

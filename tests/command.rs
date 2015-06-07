@@ -640,3 +640,85 @@ fn select_command() {
         assert_eq!(dbindex, 1);
     }
 }
+
+#[test]
+fn flushdb_command() {
+    let mut db = Database::new();
+    {
+        let parser = Parser::new(b"setkeyvalue", 3, vec!(
+                    Argument {pos: 0, len: 3},
+                    Argument {pos: 3, len: 3},
+                    Argument {pos: 6, len: 5},
+                    ));
+        assert_eq!(command(&parser, &mut db, &mut 0), Response::Status("OK".to_owned()));
+    }
+    {
+        let parser = Parser::new(b"setkeyvaluf", 3, vec!(
+                    Argument {pos: 0, len: 3},
+                    Argument {pos: 3, len: 3},
+                    Argument {pos: 6, len: 5},
+                    ));
+        assert_eq!(command(&parser, &mut db, &mut 1), Response::Status("OK".to_owned()));
+    }
+    {
+        let parser = Parser::new(b"flushdb", 1, vec!(
+                    Argument {pos: 0, len: 7},
+                    ));
+        assert_eq!(command(&parser, &mut db, &mut 1), Response::Status("OK".to_owned()));
+    }
+    {
+        let parser = Parser::new(b"getkey", 2, vec!(
+                    Argument {pos: 0, len: 3},
+                    Argument {pos: 3, len: 3},
+                    ));
+        assert_eq!(command(&parser, &mut db, &mut 0), Response::Data("value".to_owned().into_bytes()));
+    }
+    {
+        let parser = Parser::new(b"getkey", 2, vec!(
+                    Argument {pos: 0, len: 3},
+                    Argument {pos: 3, len: 3},
+                    ));
+        assert_eq!(command(&parser, &mut db, &mut 1), Response::Nil);
+    }
+}
+
+#[test]
+fn flushall_command() {
+    let mut db = Database::new();
+    {
+        let parser = Parser::new(b"setkeyvalue", 3, vec!(
+                    Argument {pos: 0, len: 3},
+                    Argument {pos: 3, len: 3},
+                    Argument {pos: 6, len: 5},
+                    ));
+        assert_eq!(command(&parser, &mut db, &mut 0), Response::Status("OK".to_owned()));
+    }
+    {
+        let parser = Parser::new(b"setkeyvaluf", 3, vec!(
+                    Argument {pos: 0, len: 3},
+                    Argument {pos: 3, len: 3},
+                    Argument {pos: 6, len: 5},
+                    ));
+        assert_eq!(command(&parser, &mut db, &mut 1), Response::Status("OK".to_owned()));
+    }
+    {
+        let parser = Parser::new(b"flushall", 1, vec!(
+                    Argument {pos: 0, len: 8},
+                    ));
+        assert_eq!(command(&parser, &mut db, &mut 1), Response::Status("OK".to_owned()));
+    }
+    {
+        let parser = Parser::new(b"getkey", 2, vec!(
+                    Argument {pos: 0, len: 3},
+                    Argument {pos: 3, len: 3},
+                    ));
+        assert_eq!(command(&parser, &mut db, &mut 0), Response::Nil);
+    }
+    {
+        let parser = Parser::new(b"getkey", 2, vec!(
+                    Argument {pos: 0, len: 3},
+                    Argument {pos: 3, len: 3},
+                    ));
+        assert_eq!(command(&parser, &mut db, &mut 1), Response::Nil);
+    }
+}
