@@ -381,15 +381,20 @@ fn ping(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     return Response::Data(b"PONG".to_vec());
 }
 
-pub fn command(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
-    if parser.argc == 0 {
-        return Response::Error("Not enough arguments".to_owned());
+pub fn command(parser: &Parser, db: &mut Database, _dbindex: &mut usize) -> Response {
+    validate!(parser.argc > 0, "Not enough arguments");
+    let command = try_validate!(parser.get_str(0), "Invalid command");
+    if command == "select" {
+        validate!(parser.argc == 2, "Wrong number of parameters");
+        let dbindex = try_validate!(parser.get_i64(1), "Invalid dbindex") as usize;
+        if dbindex > db.size {
+            return Response::Error("dbindex out of range".to_owned());
+        }
+        *_dbindex = dbindex;
+        return Response::Status("OK".to_owned());
     }
-    let try_command = parser.get_str(0);
-    if try_command.is_err() {
-        return Response::Error("Invalid command".to_owned());
-    }
-    match try_command.unwrap() {
+    let dbindex = _dbindex.clone();
+    match command {
         "set" => return set(parser, db, dbindex),
         "del" => return del(parser, db, dbindex),
         "append" => return append(parser, db, dbindex),

@@ -48,7 +48,7 @@ impl Client {
             });
         }
         let mut buffer = [0u8; 512];
-        let dbindex = 0;
+        let mut dbindex = 0;
         loop {
             let result = self.stream.read(&mut buffer);
             if result.is_err() {
@@ -68,7 +68,7 @@ impl Client {
             }
             let parser = try_parser.unwrap();
             let mut db = self.db.lock().unwrap();
-            let response = command(&parser, &mut *db, dbindex);
+            let response = command(&parser, &mut *db, &mut dbindex);
             if tx.send(response).is_err() {
                 // TODO: send a kill signal to the writer thread?
                 break;

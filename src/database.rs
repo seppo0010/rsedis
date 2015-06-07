@@ -372,7 +372,7 @@ impl Value {
 
 pub struct Database {
     data: Vec<HashMap<Vec<u8>, Value>>,
-    size: usize,
+    pub size: usize,
 }
 
 impl Database {
