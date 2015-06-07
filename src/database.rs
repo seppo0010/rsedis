@@ -6,6 +6,7 @@ use std::collections::LinkedList;
 use std::str::from_utf8;
 use std::str::Utf8Error;
 use std::num::ParseIntError;
+use std::sync::mpsc::Sender;
 
 #[derive(PartialEq)]
 #[derive(Debug)]
@@ -373,6 +374,7 @@ impl Value {
 pub struct Database {
     data: Vec<HashMap<Vec<u8>, Value>>,
     pub size: usize,
+    subscribers: HashMap<Vec<u8>, Vec<Sender<Vec<u8>>>>,
 }
 
 impl Database {
@@ -385,6 +387,7 @@ impl Database {
         return Database {
             data: data,
             size: size,
+            subscribers: HashMap::new(),
         };
     }
 
@@ -402,6 +405,34 @@ impl Database {
 
     pub fn clear(&mut self, index: usize) {
         self.data[index].clear()
+    }
+
+    fn ensure_channel(&mut self, channel: &Vec<u8>) {
+        if !self.subscribers.contains_key(channel) {
+            self.subscribers.insert(channel.clone(), Vec::new());
+        }
+    }
+
+    pub fn subscribe(&mut self, channel: Vec<u8>, sender: Sender<Vec<u8>>) {
+        self.ensure_channel(&channel);
+        let mut channelsubscribers = self.subscribers.get_mut(&channel).unwrap();
+        channelsubscribers.push(sender);
+    }
+
+    pub fn publish(&self, channel: &Vec<u8>, message: &Vec<u8>) -> usize {
+        match self.subscribers.get(channel) {
+            Some(channels) => {
+                let mut c = 0;
+                for channel in channels {
+                    match channel.send(message.clone()) {
+                        Ok(_) => c += 1,
+                        Err(_) => (),
+                    }
+                }
+                c
+            }
+            None => 0
+        }
     }
 
     pub fn clearall(&mut self) {
