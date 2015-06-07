@@ -374,7 +374,8 @@ impl Value {
 pub struct Database {
     data: Vec<HashMap<Vec<u8>, Value>>,
     pub size: usize,
-    subscribers: HashMap<Vec<u8>, Vec<Sender<Vec<u8>>>>,
+    subscribers: HashMap<Vec<u8>, HashMap<usize, Sender<Vec<u8>>>>,
+    subscriber_id: usize,
 }
 
 impl Database {
@@ -388,6 +389,7 @@ impl Database {
             data: data,
             size: size,
             subscribers: HashMap::new(),
+            subscriber_id: 0,
         };
     }
 
@@ -409,21 +411,32 @@ impl Database {
 
     fn ensure_channel(&mut self, channel: &Vec<u8>) {
         if !self.subscribers.contains_key(channel) {
-            self.subscribers.insert(channel.clone(), Vec::new());
+            self.subscribers.insert(channel.clone(), HashMap::new());
         }
     }
 
-    pub fn subscribe(&mut self, channel: Vec<u8>, sender: Sender<Vec<u8>>) {
+    pub fn subscribe(&mut self, channel: Vec<u8>, sender: Sender<Vec<u8>>) -> usize {
         self.ensure_channel(&channel);
         let mut channelsubscribers = self.subscribers.get_mut(&channel).unwrap();
-        channelsubscribers.push(sender);
+        let subscriber_id = self.subscriber_id;
+        channelsubscribers.insert(subscriber_id, sender);
+        self.subscriber_id += 1;
+        subscriber_id
+    }
+
+    pub fn unsubscribe(&mut self, channel: Vec<u8>, subscriber_id: usize) -> bool {
+        if !self.subscribers.contains_key(&channel) {
+            return false;
+        }
+        let mut channelsubscribers = self.subscribers.get_mut(&channel).unwrap();
+        channelsubscribers.remove(&subscriber_id).is_some()
     }
 
     pub fn publish(&self, channel: &Vec<u8>, message: &Vec<u8>) -> usize {
         match self.subscribers.get(channel) {
             Some(channels) => {
                 let mut c = 0;
-                for channel in channels {
+                for (_, channel) in channels {
                     match channel.send(message.clone()) {
                         Ok(_) => c += 1,
                         Err(_) => (),
