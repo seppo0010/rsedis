@@ -46,22 +46,22 @@ macro_rules! try_validate {
     })
 }
 
-fn set(parser: &Parser, db: &mut Database) -> Response {
+fn set(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argc == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let val = try_validate!(parser.get_vec(2), "Invalid value");
-    return match db.get_or_create(&key).set(val) {
+    return match db.get_or_create(dbindex, &key).set(val) {
         Ok(_) => Response::Status("OK".to_owned()),
         Err(err) => Response::Error(err.to_string()),
     }
 }
 
-fn del(parser: &Parser, db: &mut Database) -> Response {
+fn del(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argc >= 2, "Wrong number of parameters");
     let mut c = 0;
     for i in 1..parser.argc {
         let key = try_validate!(parser.get_vec(i), "Invalid key");
-        match db.remove(&key) {
+        match db.remove(dbindex, &key) {
             Some(_) => c += 1,
             None => {},
         }
@@ -69,26 +69,26 @@ fn del(parser: &Parser, db: &mut Database) -> Response {
     return Response::Integer(c);
 }
 
-fn flushall(parser: &Parser, db: &mut Database) -> Response {
+fn flushall(parser: &Parser, db: &mut Database, _: usize) -> Response {
     validate!(parser.argc == 1, "Wrong number of parameters");
-    db.clear();
+    db.clearall();
     return Response::Status("OK".to_owned());
 }
 
-fn append(parser: &Parser, db: &mut Database) -> Response {
+fn append(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argc == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let val = try_validate!(parser.get_vec(2), "Invalid value");
-    return match db.get_or_create(&key).append(val) {
+    return match db.get_or_create(dbindex, &key).append(val) {
         Ok(len) => Response::Integer(len as i64),
         Err(err) => Response::Error(err.to_string()),
     }
 }
 
-fn get(parser: &Parser, db: &mut Database) -> Response {
+fn get(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argc == 2, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
-    let obj = db.get(&key);
+    let obj = db.get(dbindex, &key);
     match obj {
         Some(value) => {
             match value {
@@ -101,47 +101,47 @@ fn get(parser: &Parser, db: &mut Database) -> Response {
     }
 }
 
-fn generic_incr(parser: &Parser, db: &mut Database, increment: i64) -> Response {
+fn generic_incr(parser: &Parser, db: &mut Database, dbindex: usize, increment: i64) -> Response {
     let key = try_validate!(parser.get_vec(1), "Invalid key");
-    match db.get_or_create(&key).incr(increment) {
+    match db.get_or_create(dbindex, &key).incr(increment) {
         Ok(val) => Response::Integer(val),
         Err(err) =>  Response::Error(err.to_string()),
     }
 }
 
-fn incr(parser: &Parser, db: &mut Database) -> Response {
+fn incr(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argc == 2, "Wrong number of parameters");
-    return generic_incr(parser, db, 1);
+    return generic_incr(parser, db, dbindex, 1);
 }
 
-fn decr(parser: &Parser, db: &mut Database) -> Response {
+fn decr(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argc == 2, "Wrong number of parameters");
-    return generic_incr(parser, db, -1);
+    return generic_incr(parser, db, dbindex, -1);
 }
 
-fn incrby(parser: &Parser, db: &mut Database) -> Response {
+fn incrby(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argc == 3, "Wrong number of parameters");
     let try_increment = parser.get_i64(2);
     if try_increment.is_err() { return Response::Error("Invalid increment".to_owned()); }
-    return generic_incr(parser, db, try_increment.unwrap());
+    return generic_incr(parser, db, dbindex, try_increment.unwrap());
 }
 
-fn decrby(parser: &Parser, db: &mut Database) -> Response {
+fn decrby(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argc == 3, "Wrong number of parameters");
     let try_increment = parser.get_i64(2);
     if try_increment.is_err() { return Response::Error("Invalid decrement".to_owned()); }
-    return generic_incr(parser, db, -try_increment.unwrap());
+    return generic_incr(parser, db, dbindex, -try_increment.unwrap());
 }
 
-fn generic_push(parser: &Parser, db: &mut Database, right: bool, create: bool) -> Response {
+fn generic_push(parser: &Parser, db: &mut Database, dbindex: usize, right: bool, create: bool) -> Response {
     validate!(parser.argc == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let val = try_validate!(parser.get_vec(2), "Invalid value");
     let el;
     if create {
-        el = db.get_or_create(&key);
+        el = db.get_or_create(dbindex, &key);
     } else {
-        match db.get_mut(&key) {
+        match db.get_mut(dbindex, &key) {
             Some(_el) => el = _el,
             None => return Response::Integer(0),
         }
@@ -152,26 +152,26 @@ fn generic_push(parser: &Parser, db: &mut Database, right: bool, create: bool) -
     }
 }
 
-fn lpush(parser: &Parser, db: &mut Database) -> Response {
-    return generic_push(parser, db, false, true);
+fn lpush(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    return generic_push(parser, db, dbindex, false, true);
 }
 
-fn rpush(parser: &Parser, db: &mut Database) -> Response {
-    return generic_push(parser, db, true, true);
+fn rpush(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    return generic_push(parser, db, dbindex, true, true);
 }
 
-fn lpushx(parser: &Parser, db: &mut Database) -> Response {
-    return generic_push(parser, db, false, false);
+fn lpushx(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    return generic_push(parser, db, dbindex, false, false);
 }
 
-fn rpushx(parser: &Parser, db: &mut Database) -> Response {
-    return generic_push(parser, db, true, false);
+fn rpushx(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    return generic_push(parser, db, dbindex, true, false);
 }
 
-fn generic_pop(parser: &Parser, db: &mut Database, right: bool) -> Response {
+fn generic_pop(parser: &Parser, db: &mut Database, dbindex: usize, right: bool) -> Response {
     validate!(parser.argc == 2, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
-    return match db.get_mut(&key) {
+    return match db.get_mut(dbindex, &key) {
         Some(mut list) => match list.pop(right) {
             Ok(el) => {
                 match el {
@@ -185,21 +185,21 @@ fn generic_pop(parser: &Parser, db: &mut Database, right: bool) -> Response {
     }
 }
 
-fn lpop(parser: &Parser, db: &mut Database) -> Response {
-    return generic_pop(parser, db, false);
+fn lpop(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    return generic_pop(parser, db, dbindex, false);
 }
 
-fn rpop(parser: &Parser, db: &mut Database) -> Response {
-    return generic_pop(parser, db, true);
+fn rpop(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    return generic_pop(parser, db, dbindex, true);
 }
 
-fn rpoplpush(parser: &Parser, db: &mut Database) -> Response {
+fn rpoplpush(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     #![allow(unused_must_use)]
     validate!(parser.argc == 3, "Wrong number of parameters");
     let source = try_validate!(parser.get_vec(1), "Invalid source");
     let destination = try_validate!(parser.get_vec(2), "Invalid destination");
 
-    match db.get(&destination) {
+    match db.get(dbindex, &destination) {
         Some(el) => match el.llen() {
             Ok(_) => (),
             Err(_) => return Response::Error("Destination is not a list".to_owned()),
@@ -208,7 +208,7 @@ fn rpoplpush(parser: &Parser, db: &mut Database) -> Response {
     }
 
     let el = {
-        let sourcelist = match db.get_mut(&source) {
+        let sourcelist = match db.get_mut(dbindex, &source) {
             Some(sourcelist) => {
                 if sourcelist.llen().is_err() {
                     return Response::Error("Source is not a list".to_owned());
@@ -226,17 +226,17 @@ fn rpoplpush(parser: &Parser, db: &mut Database) -> Response {
         }
     };
 
-    let destinationlist = db.get_or_create(&destination);
+    let destinationlist = db.get_or_create(dbindex, &destination);
     let resp = Response::Data(el.clone());
     destinationlist.push(el, false);
     resp
 }
 
-fn lindex(parser: &Parser, db: &mut Database) -> Response {
+fn lindex(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argc == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let index = try_validate!(parser.get_i64(2), "Invalid index");
-    return match db.get(&key) {
+    return match db.get(dbindex, &key) {
         Some(el) => match el.lindex(index) {
             Ok(el) => {
                 match el {
@@ -250,7 +250,7 @@ fn lindex(parser: &Parser, db: &mut Database) -> Response {
     }
 }
 
-fn linsert(parser: &Parser, db: &mut Database) -> Response {
+fn linsert(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argc == 5, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let before_str = try_validate!(parser.get_str(2), "Syntax error");
@@ -262,7 +262,7 @@ fn linsert(parser: &Parser, db: &mut Database) -> Response {
         "before" => before = true,
         _ => return Response::Error("ERR Syntax error".to_owned()),
     };
-    return match db.get_mut(&key) {
+    return match db.get_mut(dbindex, &key) {
         Some(mut el) => match el.linsert(before, pivot, value) {
             Ok(r) => {
                 match r {
@@ -276,10 +276,10 @@ fn linsert(parser: &Parser, db: &mut Database) -> Response {
     }
 }
 
-fn llen(parser: &Parser, db: &mut Database) -> Response {
+fn llen(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argc == 2, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
-    return match db.get(&key) {
+    return match db.get(dbindex, &key) {
         Some(el) => match el.llen() {
             Ok(listsize) => Response::Integer(listsize as i64),
             Err(err) => Response::Error(err.to_string()),
@@ -288,12 +288,12 @@ fn llen(parser: &Parser, db: &mut Database) -> Response {
     }
 }
 
-fn lrange(parser: &Parser, db: &mut Database) -> Response {
+fn lrange(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argc == 4, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let start = try_validate!(parser.get_i64(2), "Invalid range");
     let stop  = try_validate!(parser.get_i64(3), "Invalid range");
-    return match db.get(&key) {
+    return match db.get(dbindex, &key) {
         Some(el) => match el.lrange(start, stop) {
             Ok(items) => Response::Array(items.iter().map(|i| Response::Data(i.to_vec())).collect()),
             Err(err) => Response::Error(err.to_string()),
@@ -302,12 +302,12 @@ fn lrange(parser: &Parser, db: &mut Database) -> Response {
     }
 }
 
-fn lrem(parser: &Parser, db: &mut Database) -> Response {
+fn lrem(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argc == 4, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let count = try_validate!(parser.get_i64(2), "Invalid count");
     let value = try_validate!(parser.get_vec(3), "Invalid value");
-    return match db.get_mut(&key) {
+    return match db.get_mut(dbindex, &key) {
         Some(ref mut el) => match el.lrem(count < 0, count.abs() as usize, value) {
             Ok(removed) => Response::Integer(removed as i64),
             Err(err) => Response::Error(err.to_string()),
@@ -316,12 +316,12 @@ fn lrem(parser: &Parser, db: &mut Database) -> Response {
     }
 }
 
-fn lset(parser: &Parser, db: &mut Database) -> Response {
+fn lset(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argc == 4, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let index = try_validate!(parser.get_i64(2), "Invalid index");
     let value = try_validate!(parser.get_vec(3), "Invalid value");
-    return match db.get_mut(&key) {
+    return match db.get_mut(dbindex, &key) {
         Some(ref mut el) => match el.lset(index, value) {
             Ok(()) => Response::Status("OK".to_owned()),
             Err(err) => Response::Error(err.to_string()),
@@ -330,12 +330,12 @@ fn lset(parser: &Parser, db: &mut Database) -> Response {
     }
 }
 
-fn ltrim(parser: &Parser, db: &mut Database) -> Response {
+fn ltrim(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argc == 4, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let start = try_validate!(parser.get_i64(2), "Invalid start");
     let stop = try_validate!(parser.get_i64(3), "Invalid stop");
-    return match db.get_mut(&key) {
+    return match db.get_mut(dbindex, &key) {
         Some(ref mut el) => match el.ltrim(start, stop) {
             Ok(()) => Response::Status("OK".to_owned()),
             Err(err) => Response::Error(err.to_string()),
@@ -344,10 +344,10 @@ fn ltrim(parser: &Parser, db: &mut Database) -> Response {
     }
 }
 
-fn sadd(parser: &Parser, db: &mut Database) -> Response {
+fn sadd(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argc > 2, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
-    let el = db.get_or_create(&key);
+    let el = db.get_or_create(dbindex, &key);
     let mut count = 0;
     for i in 2..parser.argc {
         let val = try_validate!(parser.get_vec(i), "Invalid value");
@@ -359,10 +359,10 @@ fn sadd(parser: &Parser, db: &mut Database) -> Response {
     return Response::Integer(count);
 }
 
-fn scard(parser: &Parser, db: &mut Database) -> Response {
+fn scard(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argc == 2, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
-    let el = match db.get(&key) {
+    let el = match db.get(dbindex, &key) {
         Some(e) => e,
         None => return Response::Integer(0),
     };
@@ -372,7 +372,7 @@ fn scard(parser: &Parser, db: &mut Database) -> Response {
     }
 }
 
-fn ping(parser: &Parser, db: &mut Database) -> Response {
+fn ping(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     #![allow(unused_variables)]
     validate!(parser.argc <= 2, "Wrong number of parameters");
     if parser.argc == 2 {
@@ -381,7 +381,7 @@ fn ping(parser: &Parser, db: &mut Database) -> Response {
     return Response::Data(b"PONG".to_vec());
 }
 
-pub fn command(parser: &Parser, db: &mut Database) -> Response {
+pub fn command(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     if parser.argc == 0 {
         return Response::Error("Not enough arguments".to_owned());
     }
@@ -390,32 +390,32 @@ pub fn command(parser: &Parser, db: &mut Database) -> Response {
         return Response::Error("Invalid command".to_owned());
     }
     match try_command.unwrap() {
-        "set" => return set(parser, db),
-        "del" => return del(parser, db),
-        "append" => return append(parser, db),
-        "get" => return get(parser, db),
-        "incr" => return incr(parser, db),
-        "decr" => return decr(parser, db),
-        "incrby" => return incrby(parser, db),
-        "decrby" => return decrby(parser, db),
-        "ping" => return ping(parser, db),
-        "flushall" => return flushall(parser, db),
-        "lpush" => return lpush(parser, db),
-        "rpush" => return rpush(parser, db),
-        "lpushx" => return lpushx(parser, db),
-        "rpushx" => return rpushx(parser, db),
-        "lpop" => return lpop(parser, db),
-        "rpop" => return rpop(parser, db),
-        "lindex" => return lindex(parser, db),
-        "linsert" => return linsert(parser, db),
-        "llen" => return llen(parser, db),
-        "lrange" => return lrange(parser, db),
-        "lrem" => return lrem(parser, db),
-        "lset" => return lset(parser, db),
-        "ltrim" => return ltrim(parser, db),
-        "rpoplpush" => return rpoplpush(parser, db),
-        "sadd" => return sadd(parser, db),
-        "scard" => return scard(parser, db),
+        "set" => return set(parser, db, dbindex),
+        "del" => return del(parser, db, dbindex),
+        "append" => return append(parser, db, dbindex),
+        "get" => return get(parser, db, dbindex),
+        "incr" => return incr(parser, db, dbindex),
+        "decr" => return decr(parser, db, dbindex),
+        "incrby" => return incrby(parser, db, dbindex),
+        "decrby" => return decrby(parser, db, dbindex),
+        "ping" => return ping(parser, db, dbindex),
+        "flushall" => return flushall(parser, db, dbindex),
+        "lpush" => return lpush(parser, db, dbindex),
+        "rpush" => return rpush(parser, db, dbindex),
+        "lpushx" => return lpushx(parser, db, dbindex),
+        "rpushx" => return rpushx(parser, db, dbindex),
+        "lpop" => return lpop(parser, db, dbindex),
+        "rpop" => return rpop(parser, db, dbindex),
+        "lindex" => return lindex(parser, db, dbindex),
+        "linsert" => return linsert(parser, db, dbindex),
+        "llen" => return llen(parser, db, dbindex),
+        "lrange" => return lrange(parser, db, dbindex),
+        "lrem" => return lrem(parser, db, dbindex),
+        "lset" => return lset(parser, db, dbindex),
+        "ltrim" => return ltrim(parser, db, dbindex),
+        "rpoplpush" => return rpoplpush(parser, db, dbindex),
+        "sadd" => return sadd(parser, db, dbindex),
+        "scard" => return scard(parser, db, dbindex),
         _ => return Response::Error("Unknown command".to_owned()),
     };
 }

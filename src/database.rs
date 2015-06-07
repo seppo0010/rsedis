@@ -371,38 +371,51 @@ impl Value {
 }
 
 pub struct Database {
-    data: HashMap<Vec<u8>, Value>,
+    data: Vec<HashMap<Vec<u8>, Value>>,
+    size: usize,
 }
 
 impl Database {
     pub fn new() -> Database {
+        let size = 16;
+        let mut data = Vec::with_capacity(size);
+        for _ in 0..size {
+            data.push(HashMap::new())
+        }
         return Database {
-            data: HashMap::new(),
+            data: data,
+            size: size,
         };
     }
 
-    pub fn get(&self, key: &Vec<u8>) -> Option<&Value> {
-        return self.data.get(key);
+    pub fn get(&self, index: usize, key: &Vec<u8>) -> Option<&Value> {
+        self.data[index].get(key)
     }
 
-    pub fn get_mut(&mut self, key: &Vec<u8>) -> Option<&mut Value> {
-        return self.data.get_mut(key);
+    pub fn get_mut(&mut self, index: usize, key: &Vec<u8>) -> Option<&mut Value> {
+        self.data[index].get_mut(key)
     }
 
-    pub fn remove(&mut self, key: &Vec<u8>) -> Option<Value> {
-        return self.data.remove(key);
+    pub fn remove(&mut self, index: usize, key: &Vec<u8>) -> Option<Value> {
+        self.data[index].remove(key)
     }
 
-    pub fn clear(&mut self) {
-        return self.data.clear();
+    pub fn clear(&mut self, index: usize) {
+        self.data[index].clear()
     }
 
-    pub fn get_or_create(&mut self, key: &Vec<u8>) -> &mut Value {
-        if self.data.contains_key(key) {
-            return self.data.get_mut(key).unwrap();
+    pub fn clearall(&mut self) {
+        for index in 0..self.size {
+            self.data[index].clear();
+        }
+    }
+
+    pub fn get_or_create(&mut self, index: usize, key: &Vec<u8>) -> &mut Value {
+        if self.data[index].contains_key(key) {
+            return self.data[index].get_mut(key).unwrap();
         }
         let val = Value::Nil;
-        self.data.insert(Vec::clone(key), val);
-        return self.data.get_mut(key).unwrap();
+        self.data[index].insert(Vec::clone(key), val);
+        return self.data[index].get_mut(key).unwrap();
     }
 }
