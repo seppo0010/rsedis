@@ -7,3 +7,4 @@ pub mod parser;
 pub mod pubsub;
 pub mod set;
 pub mod string;
+pub mod util;
