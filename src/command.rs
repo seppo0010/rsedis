@@ -1,5 +1,9 @@
 use std::ascii::AsciiExt;
+use std::collections::HashMap;
+use std::sync::mpsc::Sender;
+use std::str::from_utf8;
 
+use super::database::PubsubEvent;
 use super::database::Database;
 use super::database::Value;
 use super::parser::Parser;
@@ -403,7 +407,40 @@ fn ping(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     return Response::Data(b"PONG".to_vec());
 }
 
-pub fn command(parser: &Parser, db: &mut Database, _dbindex: &mut usize) -> Option<Response> {
+fn subscribe(parser: &Parser, db: &mut Database, subscriptions: &mut HashMap<Vec<u8>, usize>, sender: &Sender<PubsubEvent>) -> Option<Response> {
+    opt_validate!(parser.argc >= 2, "Wrong number of parameters");
+    for i in 1..parser.argc {
+        let channel_name = try_opt_validate!(parser.get_vec(i), "Invalid channel");
+        let subscriber_id = db.subscribe(channel_name.clone(), sender.clone());
+        subscriptions.insert(channel_name.clone(), subscriber_id);
+        sender.send(PubsubEvent::Subscription(channel_name, subscriptions.len()));
+    }
+    None
+}
+
+fn unsubscribe(parser: &Parser, db: &mut Database, subscriptions: &mut HashMap<Vec<u8>, usize>, sender: &Sender<PubsubEvent>) -> Option<Response> {
+    opt_validate!(parser.argc >= 2, "Wrong number of parameters");
+    for i in 1..parser.argc {
+        let channel_name = try_opt_validate!(parser.get_vec(i), "Invalid channel");
+        match subscriptions.remove(&channel_name) {
+            Some(subscriber_id) => {
+                db.unsubscribe(channel_name.clone(), subscriber_id);
+                sender.send(PubsubEvent::Unsubscription(channel_name, subscriptions.len()));
+            },
+            None => (),
+        }
+    }
+    None
+}
+
+fn publish(parser: &Parser, db: &mut Database) -> Response {
+    validate!(parser.argc == 3, "Wrong number of parameters");
+    let channel_name = try_validate!(parser.get_vec(1), "Invalid channel");
+    let message = try_validate!(parser.get_vec(2), "Invalid channel");
+    Response::Integer(db.publish(&channel_name, &message) as i64)
+}
+
+pub fn command(parser: &Parser, db: &mut Database, _dbindex: &mut usize, subscriptions: Option<&mut HashMap<Vec<u8>, usize>>, sender: Option<&Sender<PubsubEvent>>) -> Option<Response> {
     opt_validate!(parser.argc > 0, "Not enough arguments");
     let command = try_opt_validate!(parser.get_str(0), "Invalid command");
     if command == "select" {
@@ -444,6 +481,9 @@ pub fn command(parser: &Parser, db: &mut Database, _dbindex: &mut usize) -> Opti
         "rpoplpush" => rpoplpush(parser, db, dbindex),
         "sadd" => sadd(parser, db, dbindex),
         "scard" => scard(parser, db, dbindex),
+        "subscribe" => return subscribe(parser, db, subscriptions.unwrap(), sender.unwrap()),
+        "publish" => publish(parser, db),
+        "unsubscribe" => return unsubscribe(parser, db, subscriptions.unwrap(), sender.unwrap()),
         _ => Response::Error("Unknown command".to_owned()),
     });
 }

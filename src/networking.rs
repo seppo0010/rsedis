@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::net::{ToSocketAddrs, TcpListener, TcpStream};
 use std::io::{Read, Write};
 use std::thread;
@@ -6,7 +7,7 @@ use std::sync::mpsc::{Sender, channel};
 
 use super::command::command;
 use super::command::Response;
-use super::database::Database;
+use super::database::{Database, PubsubEvent};
 use super::parser::parse;
 use super::parser::ParseError;
 
@@ -22,6 +23,28 @@ pub struct Server<A: ToSocketAddrs + Clone> {
     listener_thread: Option<thread::JoinHandle<()>>,
 }
 
+impl PubsubEvent {
+    pub fn as_response(&self) -> Response {
+        match self {
+            &PubsubEvent::Message(ref channel, ref message) => Response::Array(vec![
+                    Response::Data(b"message".to_vec()),
+                    Response::Data(channel.clone()),
+                    Response::Data(message.clone()),
+                    ]),
+            &PubsubEvent::Subscription(ref channel, ref subscriptions) => Response::Array(vec![
+                    Response::Data(b"subscribe".to_vec()),
+                    Response::Data(channel.clone()),
+                    Response::Integer(subscriptions.clone() as i64),
+                    ]),
+            &PubsubEvent::Unsubscription(ref channel, ref subscriptions) => Response::Array(vec![
+                    Response::Data(b"unsubscribe".to_vec()),
+                    Response::Data(channel.clone()),
+                    Response::Integer(subscriptions.clone() as i64),
+                    ]),
+        }
+    }
+}
+
 impl Client {
     pub fn new(stream: TcpStream, db: Arc<Mutex<Database>>) -> Client {
         return Client {
@@ -32,7 +55,7 @@ impl Client {
 
     pub fn run(&mut self) {
         #![allow(unused_must_use)]
-        let (tx, rx) = channel();
+        let (stream_tx, rx) = channel();
         {
             let mut stream = self.stream.try_clone().unwrap();
             thread::spawn(move || {
@@ -47,8 +70,23 @@ impl Client {
                 }
             });
         }
+        let (pubsub_tx, pubsub_rx) = channel();
+        {
+            let tx = stream_tx.clone();
+            thread::spawn(move || {
+                loop {
+                    let try_recv = pubsub_rx.recv();
+                    if try_recv.is_err() {
+                        break;
+                    }
+                    let msg:PubsubEvent = try_recv.unwrap();
+                    tx.send(msg.as_response());
+                }
+            });
+        }
         let mut buffer = [0u8; 512];
         let mut dbindex = 0;
+        let mut subscriptions = HashMap::new();
         loop {
             let result = self.stream.read(&mut buffer);
             if result.is_err() {
@@ -68,8 +106,8 @@ impl Client {
             }
             let parser = try_parser.unwrap();
             let mut db = self.db.lock().unwrap();
-            match command(&parser, &mut *db, &mut dbindex) {
-                Some(response) => if tx.send(response).is_err() {
+            match command(&parser, &mut *db, &mut dbindex, Some(&mut subscriptions), Some(&pubsub_tx)) {
+                Some(response) => if stream_tx.send(response).is_err() {
                     // TODO: send a kill signal to the writer thread?
                     break;
                 },

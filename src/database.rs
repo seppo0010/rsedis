@@ -26,6 +26,14 @@ pub enum OperationError {
     OutOfBoundsError,
 }
 
+#[derive(PartialEq)]
+#[derive(Debug)]
+pub enum PubsubEvent {
+    Subscription(Vec<u8>, usize),
+    Message(Vec<u8>, Vec<u8>),
+    Unsubscription(Vec<u8>, usize),
+}
+
 impl fmt::Display for OperationError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.description().fmt(f)
@@ -374,7 +382,7 @@ impl Value {
 pub struct Database {
     data: Vec<HashMap<Vec<u8>, Value>>,
     pub size: usize,
-    subscribers: HashMap<Vec<u8>, HashMap<usize, Sender<Vec<u8>>>>,
+    subscribers: HashMap<Vec<u8>, HashMap<usize, Sender<PubsubEvent>>>,
     subscriber_id: usize,
 }
 
@@ -415,7 +423,7 @@ impl Database {
         }
     }
 
-    pub fn subscribe(&mut self, channel: Vec<u8>, sender: Sender<Vec<u8>>) -> usize {
+    pub fn subscribe(&mut self, channel: Vec<u8>, sender: Sender<PubsubEvent>) -> usize {
         self.ensure_channel(&channel);
         let mut channelsubscribers = self.subscribers.get_mut(&channel).unwrap();
         let subscriber_id = self.subscriber_id;
@@ -432,12 +440,12 @@ impl Database {
         channelsubscribers.remove(&subscriber_id).is_some()
     }
 
-    pub fn publish(&self, channel: &Vec<u8>, message: &Vec<u8>) -> usize {
-        match self.subscribers.get(channel) {
+    pub fn publish(&self, channel_name: &Vec<u8>, message: &Vec<u8>) -> usize {
+        match self.subscribers.get(channel_name) {
             Some(channels) => {
                 let mut c = 0;
                 for (_, channel) in channels {
-                    match channel.send(message.clone()) {
+                    match channel.send(PubsubEvent::Message(channel_name.clone(), message.clone())) {
                         Ok(_) => c += 1,
                         Err(_) => (),
                     }

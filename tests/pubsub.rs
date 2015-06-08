@@ -2,7 +2,7 @@ extern crate rsedis;
 
 use std::sync::mpsc::channel;
 
-use rsedis::database::Database;
+use rsedis::database::{Database, PubsubEvent};
 
 #[test]
 fn pubsub_basic() {
@@ -12,7 +12,7 @@ fn pubsub_basic() {
     let (tx, rx) = channel();
     database.subscribe(channel_name.clone(), tx);
     database.publish(&channel_name, &message);
-    assert_eq!(rx.recv().unwrap(), message);
+    assert_eq!(rx.recv().unwrap(), PubsubEvent::Message(channel_name, message));
 }
 
 #[test]
