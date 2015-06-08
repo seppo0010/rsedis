@@ -8,6 +8,8 @@ use std::str::Utf8Error;
 use std::num::ParseIntError;
 use std::sync::mpsc::Sender;
 
+use super::util::glob_match;
+
 #[derive(PartialEq)]
 #[derive(Debug)]
 pub enum Value {
@@ -30,8 +32,10 @@ pub enum OperationError {
 #[derive(Debug)]
 pub enum PubsubEvent {
     Subscription(Vec<u8>, usize),
-    Message(Vec<u8>, Vec<u8>),
     Unsubscription(Vec<u8>, usize),
+    PatternSubscription(Vec<u8>, usize),
+    PatternUnsubscription(Vec<u8>, usize),
+    Message(Vec<u8>, Option<Vec<u8>>, Vec<u8>),
 }
 
 impl fmt::Display for OperationError {
@@ -383,6 +387,7 @@ pub struct Database {
     data: Vec<HashMap<Vec<u8>, Value>>,
     pub size: usize,
     subscribers: HashMap<Vec<u8>, HashMap<usize, Sender<PubsubEvent>>>,
+    pattern_subscribers: HashMap<Vec<u8>, HashMap<usize, Sender<PubsubEvent>>>,
     subscriber_id: usize,
 }
 
@@ -397,6 +402,7 @@ impl Database {
             data: data,
             size: size,
             subscribers: HashMap::new(),
+            pattern_subscribers: HashMap::new(),
             subscriber_id: 0,
         };
     }
@@ -440,20 +446,53 @@ impl Database {
         channelsubscribers.remove(&subscriber_id).is_some()
     }
 
+    fn pensure_channel(&mut self, pattern: &Vec<u8>) {
+        if !self.pattern_subscribers.contains_key(pattern) {
+            self.pattern_subscribers.insert(pattern.clone(), HashMap::new());
+        }
+    }
+
+    pub fn psubscribe(&mut self, pattern: Vec<u8>, sender: Sender<PubsubEvent>) -> usize {
+        self.pensure_channel(&pattern);
+        let mut channelsubscribers = self.pattern_subscribers.get_mut(&pattern).unwrap();
+        let subscriber_id = self.subscriber_id;
+        channelsubscribers.insert(subscriber_id, sender);
+        self.subscriber_id += 1;
+        subscriber_id
+    }
+
+    pub fn punsubscribe(&mut self, pattern: Vec<u8>, subscriber_id: usize) -> bool {
+        if !self.pattern_subscribers.contains_key(&pattern) {
+            return false;
+        }
+        let mut channelsubscribers = self.pattern_subscribers.get_mut(&pattern).unwrap();
+        channelsubscribers.remove(&subscriber_id).is_some()
+    }
+
     pub fn publish(&self, channel_name: &Vec<u8>, message: &Vec<u8>) -> usize {
+        let mut c = 0;
         match self.subscribers.get(channel_name) {
             Some(channels) => {
-                let mut c = 0;
                 for (_, channel) in channels {
-                    match channel.send(PubsubEvent::Message(channel_name.clone(), message.clone())) {
+                    match channel.send(PubsubEvent::Message(channel_name.clone(), None, message.clone())) {
                         Ok(_) => c += 1,
                         Err(_) => (),
                     }
                 }
-                c
             }
-            None => 0
+            None => (),
         }
+        for (pattern, channels) in self.pattern_subscribers.iter() {
+            if glob_match(&pattern, &channel_name, false) {
+                for (_, channel) in channels {
+                    match channel.send(PubsubEvent::Message(channel_name.clone(), Some(pattern.clone()), message.clone())) {
+                        Ok(_) => c += 1,
+                        Err(_) => (),
+                    }
+                }
+            }
+        }
+        c
     }
 
     pub fn clearall(&mut self) {

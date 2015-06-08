@@ -26,11 +26,19 @@ pub struct Server<A: ToSocketAddrs + Clone> {
 impl PubsubEvent {
     pub fn as_response(&self) -> Response {
         match self {
-            &PubsubEvent::Message(ref channel, ref message) => Response::Array(vec![
-                    Response::Data(b"message".to_vec()),
-                    Response::Data(channel.clone()),
-                    Response::Data(message.clone()),
-                    ]),
+            &PubsubEvent::Message(ref channel, ref pattern, ref message) => match pattern {
+                &Some(ref pattern) => Response::Array(vec![
+                        Response::Data(b"message".to_vec()),
+                        Response::Data(channel.clone()),
+                        Response::Data(pattern.clone()),
+                        Response::Data(message.clone()),
+                        ]),
+                &None => Response::Array(vec![
+                        Response::Data(b"message".to_vec()),
+                        Response::Data(channel.clone()),
+                        Response::Data(message.clone()),
+                        ]),
+            },
             &PubsubEvent::Subscription(ref channel, ref subscriptions) => Response::Array(vec![
                     Response::Data(b"subscribe".to_vec()),
                     Response::Data(channel.clone()),
@@ -39,6 +47,16 @@ impl PubsubEvent {
             &PubsubEvent::Unsubscription(ref channel, ref subscriptions) => Response::Array(vec![
                     Response::Data(b"unsubscribe".to_vec()),
                     Response::Data(channel.clone()),
+                    Response::Integer(subscriptions.clone() as i64),
+                    ]),
+            &PubsubEvent::PatternSubscription(ref pattern, ref subscriptions) => Response::Array(vec![
+                    Response::Data(b"psubscribe".to_vec()),
+                    Response::Data(pattern.clone()),
+                    Response::Integer(subscriptions.clone() as i64),
+                    ]),
+            &PubsubEvent::PatternUnsubscription(ref pattern, ref subscriptions) => Response::Array(vec![
+                    Response::Data(b"punsubscribe".to_vec()),
+                    Response::Data(pattern.clone()),
                     Response::Integer(subscriptions.clone() as i64),
                     ]),
         }
@@ -87,6 +105,7 @@ impl Client {
         let mut buffer = [0u8; 512];
         let mut dbindex = 0;
         let mut subscriptions = HashMap::new();
+        let mut psubscriptions = HashMap::new();
         loop {
             let result = self.stream.read(&mut buffer);
             if result.is_err() {
@@ -106,7 +125,7 @@ impl Client {
             }
             let parser = try_parser.unwrap();
             let mut db = self.db.lock().unwrap();
-            match command(&parser, &mut *db, &mut dbindex, Some(&mut subscriptions), Some(&pubsub_tx)) {
+            match command(&parser, &mut *db, &mut dbindex, Some(&mut subscriptions), Some(&mut psubscriptions), Some(&pubsub_tx)) {
                 Some(response) => if stream_tx.send(response).is_err() {
                     // TODO: send a kill signal to the writer thread?
                     break;
