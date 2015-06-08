@@ -630,6 +630,70 @@ fn scard_command() {
 }
 
 #[test]
+fn sdiff_command() {
+    let mut db = Database::new();
+    {
+        let parser = Parser::new(b"saddkey123", 5, vec!(
+                    Argument {pos: 0, len: 4},
+                    Argument {pos: 4, len: 3},
+                    Argument {pos: 7, len: 1},
+                    Argument {pos: 8, len: 1},
+                    Argument {pos: 9, len: 1},
+                    ));
+        command(&parser, &mut db, &mut 0, None, None, None);
+    }
+    {
+        let parser = Parser::new(b"sdiffkey", 2, vec!(
+                    Argument {pos: 0, len: 5},
+                    Argument {pos: 5, len: 3},
+                    ));
+        let arr = match command(&parser, &mut db, &mut 0, None, None, None).unwrap() {
+            Response::Array(arr) => arr,
+            _ => panic!("Expected array"),
+        };
+        let mut r = arr.iter().map(|el| match el {
+            &Response::Data(ref el) => el.clone(),
+            _ => panic!("Expected data"),
+        }).collect::<Vec<_>>();
+        r.sort();
+        assert_eq!(r, vec![b"1".to_vec(), b"2".to_vec(), b"3".to_vec()]);
+    }
+}
+
+#[test]
+fn sdiff2_command() {
+    let mut db = Database::new();
+    {
+        let parser = Parser::new(b"saddkey123", 5, vec!(
+                    Argument {pos: 0, len: 4},
+                    Argument {pos: 4, len: 3},
+                    Argument {pos: 7, len: 1},
+                    Argument {pos: 8, len: 1},
+                    Argument {pos: 9, len: 1},
+                    ));
+        command(&parser, &mut db, &mut 0, None, None, None);
+    }
+    {
+        let parser = Parser::new(b"saddkey223", 4, vec!(
+                    Argument {pos: 0, len: 4},
+                    Argument {pos: 4, len: 4},
+                    Argument {pos: 8, len: 1},
+                    Argument {pos: 9, len: 1},
+                    ));
+        command(&parser, &mut db, &mut 0, None, None, None);
+    }
+    {
+        let parser = Parser::new(b"sdiffkeykey2", 3, vec!(
+                    Argument {pos: 0, len: 5},
+                    Argument {pos: 5, len: 3},
+                    Argument {pos: 8, len: 4},
+                    ));
+        assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(),
+            Response::Array(vec![Response::Data(b"1".to_vec()),]));
+    }
+}
+
+#[test]
 fn select_command() {
     let mut db = Database::new();
     {
