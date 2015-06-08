@@ -1,7 +1,6 @@
 use std::ascii::AsciiExt;
 use std::collections::HashMap;
 use std::sync::mpsc::Sender;
-use std::str::from_utf8;
 
 use super::database::PubsubEvent;
 use super::database::Database;
@@ -413,12 +412,16 @@ fn subscribe(parser: &Parser, db: &mut Database, subscriptions: &mut HashMap<Vec
         let channel_name = try_opt_validate!(parser.get_vec(i), "Invalid channel");
         let subscriber_id = db.subscribe(channel_name.clone(), sender.clone());
         subscriptions.insert(channel_name.clone(), subscriber_id);
-        sender.send(PubsubEvent::Subscription(channel_name, subscriptions.len()));
+        match sender.send(PubsubEvent::Subscription(channel_name.clone(), subscriptions.len())) {
+            Ok(_) => None,
+            Err(_) => subscriptions.remove(&channel_name),
+        };
     }
     None
 }
 
 fn unsubscribe(parser: &Parser, db: &mut Database, subscriptions: &mut HashMap<Vec<u8>, usize>, sender: &Sender<PubsubEvent>) -> Option<Response> {
+    #![allow(unused_must_use)]
     opt_validate!(parser.argc >= 2, "Wrong number of parameters");
     for i in 1..parser.argc {
         let channel_name = try_opt_validate!(parser.get_vec(i), "Invalid channel");
