@@ -3,13 +3,15 @@ extern crate rsedis;
 use std::collections::HashMap;
 use std::str::from_utf8;
 use std::sync::mpsc::channel;
+use std::sync::{Arc, Mutex};
+use std::thread;
 
 use rsedis::database::Database;
 use rsedis::database::Value;
 use rsedis::parser::Parser;
 use rsedis::parser::Argument;
 use rsedis::command::command;
-use rsedis::command::Response;
+use rsedis::command::{Response, ResponseError};
 
 fn getstr(database: &Database, key: &[u8]) -> String {
     match database.get(0, &key.to_vec()) {
@@ -201,7 +203,7 @@ fn lpop_command() {
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
                     ));
-        command(&parser, &mut db, &mut 0, None, None, None);
+        command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
         let parser = Parser::new(b"rpushkeyvaluf", 3, vec!(
@@ -209,7 +211,7 @@ fn lpop_command() {
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
                     ));
-        command(&parser, &mut db, &mut 0, None, None, None);
+        command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
         let parser = Parser::new(b"lpopkeyvalue", 2, vec!(
@@ -232,7 +234,7 @@ fn rpop_command() {
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
                     ));
-        command(&parser, &mut db, &mut 0, None, None, None);
+        command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
         let parser = Parser::new(b"rpushkeyvaluf", 3, vec!(
@@ -240,7 +242,7 @@ fn rpop_command() {
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
                     ));
-        command(&parser, &mut db, &mut 0, None, None, None);
+        command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
         let parser = Parser::new(b"rpopkeyvalue", 2, vec!(
@@ -262,7 +264,7 @@ fn lindex_command() {
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
                     ));
-        command(&parser, &mut db, &mut 0, None, None, None);
+        command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
         let parser = Parser::new(b"rpushkeyvaluf", 3, vec!(
@@ -270,7 +272,7 @@ fn lindex_command() {
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
                     ));
-        command(&parser, &mut db, &mut 0, None, None, None);
+        command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
         let parser = Parser::new(b"lindexkey0", 3, vec!(
@@ -291,7 +293,7 @@ fn linsert_command() {
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
                     ));
-        command(&parser, &mut db, &mut 0, None, None, None);
+        command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
         let parser = Parser::new(b"rpushkeyvalug", 3, vec!(
@@ -299,7 +301,7 @@ fn linsert_command() {
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
                     ));
-        command(&parser, &mut db, &mut 0, None, None, None);
+        command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
         let parser = Parser::new(b"linsertkeybeforevalugvaluf", 5, vec!(
@@ -322,8 +324,8 @@ fn llen_command() {
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
                     ));
-        command(&parser, &mut db, &mut 0, None, None, None);
-        command(&parser, &mut db, &mut 0, None, None, None);
+        command(&parser, &mut db, &mut 0, None, None, None).unwrap();
+        command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
         let parser = Parser::new(b"llenkey", 2, vec!(
@@ -372,7 +374,7 @@ fn lrange_command() {
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
                     ));
-        command(&parser, &mut db, &mut 0, None, None, None);
+        command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
         let parser = Parser::new(b"rpushkeyvaluf", 3, vec!(
@@ -380,7 +382,7 @@ fn lrange_command() {
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
                     ));
-        command(&parser, &mut db, &mut 0, None, None, None);
+        command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
         let parser = Parser::new(b"rpushkeyvalug", 3, vec!(
@@ -388,7 +390,7 @@ fn lrange_command() {
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
                     ));
-        command(&parser, &mut db, &mut 0, None, None, None);
+        command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
         let parser = Parser::new(b"lrange key 0 -1", 4, vec!(
@@ -414,10 +416,10 @@ fn lrem_command() {
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
                     ));
-        command(&parser, &mut db, &mut 0, None, None, None);
-        command(&parser, &mut db, &mut 0, None, None, None);
-        command(&parser, &mut db, &mut 0, None, None, None);
-        command(&parser, &mut db, &mut 0, None, None, None);
+        command(&parser, &mut db, &mut 0, None, None, None).unwrap();
+        command(&parser, &mut db, &mut 0, None, None, None).unwrap();
+        command(&parser, &mut db, &mut 0, None, None, None).unwrap();
+        command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
         let parser = Parser::new(b"lremkey2value", 4, vec!(
@@ -446,10 +448,10 @@ fn lset_command() {
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
                     ));
-        command(&parser, &mut db, &mut 0, None, None, None);
-        command(&parser, &mut db, &mut 0, None, None, None);
-        command(&parser, &mut db, &mut 0, None, None, None);
-        command(&parser, &mut db, &mut 0, None, None, None);
+        command(&parser, &mut db, &mut 0, None, None, None).unwrap();
+        command(&parser, &mut db, &mut 0, None, None, None).unwrap();
+        command(&parser, &mut db, &mut 0, None, None, None).unwrap();
+        command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
         let parser = Parser::new(b"lsetkey2valuf", 4, vec!(
@@ -482,7 +484,7 @@ fn rpoplpush_command() {
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
                     ));
-        command(&parser, &mut db, &mut 0, None, None, None);
+        command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
         let parser = Parser::new(b"rpushkeyvaluf", 3, vec!(
@@ -490,7 +492,7 @@ fn rpoplpush_command() {
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
                     ));
-        command(&parser, &mut db, &mut 0, None, None, None);
+        command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
         let parser = Parser::new(b"llenkey2", 2, vec!(
@@ -546,6 +548,111 @@ fn rpoplpush_command() {
 }
 
 #[test]
+fn brpoplpush_nowait() {
+    let mut db = Database::new();
+    {
+        let parser = Parser::new(b"rpushkeyvalue", 3, vec!(
+                    Argument {pos: 0, len: 5},
+                    Argument {pos: 5, len: 3},
+                    Argument {pos: 8, len: 5},
+                    ));
+        command(&parser, &mut db, &mut 0, None, None, None).unwrap();
+    }
+    {
+        let parser = Parser::new(b"rpushkeyvaluf", 3, vec!(
+                    Argument {pos: 0, len: 5},
+                    Argument {pos: 5, len: 3},
+                    Argument {pos: 8, len: 5},
+                    ));
+        command(&parser, &mut db, &mut 0, None, None, None).unwrap();
+    }
+    {
+        let parser = Parser::new(b"llenkey2", 2, vec!(
+                    Argument {pos: 0, len: 4},
+                    Argument {pos: 4, len: 4},
+                    ));
+        assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(0));
+    }
+    {
+        let parser = Parser::new(b"brpoplpushkeykey20", 4, vec!(
+                    Argument {pos: 0, len: 10},
+                    Argument {pos: 10, len: 3},
+                    Argument {pos: 13, len: 4},
+                    Argument {pos: 17, len: 1},
+                    ));
+        assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Data("valuf".to_owned().into_bytes()));
+    }
+}
+
+#[test]
+fn brpoplpush_waiting() {
+    let db = Arc::new(Mutex::new(Database::new()));
+    let (tx, rx) = channel();
+    let db2 = db.clone();
+    thread::spawn(move || {
+        let parser = Parser::new(b"brpoplpushkey1key20", 4, vec!(
+                    Argument {pos: 0, len: 10},
+                    Argument {pos: 10, len: 4},
+                    Argument {pos: 14, len: 4},
+                    Argument {pos: 18, len: 1},
+                    ));
+        let r = match command(&parser, &mut db.lock().unwrap(), &mut 0, None, None, None).unwrap_err() {
+            ResponseError::Wait(receiver) => {
+                tx.send(1).unwrap();
+                receiver
+            }
+            _ => panic!("Unexpected error")
+        };
+        r.recv().unwrap();
+        assert_eq!(command(&parser, &mut db.lock().unwrap(), &mut 0, None, None, None).unwrap(),
+            Response::Data("value".to_owned().into_bytes()));
+        tx.send(2).unwrap();
+    });
+    assert_eq!(rx.recv().unwrap(), 1);
+
+    {
+        let parser = Parser::new(b"rpushkey1value", 3, vec!(
+                    Argument {pos: 0, len: 5},
+                    Argument {pos: 5, len: 4},
+                    Argument {pos: 9, len: 5},
+                    ));
+        command(&parser, &mut db2.lock().unwrap(), &mut 0, None, None, None).unwrap();
+        assert_eq!(rx.recv().unwrap(), 2);
+    }
+    {
+        let parser = Parser::new(b"lrangekey20-1", 4, vec!(
+                    Argument {pos: 0, len: 6},
+                    Argument {pos: 6, len: 4},
+                    Argument {pos: 10, len: 1},
+                    Argument {pos: 11, len: 2},
+                    ));
+        assert_eq!(command(&parser, &mut db2.lock().unwrap(), &mut 0, None, None, None).unwrap(), Response::Array(vec![
+                    Response::Data("value".to_owned().into_bytes()),
+                    ]));
+    }
+}
+
+#[test]
+fn brpoplpush_timeout() {
+    let mut db = Database::new();
+    {
+        let parser = Parser::new(b"brpoplpushkeykey21", 4, vec!(
+                    Argument {pos: 0, len: 10},
+                    Argument {pos: 10, len: 3},
+                    Argument {pos: 13, len: 4},
+                    Argument {pos: 17, len: 1},
+                    ));
+        let receiver = match command(&parser, &mut db, &mut 0, None, None, None).unwrap_err() {
+            ResponseError::Wait(receiver) => receiver,
+            _ => panic!("Unexpected response"),
+        };
+        assert!(receiver.try_recv().is_err());
+        thread::sleep_ms(1400);
+        assert_eq!(receiver.try_recv().unwrap(), false);
+    }
+}
+
+#[test]
 fn ltrim_command() {
     let mut db = Database::new();
     {
@@ -554,8 +661,8 @@ fn ltrim_command() {
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
                     ));
-        command(&parser, &mut db, &mut 0, None, None, None);
-        command(&parser, &mut db, &mut 0, None, None, None);
+        command(&parser, &mut db, &mut 0, None, None, None).unwrap();
+        command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
         let parser = Parser::new(b"rpushkeyvaluf", 3, vec!(
@@ -563,8 +670,8 @@ fn ltrim_command() {
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
                     ));
-        command(&parser, &mut db, &mut 0, None, None, None);
-        command(&parser, &mut db, &mut 0, None, None, None);
+        command(&parser, &mut db, &mut 0, None, None, None).unwrap();
+        command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
         let parser = Parser::new(b"ltrimkey1-2", 4, vec!(
@@ -618,7 +725,7 @@ fn scard_command() {
                     Argument {pos: 8, len: 1},
                     Argument {pos: 9, len: 1},
                     ));
-        command(&parser, &mut db, &mut 0, None, None, None);
+        command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
         let parser = Parser::new(b"scardkey", 2, vec!(
@@ -640,7 +747,7 @@ fn sdiff_command() {
                     Argument {pos: 8, len: 1},
                     Argument {pos: 9, len: 1},
                     ));
-        command(&parser, &mut db, &mut 0, None, None, None);
+        command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
         let parser = Parser::new(b"sdiffkey", 2, vec!(
@@ -671,7 +778,7 @@ fn sdiff2_command() {
                     Argument {pos: 8, len: 1},
                     Argument {pos: 9, len: 1},
                     ));
-        command(&parser, &mut db, &mut 0, None, None, None);
+        command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
         let parser = Parser::new(b"saddkey223", 4, vec!(
@@ -680,7 +787,7 @@ fn sdiff2_command() {
                     Argument {pos: 8, len: 1},
                     Argument {pos: 9, len: 1},
                     ));
-        command(&parser, &mut db, &mut 0, None, None, None);
+        command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
         let parser = Parser::new(b"sdiffkeykey2", 3, vec!(
@@ -702,7 +809,7 @@ fn select_command() {
                     Argument {pos: 0, len: 6},
                     Argument {pos: 6, len: 1},
                     ));
-        command(&parser, &mut db, &mut dbindex, None, None, None);
+        command(&parser, &mut db, &mut dbindex, None, None, None).unwrap();
         assert_eq!(dbindex, 1);
     }
 }
@@ -801,7 +908,7 @@ fn subscribe_publish_command() {
                     Argument {pos: 0, len: 9},
                     Argument {pos: 9, len: 7},
                     ));
-        assert!(command(&parser, &mut db, &mut 0, Some(&mut subscriptions), Some(&mut psubscriptions), Some(&tx)).is_none());
+        assert!(command(&parser, &mut db, &mut 0, Some(&mut subscriptions), Some(&mut psubscriptions), Some(&tx)).is_err());
     }
 
     {
@@ -818,7 +925,7 @@ fn subscribe_publish_command() {
                     Argument {pos: 0, len: 11},
                     Argument {pos: 11, len: 7},
                     ));
-        assert!(command(&parser, &mut db, &mut 0, Some(&mut subscriptions), Some(&mut psubscriptions), Some(&tx)).is_none());
+        assert!(command(&parser, &mut db, &mut 0, Some(&mut subscriptions), Some(&mut psubscriptions), Some(&tx)).is_err());
     }
 
     assert_eq!(rx.try_recv().unwrap().as_response(),

@@ -388,6 +388,7 @@ pub struct Database {
     pub size: usize,
     subscribers: HashMap<Vec<u8>, HashMap<usize, Sender<PubsubEvent>>>,
     pattern_subscribers: HashMap<Vec<u8>, HashMap<usize, Sender<PubsubEvent>>>,
+    key_subscribers: HashMap<Vec<u8>, HashMap<usize, Sender<bool>>>,
     subscriber_id: usize,
 }
 
@@ -403,6 +404,7 @@ impl Database {
             size: size,
             subscribers: HashMap::new(),
             pattern_subscribers: HashMap::new(),
+            key_subscribers: HashMap::new(),
             subscriber_id: 0,
         };
     }
@@ -421,6 +423,39 @@ impl Database {
 
     pub fn clear(&mut self, index: usize) {
         self.data[index].clear()
+    }
+
+    fn ensure_key_subscribers(&mut self, key: &Vec<u8>) {
+        if !self.key_subscribers.contains_key(key) {
+            self.key_subscribers.insert(key.clone(), HashMap::new());
+        }
+    }
+
+    pub fn key_subscribe(&mut self, key: &Vec<u8>, sender: Sender<bool>) -> usize {
+        self.ensure_key_subscribers(key);
+        let mut key_subscribers = self.key_subscribers.get_mut(key).unwrap();
+        let subscriber_id = self.subscriber_id;
+        key_subscribers.insert(subscriber_id, sender);
+        self.subscriber_id += 1;
+        subscriber_id
+    }
+
+    pub fn key_publish(&mut self, key: &Vec<u8>) {
+        let mut torem = Vec::new();
+        match self.key_subscribers.get_mut(key) {
+            Some(mut channels) => {
+                for (subscriber_id, channel) in channels.iter() {
+                    match channel.send(true) {
+                        Ok(_) => (),
+                        Err(_) => { torem.push(subscriber_id.clone()); () },
+                    }
+                }
+                for subscriber_id in torem {
+                    channels.remove(&subscriber_id);
+                }
+            }
+            None => (),
+        }
     }
 
     fn ensure_channel(&mut self, channel: &Vec<u8>) {

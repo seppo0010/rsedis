@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{Sender, channel};
 
 use super::command::command;
-use super::command::Response;
+use super::command::{Response, ResponseError};
 use super::database::{Database, PubsubEvent};
 use super::parser::parse;
 use super::parser::ParseError;
@@ -124,13 +124,36 @@ impl Client {
                 };
             }
             let parser = try_parser.unwrap();
-            let mut db = self.db.lock().unwrap();
-            match command(&parser, &mut *db, &mut dbindex, Some(&mut subscriptions), Some(&mut psubscriptions), Some(&pubsub_tx)) {
-                Some(response) => if stream_tx.send(response).is_err() {
-                    // TODO: send a kill signal to the writer thread?
-                    break;
-                },
-                None => (),
+            let mut error = false;
+            loop {
+                let mut db = self.db.lock().unwrap();
+                match command(&parser, &mut *db, &mut dbindex, Some(&mut subscriptions), Some(&mut psubscriptions), Some(&pubsub_tx)) {
+                    Ok(response) => {
+                        match stream_tx.send(response) {
+                            Ok(_) => (),
+                            // TODO: send a kill signal to the writer thread?
+                            Err(_) => error = true,
+                        };
+                        break;
+                    },
+                    Err(err) => match err {
+                        ResponseError::NoReply => (),
+                        // Repeating the same command is actually wrong because of the timeout
+                        ResponseError::Wait(ref receiver) => {
+                            drop(db);
+                            if !receiver.recv().unwrap() {
+                                match stream_tx.send(Response::Nil) {
+                                    Ok(_) => (),
+                                    // TODO: send a kill signal to the writer thread?
+                                    Err(_) => error = true,
+                                };
+                            }
+                        }
+                    },
+                }
+            }
+            if error {
+                break;
             }
         };
     }
