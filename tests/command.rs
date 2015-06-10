@@ -1,6 +1,7 @@
 extern crate rsedis;
 
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::str::from_utf8;
 use std::sync::mpsc::channel;
 use std::sync::{Arc, Mutex};
@@ -764,6 +765,36 @@ fn sdiff_command() {
         }).collect::<Vec<_>>();
         r.sort();
         assert_eq!(r, vec![b"1".to_vec(), b"2".to_vec(), b"3".to_vec()]);
+    }
+}
+
+#[test]
+fn sdiffstore_command() {
+    let mut db = Database::new();
+    {
+        let parser = Parser::new(b"saddkey123", 5, vec!(
+                    Argument {pos: 0, len: 4},
+                    Argument {pos: 4, len: 3},
+                    Argument {pos: 7, len: 1},
+                    Argument {pos: 8, len: 1},
+                    Argument {pos: 9, len: 1},
+                    ));
+        command(&parser, &mut db, &mut 0, None, None, None).unwrap();
+    }
+    {
+        let parser = Parser::new(b"sdiffstoretargetkey", 3, vec!(
+                    Argument {pos: 0, len: 10},
+                    Argument {pos: 10, len: 6},
+                    Argument {pos: 16, len: 3},
+                    ));
+        assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(3));
+    }
+    {
+        let mut set = HashSet::new();
+        set.insert(b"1".to_vec());
+        set.insert(b"2".to_vec());
+        set.insert(b"3".to_vec());
+        assert_eq!(db.get(0, &b"target".to_vec()).unwrap(), &Value::Set(set));
     }
 }
 

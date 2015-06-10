@@ -381,6 +381,10 @@ impl Value {
             _ => Err(OperationError::WrongTypeError),
         }
     }
+
+    pub fn create_set(&mut self, set: HashSet<Vec<u8>>) {
+        *self = Value::Set(set);
+    }
 }
 
 pub struct Database {

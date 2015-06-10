@@ -45,7 +45,7 @@
     - [ ] sunion
     - [ ] sunionstore
     - [x] sdiff
-    - [ ] sdiffstore
+    - [x] sdiffstore
     - [ ] smembers
     - [ ] sscan
     - [ ] zadd

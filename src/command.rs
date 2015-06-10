@@ -500,6 +500,35 @@ fn sdiff(parser: &Parser, db: &Database, dbindex: usize) -> Response {
     }
 }
 
+fn sdiffstore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    validate!(parser.argc >= 3, "Wrong number of parameters");
+    let destination_key = try_validate!(parser.get_vec(1), "Invalid destination");
+    let key = try_validate!(parser.get_vec(2), "Invalid key");
+    let set = {
+        let mut sets = Vec::with_capacity(parser.argc - 3);
+        let el = match db.get(dbindex, &key) {
+            Some(e) => e,
+            None => return Response::Array(vec![]),
+        };
+        for i in 3..parser.argc {
+            let key = try_validate!(parser.get_vec(i), "Invalid key");
+            match db.get(dbindex, &key) {
+                Some(e) => sets.push(e),
+                None => (),
+            };
+        }
+        match el.sdiff(&sets) {
+            Ok(set) => set,
+            Err(err) => return Response::Error(err.to_string()),
+        }
+    };
+
+    db.remove(dbindex, &destination_key);
+    let r = set.len() as i64;
+    db.get_or_create(dbindex, &destination_key).create_set(set);
+    Response::Integer(r)
+}
+
 fn ping(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     #![allow(unused_variables)]
     validate!(parser.argc <= 2, "Wrong number of parameters");
@@ -649,6 +678,7 @@ pub fn command(
         "sadd" => sadd(parser, db, dbindex),
         "scard" => scard(parser, db, dbindex),
         "sdiff" => sdiff(parser, db, dbindex),
+        "sdiffstore" => sdiffstore(parser, db, dbindex),
         "subscribe" => return subscribe(parser, db, subscriptions.unwrap(), pattern_subscriptions.unwrap().len(), sender.unwrap()),
         "unsubscribe" => return unsubscribe(parser, db, subscriptions.unwrap(), pattern_subscriptions.unwrap().len(), sender.unwrap()),
         "psubscribe" => return psubscribe(parser, db, subscriptions.unwrap().len(), pattern_subscriptions.unwrap(), sender.unwrap()),
