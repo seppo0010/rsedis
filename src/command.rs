@@ -186,6 +186,7 @@ fn decrby(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
 }
 
 fn generic_push(parser: &Parser, db: &mut Database, dbindex: usize, right: bool, create: bool) -> Response {
+    // TODO variadic
     validate!(parser.argc == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let val = try_validate!(parser.get_vec(2), "Invalid value");
