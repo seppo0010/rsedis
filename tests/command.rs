@@ -28,15 +28,10 @@ macro_rules! parser {
 }
 
 fn getstr(database: &Database, key: &[u8]) -> String {
-    match database.get(0, &key.to_vec()) {
-        Some(val) => {
-            match val {
-                &Value::Data(ref bytes) => return from_utf8(bytes).unwrap().to_owned(),
-                &Value::Integer(i) => return format!("{}", i),
-                _ => panic!("Got non-string"),
-            }
-        },
-        _ => assert!(false),
+    match database.get(0, &key.to_vec()).unwrap() {
+        &Value::Data(ref bytes) => return from_utf8(bytes).unwrap().to_owned(),
+        &Value::Integer(i) => return format!("{}", i),
+        _ => panic!("Got non-string"),
     }
     return String::new();
 }
@@ -58,6 +53,27 @@ fn set_command() {
     let parser = parser!(b"set key value");
     assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Status("OK".to_owned()));
     assert_eq!("value", getstr(&db, b"key"));
+
+    assert_eq!(command(&parser!(b"set key2 value xx"), &mut db, &mut 0, None, None, None).unwrap(), Response::Nil);
+    assert_eq!(command(&parser!(b"get key2"), &mut db, &mut 0, None, None, None).unwrap(), Response::Nil);
+    assert_eq!(command(&parser!(b"set key2 value nx"), &mut db, &mut 0, None, None, None).unwrap(), Response::Status("OK".to_owned()));
+    assert_eq!("value", getstr(&db, b"key2"));
+    assert_eq!(command(&parser!(b"set key2 valuf xx"), &mut db, &mut 0, None, None, None).unwrap(), Response::Status("OK".to_owned()));
+    assert_eq!("valuf", getstr(&db, b"key2"));
+    assert_eq!(command(&parser!(b"set key2 value nx"), &mut db, &mut 0, None, None, None).unwrap(), Response::Nil);
+    assert_eq!("valuf", getstr(&db, b"key2"));
+
+    assert_eq!(command(&parser!(b"set key3 value px 1234"), &mut db, &mut 0, None, None, None).unwrap(), Response::Status("OK".to_owned()));
+    let now = mstime();
+    let exp = db.get_msexpiration(0, &b"key3".to_vec()).unwrap().clone();
+    assert!(exp >= now + 1000);
+    assert!(exp <= now + 1234);
+
+    assert_eq!(command(&parser!(b"set key3 value ex 1234"), &mut db, &mut 0, None, None, None).unwrap(), Response::Status("OK".to_owned()));
+    let now = mstime();
+    let exp = db.get_msexpiration(0, &b"key3".to_vec()).unwrap().clone();
+    assert!(exp >= now + 1233 * 1000);
+    assert!(exp <= now + 1234 * 1000);
 }
 
 #[test]

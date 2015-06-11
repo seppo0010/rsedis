@@ -85,14 +85,53 @@ macro_rules! try_validate {
 }
 
 fn set(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
-    validate!(parser.argv.len() == 3, "Wrong number of parameters");
+    validate!(parser.argv.len() >= 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let val = try_validate!(parser.get_vec(2), "Invalid value");
+    let mut nx = false;
+    let mut xx = false;
+    let mut expiration = None;
+    let mut skip = false;
+    for i in 3..parser.argv.len() {
+        if skip {
+            skip = false;
+            continue;
+        }
+        let param = try_validate!(parser.get_str(i), "Invalid parameter");
+        match &*param.to_ascii_lowercase() {
+            "nx" => nx = true,
+            "xx" => xx = true,
+            "px" => {
+                let px = try_validate!(parser.get_i64(i + 1), "Invalid parameter");
+                expiration = Some(px);
+                skip = true;
+            },
+            "ex" => {
+                let ex = try_validate!(parser.get_i64(i + 1), "Invalid parameter");
+                expiration = Some(ex * 1000);
+                skip = true;
+            },
+            _ => return Response::Error("Invalid parameter".to_owned()),
+        }
+    }
+
+    if nx && db.get(dbindex, &key).is_some() {
+        return Response::Nil;
+    }
+
+    if xx && db.get(dbindex, &key).is_none() {
+        return Response::Nil;
+    }
+
     let r = match db.get_or_create(dbindex, &key).set(val) {
         Ok(_) => Response::Status("OK".to_owned()),
         Err(err) => Response::Error(err.to_string()),
     };
     db.key_publish(&key);
+    match expiration {
+        Some(msexp) => db.set_msexpiration(dbindex, key, msexp + mstime()),
+        None => (),
+    }
     r
 }
 
