@@ -196,6 +196,17 @@ fn pttl_command() {
 }
 
 #[test]
+fn persist_command() {
+    let mut db = Database::new();
+    let parser = parser!(b"persist key");
+    assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(0));
+    assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
+    assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(0));
+    db.set_msexpiration(0, b"key".to_vec(), mstime() + 100 * 1000);
+    assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(1));
+}
+
+#[test]
 fn type_command() {
     let mut db = Database::new();
     let parser = parser!(b"type key");

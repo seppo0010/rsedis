@@ -189,6 +189,15 @@ fn pttl(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     generic_ttl(db, dbindex, &key, 1)
 }
 
+fn persist(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() == 2, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    Response::Integer(match db.remove_msexpiration(dbindex, &key) {
+        Some(_) => 1,
+        None => 0,
+    })
+}
+
 fn dbtype(parser: &Parser, db: &Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 2, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
@@ -744,6 +753,7 @@ pub fn command(
         "expire" => expire(parser, db, dbindex),
         "ttl" => ttl(parser, db, dbindex),
         "pttl" => pttl(parser, db, dbindex),
+        "persist" => persist(parser, db, dbindex),
         "type" => dbtype(parser, db, dbindex),
         "set" => set(parser, db, dbindex),
         "del" => del(parser, db, dbindex),
