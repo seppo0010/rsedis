@@ -95,6 +95,15 @@ fn set(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     r
 }
 
+fn exists(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    validate!(parser.argc == 2, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    Response::Integer(match db.get(dbindex, &key) {
+        Some(_) => 1,
+        None => 0,
+    })
+}
+
 fn del(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argc >= 2, "Wrong number of parameters");
     let mut c = 0;
@@ -657,6 +666,7 @@ pub fn command(
         "decr" => decr(parser, db, dbindex),
         "incrby" => incrby(parser, db, dbindex),
         "decrby" => decrby(parser, db, dbindex),
+        "exists" => exists(parser, db, dbindex),
         "ping" => ping(parser, db, dbindex),
         "flushdb" => flushdb(parser, db, dbindex),
         "flushall" => flushall(parser, db, dbindex),

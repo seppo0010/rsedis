@@ -7,7 +7,7 @@
     - [x] append
     - [ ] strlen
     - [x] del
-    - [ ] exists
+    - [x] exists
     - [ ] setbit
     - [ ] getbit
     - [ ] setrange

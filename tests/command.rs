@@ -76,6 +76,26 @@ fn del_command() {
 }
 
 #[test]
+fn exists_command() {
+    let mut db = Database::new();
+    {
+        let parser = Parser::new(b"existskey", 2, vec!(
+                    Argument {pos: 0, len: 6},
+                    Argument {pos: 6, len: 3},
+                    ));
+        assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(0));
+    }
+    assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
+    {
+        let parser = Parser::new(b"existskey", 2, vec!(
+                    Argument {pos: 0, len: 6},
+                    Argument {pos: 6, len: 3},
+                    ));
+        assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(1));
+    }
+}
+
+#[test]
 fn serialize_status() {
     let response = Response::Status("OK".to_owned());
     assert_eq!(response.as_bytes(), b"+OK\r\n");
