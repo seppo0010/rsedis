@@ -1,3 +1,5 @@
+extern crate time;
+
 pub mod command;
 pub mod database;
 pub mod networking;

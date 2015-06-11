@@ -9,6 +9,7 @@ use std::num::ParseIntError;
 use std::sync::mpsc::Sender;
 
 use super::util::glob_match;
+use super::util::mstime;
 
 #[derive(PartialEq)]
 #[derive(Debug)]
@@ -389,6 +390,7 @@ impl Value {
 
 pub struct Database {
     data: Vec<HashMap<Vec<u8>, Value>>,
+    data_expiration_ns: Vec<HashMap<Vec<u8>, i64>>,
     pub size: usize,
     subscribers: HashMap<Vec<u8>, HashMap<usize, Sender<PubsubEvent>>>,
     pattern_subscribers: HashMap<Vec<u8>, HashMap<usize, Sender<PubsubEvent>>>,
@@ -400,11 +402,14 @@ impl Database {
     pub fn new() -> Database {
         let size = 16;
         let mut data = Vec::with_capacity(size);
+        let mut data_expiration_ns = Vec::with_capacity(size);
         for _ in 0..size {
-            data.push(HashMap::new())
+            data.push(HashMap::new());
+            data_expiration_ns.push(HashMap::new());
         }
         return Database {
             data: data,
+            data_expiration_ns: data_expiration_ns,
             size: size,
             subscribers: HashMap::new(),
             pattern_subscribers: HashMap::new(),
@@ -413,20 +418,54 @@ impl Database {
         };
     }
 
+    fn is_expired(&self, index: usize, key: &Vec<u8>) -> bool {
+        match self.data_expiration_ns[index].get(key) {
+            Some(t) => t < &mstime(),
+            None => false,
+        }
+    }
+
     pub fn get(&self, index: usize, key: &Vec<u8>) -> Option<&Value> {
-        self.data[index].get(key)
+        if self.is_expired(index, key) {
+            None
+        } else {
+            self.data[index].get(key)
+        }
     }
 
     pub fn get_mut(&mut self, index: usize, key: &Vec<u8>) -> Option<&mut Value> {
-        self.data[index].get_mut(key)
+        if self.is_expired(index, key) {
+            self.remove(index, key);
+            None
+        } else {
+            self.data[index].get_mut(key)
+        }
     }
 
     pub fn remove(&mut self, index: usize, key: &Vec<u8>) -> Option<Value> {
-        self.data[index].remove(key)
+        let mut r = self.data[index].remove(key);
+        if self.is_expired(index, key) {
+            r = None;
+        }
+        self.data_expiration_ns[index].remove(key);
+        r
+    }
+
+    pub fn set_msexpiration(&mut self, index: usize, key: Vec<u8>, msexpiration: i64) {
+        self.data_expiration_ns[index].insert(key, msexpiration);
     }
 
     pub fn clear(&mut self, index: usize) {
         self.data[index].clear()
+    }
+
+    pub fn get_or_create(&mut self, index: usize, key: &Vec<u8>) -> &mut Value {
+        if self.get(index, key).is_some() {
+            return self.get_mut(index, key).unwrap();
+        }
+        let val = Value::Nil;
+        self.data[index].insert(Vec::clone(key), val);
+        return self.data[index].get_mut(key).unwrap();
     }
 
     fn ensure_key_subscribers(&mut self, key: &Vec<u8>) {
@@ -538,14 +577,5 @@ impl Database {
         for index in 0..self.size {
             self.data[index].clear();
         }
-    }
-
-    pub fn get_or_create(&mut self, index: usize, key: &Vec<u8>) -> &mut Value {
-        if self.data[index].contains_key(key) {
-            return self.data[index].get_mut(key).unwrap();
-        }
-        let val = Value::Nil;
-        self.data[index].insert(Vec::clone(key), val);
-        return self.data[index].get_mut(key).unwrap();
     }
 }

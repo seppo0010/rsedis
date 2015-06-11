@@ -1,5 +1,7 @@
 use std::ascii::AsciiExt;
 
+use time::get_time;
+
 #[must_use]
 fn match_char(e1: &u8, e2: &u8, ignore_case: bool) -> bool {
     if ignore_case {
@@ -126,4 +128,13 @@ pub fn glob_match(pattern: &Vec<u8>, element: &Vec<u8>, ignore_case: bool) -> bo
         return true;
     }
     return false;
+}
+
+pub fn ustime() -> i64 {
+    let tv = get_time();
+    tv.sec * 1000000 + tv.nsec as i64
+}
+
+pub fn mstime() -> i64 {
+    ustime() / 1000
 }

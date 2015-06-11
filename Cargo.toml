@@ -17,3 +17,6 @@ name = "rsedis"
 
 name = "tests"
 path = "tests/tests.rs"
+
+[dependencies]
+time = "0.1"

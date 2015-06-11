@@ -4,6 +4,7 @@ use std;
 
 use rsedis::database::Database;
 use rsedis::database::Value;
+use rsedis::util::mstime;
 
 #[test]
 fn set_get() {
@@ -171,4 +172,25 @@ fn incr_overflow() {
     let value = format!("{}", std::i64::MAX).into_bytes();
     assert!(database.get_or_create(0, &key).set(value).is_ok());
     assert!(database.get_or_create(0, &key).incr(1).is_err());
+}
+
+#[test]
+fn set_expire_get() {
+    let mut database = Database::new();
+    let key = vec![1u8];
+    let value = vec![1u8, 2, 3, 4];
+    assert!(database.get_or_create(0, &key).set(value).is_ok());
+    database.set_msexpiration(0, key.clone(), mstime());
+    assert_eq!(database.get(0, &key), None);
+}
+
+#[test]
+fn set_will_expire_get() {
+    let mut database = Database::new();
+    let key = vec![1u8];
+    let value = vec![1u8, 2, 3, 4];
+    let expected = Vec::clone(&value);
+    assert!(database.get_or_create(0, &key).set(value).is_ok());
+    database.set_msexpiration(0, key.clone(), mstime() + 10000);
+    assert_eq!(database.get(0, &key), Some(&Value::Data(expected)));
 }
