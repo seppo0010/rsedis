@@ -1,4 +1,4 @@
-- [ ] commands
+- commands
     - [x] get
     - [x] set
     - [ ] setnx
@@ -163,7 +163,7 @@
     - [ ] pfmerge
     - [ ] pfdebug
     - [ ] latency
-- [ ] config
+- config
     - [ ] include
     - [ ] daemonize
     - [ ] pidfile
