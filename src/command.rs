@@ -10,6 +10,7 @@ use super::database::PubsubEvent;
 use super::database::Database;
 use super::database::Value;
 use super::parser::Parser;
+use super::util::mstime;
 
 #[derive(PartialEq)]
 #[derive(Debug)]
@@ -118,6 +119,44 @@ fn del(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
         }
     }
     return Response::Integer(c);
+}
+
+fn generic_expire(db: &mut Database, dbindex: usize, key: Vec<u8>, msexpiration: i64) -> Response {
+    Response::Integer(match db.get(dbindex, &key) {
+        Some(_) => {
+            db.set_msexpiration(dbindex, key, msexpiration);
+            1
+        },
+        None => 0,
+    })
+}
+
+fn expire(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() == 3, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let expiration = try_validate!(parser.get_i64(2), "Invalid expiration");
+    generic_expire(db, dbindex, key, mstime() + expiration * 1000)
+}
+
+fn expireat(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() == 3, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let expiration = try_validate!(parser.get_i64(2), "Invalid expiration");
+    generic_expire(db, dbindex, key, expiration * 1000)
+}
+
+fn pexpire(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() == 3, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let expiration = try_validate!(parser.get_i64(2), "Invalid expiration");
+    generic_expire(db, dbindex, key, mstime() + expiration)
+}
+
+fn pexpireat(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() == 3, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let expiration = try_validate!(parser.get_i64(2), "Invalid expiration");
+    generic_expire(db, dbindex, key, expiration)
 }
 
 fn flushdb(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
@@ -658,6 +697,10 @@ pub fn command(
     }
     let dbindex = _dbindex.clone();
     return Ok(match command {
+        "pexpireat" => pexpireat(parser, db, dbindex),
+        "pexpire" => pexpire(parser, db, dbindex),
+        "expireat" => expireat(parser, db, dbindex),
+        "expire" => expire(parser, db, dbindex),
         "set" => set(parser, db, dbindex),
         "del" => del(parser, db, dbindex),
         "append" => append(parser, db, dbindex),

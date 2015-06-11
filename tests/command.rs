@@ -13,6 +13,7 @@ use rsedis::parser::Parser;
 use rsedis::parser::Argument;
 use rsedis::command::command;
 use rsedis::command::{Response, ResponseError};
+use rsedis::util::mstime;
 
 macro_rules! parser {
     ($str: expr) => ({
@@ -88,6 +89,82 @@ fn exists_command() {
         let parser = parser!(b"exists key");
         assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(1));
     }
+}
+
+#[test]
+fn expire_command() {
+    let mut db = Database::new();
+    {
+        let parser = parser!(b"expire key 100");
+        assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(0));
+    }
+    assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
+    {
+        let parser = parser!(b"expire key 100");
+        assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(1));
+    }
+    let now = mstime();
+    let exp = db.get_msexpiration(0, &b"key".to_vec()).unwrap().clone();
+    assert!(exp >= now);
+    assert!(exp <= now + 100 * 1000);
+}
+
+#[test]
+fn pexpire_command() {
+    let mut db = Database::new();
+    {
+        let parser = parser!(b"pexpire key 100");
+        assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(0));
+    }
+    assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
+    {
+        let parser = parser!(b"pexpire key 100");
+        assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(1));
+    }
+    let now = mstime();
+    let exp = db.get_msexpiration(0, &b"key".to_vec()).unwrap().clone();
+    assert!(exp >= now);
+    assert!(exp <= now + 100);
+}
+
+#[test]
+fn expireat_command() {
+    let mut db = Database::new();
+    let now = mstime() / 1000;
+    let exp_exp = now + 100;
+    let qs = format!("expireat key {}", exp_exp);
+    let q = qs.as_bytes();
+    {
+        let parser = parser!(q);
+        assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(0));
+    }
+    assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
+    {
+        let parser = parser!(q);
+        assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(1));
+    }
+    let exp = db.get_msexpiration(0, &b"key".to_vec()).unwrap().clone();
+    assert_eq!(exp, exp_exp * 1000);
+}
+
+#[test]
+fn pexpireat_command() {
+    let mut db = Database::new();
+    let now = mstime();
+    let exp_exp = now + 100;
+    let qs = format!("pexpireat key {}", exp_exp);
+    let q = qs.as_bytes();
+    {
+        let parser = parser!(q);
+        assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(0));
+    }
+    assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
+    {
+        let parser = parser!(q);
+        assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(1));
+    }
+    let exp = db.get_msexpiration(0, &b"key".to_vec()).unwrap().clone();
+    assert_eq!(exp, exp_exp);
 }
 
 #[test]

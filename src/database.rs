@@ -455,6 +455,10 @@ impl Database {
         self.data_expiration_ns[index].insert(key, msexpiration);
     }
 
+    pub fn get_msexpiration(&mut self, index: usize, key: &Vec<u8>) -> Option<&i64> {
+        self.data_expiration_ns[index].get(key)
+    }
+
     pub fn clear(&mut self, index: usize) {
         self.data[index].clear()
     }
