@@ -168,6 +168,34 @@ fn pexpireat_command() {
 }
 
 #[test]
+fn ttl_command() {
+    let mut db = Database::new();
+    let parser = parser!(b"ttl key");
+    assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(-2));
+    assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
+    assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(-1));
+    db.set_msexpiration(0, b"key".to_vec(), mstime() + 100 * 1000);
+    match command(&parser, &mut db, &mut 0, None, None, None).unwrap() {
+        Response::Integer(i) => assert!(i <= 100 && i > 80),
+        _ => panic!("Expected integer"),
+    }
+}
+
+#[test]
+fn pttl_command() {
+    let mut db = Database::new();
+    let parser = parser!(b"pttl key");
+    assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(-2));
+    assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
+    assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(-1));
+    db.set_msexpiration(0, b"key".to_vec(), mstime() + 100 * 1000);
+    match command(&parser, &mut db, &mut 0, None, None, None).unwrap() {
+        Response::Integer(i) => assert!(i <= 100 * 1000 && i > 80 * 1000),
+        _ => panic!("Expected integer"),
+    }
+}
+
+#[test]
 fn serialize_status() {
     let response = Response::Status("OK".to_owned());
     assert_eq!(response.as_bytes(), b"+OK\r\n");

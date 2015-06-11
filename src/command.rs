@@ -165,6 +165,30 @@ fn flushdb(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     return Response::Status("OK".to_owned());
 }
 
+fn generic_ttl(db: &mut Database, dbindex: usize, key: &Vec<u8>, divisor: i64) -> Response {
+    Response::Integer(match db.get(dbindex, key) {
+        Some(_) => {
+            match db.get_msexpiration(dbindex, key) {
+                Some(exp) => (exp - mstime()) / divisor,
+                None => -1,
+            }
+        },
+        None => -2,
+    })
+}
+
+fn ttl(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() == 2, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    generic_ttl(db, dbindex, &key, 1000)
+}
+
+fn pttl(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() == 2, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    generic_ttl(db, dbindex, &key, 1)
+}
+
 fn flushall(parser: &Parser, db: &mut Database, _: usize) -> Response {
     validate!(parser.argv.len() == 1, "Wrong number of parameters");
     db.clearall();
@@ -701,6 +725,8 @@ pub fn command(
         "pexpire" => pexpire(parser, db, dbindex),
         "expireat" => expireat(parser, db, dbindex),
         "expire" => expire(parser, db, dbindex),
+        "ttl" => ttl(parser, db, dbindex),
+        "pttl" => pttl(parser, db, dbindex),
         "set" => set(parser, db, dbindex),
         "del" => del(parser, db, dbindex),
         "append" => append(parser, db, dbindex),
