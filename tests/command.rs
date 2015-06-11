@@ -196,6 +196,28 @@ fn pttl_command() {
 }
 
 #[test]
+fn type_command() {
+    let mut db = Database::new();
+    let parser = parser!(b"type key");
+    assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Data(b"none".to_vec()));
+
+    assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
+    assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Data(b"string".to_vec()));
+    assert!(db.get_or_create(0, &b"key".to_vec()).set(b"1".to_vec()).is_ok());
+    assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Data(b"string".to_vec()));
+
+    assert!(db.remove(0, &b"key".to_vec()).is_some());
+    assert!(db.get_or_create(0, &b"key".to_vec()).push(b"1".to_vec(), true).is_ok());
+    assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Data(b"list".to_vec()));
+
+    assert!(db.remove(0, &b"key".to_vec()).is_some());
+    assert!(db.get_or_create(0, &b"key".to_vec()).sadd(b"1".to_vec()).is_ok());
+    assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Data(b"set".to_vec()));
+
+    // TODO: zset and hash
+}
+
+#[test]
 fn serialize_status() {
     let response = Response::Status("OK".to_owned());
     assert_eq!(response.as_bytes(), b"+OK\r\n");

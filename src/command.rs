@@ -189,6 +189,23 @@ fn pttl(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     generic_ttl(db, dbindex, &key, 1)
 }
 
+fn dbtype(parser: &Parser, db: &Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() == 2, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    match db.get(dbindex, &key) {
+        Some(value) => {
+            match value {
+                &Value::Nil => Response::Data("none".to_owned().into_bytes()),
+                &Value::Data(_) => Response::Data("string".to_owned().into_bytes()),
+                &Value::Integer(_) => Response::Data("string".to_owned().into_bytes()),
+                &Value::List(_) => Response::Data("list".to_owned().into_bytes()),
+                &Value::Set(_) => Response::Data("set".to_owned().into_bytes()),
+            }
+        }
+        None => Response::Data("none".to_owned().into_bytes()),
+    }
+}
+
 fn flushall(parser: &Parser, db: &mut Database, _: usize) -> Response {
     validate!(parser.argv.len() == 1, "Wrong number of parameters");
     db.clearall();
@@ -727,6 +744,7 @@ pub fn command(
         "expire" => expire(parser, db, dbindex),
         "ttl" => ttl(parser, db, dbindex),
         "pttl" => pttl(parser, db, dbindex),
+        "type" => dbtype(parser, db, dbindex),
         "set" => set(parser, db, dbindex),
         "del" => del(parser, db, dbindex),
         "append" => append(parser, db, dbindex),
