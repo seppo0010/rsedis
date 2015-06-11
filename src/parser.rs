@@ -9,8 +9,7 @@ pub struct Argument {
 
 pub struct Parser<'a> {
     data: &'a[u8],
-    pub argc: usize,
-    argv: Vec<Argument>
+    pub argv: Vec<Argument>
 }
 
 pub enum ParseError {
@@ -41,10 +40,9 @@ impl Error for ParseError {
 }
 
 impl<'a> Parser<'a> {
-    pub fn new(data: &[u8], argc: usize, argv: Vec<Argument>) -> Parser {
+    pub fn new(data: &[u8], argv: Vec<Argument>) -> Parser {
         return Parser {
             data: data,
-            argc: argc,
             argv: argv,
         };
     }
@@ -76,7 +74,7 @@ impl<'a> Parser<'a> {
     }
 
     pub fn get_slice(&self, pos: usize) -> Result<&[u8], i32> {
-        if pos >= self.argc {
+        if pos >= self.argv.len() {
             return Err(0);
         }
         let arg = &self.argv[pos];
@@ -150,6 +148,6 @@ pub fn parse(input: &[u8], len: usize) -> Result<Parser, ParseError> {
                 return Err(ParseError::Incomplete);
             }
         }
-        Ok(Parser::new(input, argc, argv))
+        Ok(Parser::new(input, argv))
     }
 }

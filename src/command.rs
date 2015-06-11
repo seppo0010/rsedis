@@ -84,7 +84,7 @@ macro_rules! try_validate {
 }
 
 fn set(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
-    validate!(parser.argc == 3, "Wrong number of parameters");
+    validate!(parser.argv.len() == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let val = try_validate!(parser.get_vec(2), "Invalid value");
     let r = match db.get_or_create(dbindex, &key).set(val) {
@@ -96,7 +96,7 @@ fn set(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
 }
 
 fn exists(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
-    validate!(parser.argc == 2, "Wrong number of parameters");
+    validate!(parser.argv.len() == 2, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     Response::Integer(match db.get(dbindex, &key) {
         Some(_) => 1,
@@ -105,9 +105,9 @@ fn exists(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
 }
 
 fn del(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
-    validate!(parser.argc >= 2, "Wrong number of parameters");
+    validate!(parser.argv.len() >= 2, "Wrong number of parameters");
     let mut c = 0;
-    for i in 1..parser.argc {
+    for i in 1..parser.argv.len() {
         let key = try_validate!(parser.get_vec(i), "Invalid key");
         match db.remove(dbindex, &key) {
             Some(_) => {
@@ -121,19 +121,19 @@ fn del(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
 }
 
 fn flushdb(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
-    validate!(parser.argc == 1, "Wrong number of parameters");
+    validate!(parser.argv.len() == 1, "Wrong number of parameters");
     db.clear(dbindex);
     return Response::Status("OK".to_owned());
 }
 
 fn flushall(parser: &Parser, db: &mut Database, _: usize) -> Response {
-    validate!(parser.argc == 1, "Wrong number of parameters");
+    validate!(parser.argv.len() == 1, "Wrong number of parameters");
     db.clearall();
     return Response::Status("OK".to_owned());
 }
 
 fn append(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
-    validate!(parser.argc == 3, "Wrong number of parameters");
+    validate!(parser.argv.len() == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let val = try_validate!(parser.get_vec(2), "Invalid value");
     let r = match db.get_or_create(dbindex, &key).append(val) {
@@ -145,7 +145,7 @@ fn append(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
 }
 
 fn get(parser: &Parser, db: &Database, dbindex: usize) -> Response {
-    validate!(parser.argc == 2, "Wrong number of parameters");
+    validate!(parser.argv.len() == 2, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let obj = db.get(dbindex, &key);
     match obj {
@@ -171,24 +171,24 @@ fn generic_incr(parser: &Parser, db: &mut Database, dbindex: usize, increment: i
 }
 
 fn incr(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
-    validate!(parser.argc == 2, "Wrong number of parameters");
+    validate!(parser.argv.len() == 2, "Wrong number of parameters");
     return generic_incr(parser, db, dbindex, 1);
 }
 
 fn decr(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
-    validate!(parser.argc == 2, "Wrong number of parameters");
+    validate!(parser.argv.len() == 2, "Wrong number of parameters");
     return generic_incr(parser, db, dbindex, -1);
 }
 
 fn incrby(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
-    validate!(parser.argc == 3, "Wrong number of parameters");
+    validate!(parser.argv.len() == 3, "Wrong number of parameters");
     let try_increment = parser.get_i64(2);
     if try_increment.is_err() { return Response::Error("Invalid increment".to_owned()); }
     return generic_incr(parser, db, dbindex, try_increment.unwrap());
 }
 
 fn decrby(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
-    validate!(parser.argc == 3, "Wrong number of parameters");
+    validate!(parser.argv.len() == 3, "Wrong number of parameters");
     let try_increment = parser.get_i64(2);
     if try_increment.is_err() { return Response::Error("Invalid decrement".to_owned()); }
     return generic_incr(parser, db, dbindex, -try_increment.unwrap());
@@ -196,7 +196,7 @@ fn decrby(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
 
 fn generic_push(parser: &Parser, db: &mut Database, dbindex: usize, right: bool, create: bool) -> Response {
     // TODO variadic
-    validate!(parser.argc == 3, "Wrong number of parameters");
+    validate!(parser.argv.len() == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let val = try_validate!(parser.get_vec(2), "Invalid value");
     let r = {
@@ -235,7 +235,7 @@ fn rpushx(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
 }
 
 fn generic_pop(parser: &Parser, db: &mut Database, dbindex: usize, right: bool) -> Response {
-    validate!(parser.argc == 2, "Wrong number of parameters");
+    validate!(parser.argv.len() == 2, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let r = {
         match db.get_mut(dbindex, &key) {
@@ -304,7 +304,7 @@ fn generic_rpoplpush(db: &mut Database, dbindex: usize, source: &Vec<u8>, destin
 }
 
 fn rpoplpush(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
-    validate!(parser.argc == 3, "Wrong number of parameters");
+    validate!(parser.argv.len() == 3, "Wrong number of parameters");
     let source = try_validate!(parser.get_vec(1), "Invalid source");
     let destination = try_validate!(parser.get_vec(2), "Invalid destination");
     generic_rpoplpush(db, dbindex, &source, &destination)
@@ -312,7 +312,7 @@ fn rpoplpush(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
 
 fn brpoplpush(parser: &Parser, db: &mut Database, dbindex: usize) -> Result<Response, ResponseError> {
     #![allow(unused_must_use)]
-    opt_validate!(parser.argc == 4, "Wrong number of parameters");
+    opt_validate!(parser.argv.len() == 4, "Wrong number of parameters");
 
     let source = try_opt_validate!(parser.get_vec(1), "Invalid source");
     let destination = try_opt_validate!(parser.get_vec(2), "Invalid destination");
@@ -336,7 +336,7 @@ fn brpoplpush(parser: &Parser, db: &mut Database, dbindex: usize) -> Result<Resp
 }
 
 fn lindex(parser: &Parser, db: &Database, dbindex: usize) -> Response {
-    validate!(parser.argc == 3, "Wrong number of parameters");
+    validate!(parser.argv.len() == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let index = try_validate!(parser.get_i64(2), "Invalid index");
     return match db.get(dbindex, &key) {
@@ -354,7 +354,7 @@ fn lindex(parser: &Parser, db: &Database, dbindex: usize) -> Response {
 }
 
 fn linsert(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
-    validate!(parser.argc == 5, "Wrong number of parameters");
+    validate!(parser.argv.len() == 5, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let before_str = try_validate!(parser.get_str(2), "Syntax error");
     let pivot = try_validate!(parser.get_vec(3), "Invalid pivot");
@@ -382,7 +382,7 @@ fn linsert(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
 }
 
 fn llen(parser: &Parser, db: &Database, dbindex: usize) -> Response {
-    validate!(parser.argc == 2, "Wrong number of parameters");
+    validate!(parser.argv.len() == 2, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     return match db.get(dbindex, &key) {
         Some(el) => match el.llen() {
@@ -394,7 +394,7 @@ fn llen(parser: &Parser, db: &Database, dbindex: usize) -> Response {
 }
 
 fn lrange(parser: &Parser, db: &Database, dbindex: usize) -> Response {
-    validate!(parser.argc == 4, "Wrong number of parameters");
+    validate!(parser.argv.len() == 4, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let start = try_validate!(parser.get_i64(2), "Invalid range");
     let stop  = try_validate!(parser.get_i64(3), "Invalid range");
@@ -408,7 +408,7 @@ fn lrange(parser: &Parser, db: &Database, dbindex: usize) -> Response {
 }
 
 fn lrem(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
-    validate!(parser.argc == 4, "Wrong number of parameters");
+    validate!(parser.argv.len() == 4, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let count = try_validate!(parser.get_i64(2), "Invalid count");
     let value = try_validate!(parser.get_vec(3), "Invalid value");
@@ -424,7 +424,7 @@ fn lrem(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
 }
 
 fn lset(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
-    validate!(parser.argc == 4, "Wrong number of parameters");
+    validate!(parser.argv.len() == 4, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let index = try_validate!(parser.get_i64(2), "Invalid index");
     let value = try_validate!(parser.get_vec(3), "Invalid value");
@@ -440,7 +440,7 @@ fn lset(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
 }
 
 fn ltrim(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
-    validate!(parser.argc == 4, "Wrong number of parameters");
+    validate!(parser.argv.len() == 4, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let start = try_validate!(parser.get_i64(2), "Invalid start");
     let stop = try_validate!(parser.get_i64(3), "Invalid stop");
@@ -456,12 +456,12 @@ fn ltrim(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
 }
 
 fn sadd(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
-    validate!(parser.argc > 2, "Wrong number of parameters");
+    validate!(parser.argv.len() > 2, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let mut count = 0;
     {
         let el = db.get_or_create(dbindex, &key);
-        for i in 2..parser.argc {
+        for i in 2..parser.argv.len() {
             let val = try_validate!(parser.get_vec(i), "Invalid value");
             match el.sadd(val) {
                 Ok(added) => if added { count += 1 },
@@ -474,7 +474,7 @@ fn sadd(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
 }
 
 fn scard(parser: &Parser, db: &Database, dbindex: usize) -> Response {
-    validate!(parser.argc == 2, "Wrong number of parameters");
+    validate!(parser.argv.len() == 2, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let el = match db.get(dbindex, &key) {
         Some(e) => e,
@@ -487,14 +487,14 @@ fn scard(parser: &Parser, db: &Database, dbindex: usize) -> Response {
 }
 
 fn sdiff(parser: &Parser, db: &Database, dbindex: usize) -> Response {
-    validate!(parser.argc >= 2, "Wrong number of parameters");
-    let mut sets = Vec::with_capacity(parser.argc - 2);
+    validate!(parser.argv.len() >= 2, "Wrong number of parameters");
+    let mut sets = Vec::with_capacity(parser.argv.len() - 2);
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let el = match db.get(dbindex, &key) {
         Some(e) => e,
         None => return Response::Array(vec![]),
     };
-    for i in 2..parser.argc {
+    for i in 2..parser.argv.len() {
         let key = try_validate!(parser.get_vec(i), "Invalid key");
         match db.get(dbindex, &key) {
             Some(e) => sets.push(e),
@@ -510,16 +510,16 @@ fn sdiff(parser: &Parser, db: &Database, dbindex: usize) -> Response {
 }
 
 fn sdiffstore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
-    validate!(parser.argc >= 3, "Wrong number of parameters");
+    validate!(parser.argv.len() >= 3, "Wrong number of parameters");
     let destination_key = try_validate!(parser.get_vec(1), "Invalid destination");
     let key = try_validate!(parser.get_vec(2), "Invalid key");
     let set = {
-        let mut sets = Vec::with_capacity(parser.argc - 3);
+        let mut sets = Vec::with_capacity(parser.argv.len() - 3);
         let el = match db.get(dbindex, &key) {
             Some(e) => e,
             None => return Response::Array(vec![]),
         };
-        for i in 3..parser.argc {
+        for i in 3..parser.argv.len() {
             let key = try_validate!(parser.get_vec(i), "Invalid key");
             match db.get(dbindex, &key) {
                 Some(e) => sets.push(e),
@@ -540,8 +540,8 @@ fn sdiffstore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
 
 fn ping(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     #![allow(unused_variables)]
-    validate!(parser.argc <= 2, "Wrong number of parameters");
-    if parser.argc == 2 {
+    validate!(parser.argv.len() <= 2, "Wrong number of parameters");
+    if parser.argv.len() == 2 {
         return Response::Data(parser.get_vec(1).unwrap());
     }
     return Response::Data(b"PONG".to_vec());
@@ -554,8 +554,8 @@ fn subscribe(
         pattern_subscriptions_len: usize,
         sender: &Sender<PubsubEvent>
         ) -> Result<Response, ResponseError> {
-    opt_validate!(parser.argc >= 2, "Wrong number of parameters");
-    for i in 1..parser.argc {
+    opt_validate!(parser.argv.len() >= 2, "Wrong number of parameters");
+    for i in 1..parser.argv.len() {
         let channel_name = try_opt_validate!(parser.get_vec(i), "Invalid channel");
         let subscriber_id = db.subscribe(channel_name.clone(), sender.clone());
         subscriptions.insert(channel_name.clone(), subscriber_id);
@@ -575,8 +575,8 @@ fn unsubscribe(
         sender: &Sender<PubsubEvent>
         ) -> Result<Response, ResponseError> {
     #![allow(unused_must_use)]
-    opt_validate!(parser.argc >= 2, "Wrong number of parameters");
-    for i in 1..parser.argc {
+    opt_validate!(parser.argv.len() >= 2, "Wrong number of parameters");
+    for i in 1..parser.argv.len() {
         let channel_name = try_opt_validate!(parser.get_vec(i), "Invalid channel");
         match subscriptions.remove(&channel_name) {
             Some(subscriber_id) => {
@@ -596,8 +596,8 @@ fn psubscribe(
         pattern_subscriptions: &mut HashMap<Vec<u8>, usize>,
         sender: &Sender<PubsubEvent>
         ) -> Result<Response, ResponseError> {
-    opt_validate!(parser.argc >= 2, "Wrong number of parameters");
-    for i in 1..parser.argc {
+    opt_validate!(parser.argv.len() >= 2, "Wrong number of parameters");
+    for i in 1..parser.argv.len() {
         let pattern = try_opt_validate!(parser.get_vec(i), "Invalid channel");
         let subscriber_id = db.psubscribe(pattern.clone(), sender.clone());
         pattern_subscriptions.insert(pattern.clone(), subscriber_id);
@@ -617,8 +617,8 @@ fn punsubscribe(
         sender: &Sender<PubsubEvent>
         ) -> Result<Response, ResponseError> {
     #![allow(unused_must_use)]
-    opt_validate!(parser.argc >= 2, "Wrong number of parameters");
-    for i in 1..parser.argc {
+    opt_validate!(parser.argv.len() >= 2, "Wrong number of parameters");
+    for i in 1..parser.argv.len() {
         let pattern = try_opt_validate!(parser.get_vec(i), "Invalid channel");
         match pattern_subscriptions.remove(&pattern) {
             Some(subscriber_id) => {
@@ -631,7 +631,7 @@ fn punsubscribe(
     Err(ResponseError::NoReply)}
 
 fn publish(parser: &Parser, db: &mut Database) -> Response {
-    validate!(parser.argc == 3, "Wrong number of parameters");
+    validate!(parser.argv.len() == 3, "Wrong number of parameters");
     let channel_name = try_validate!(parser.get_vec(1), "Invalid channel");
     let message = try_validate!(parser.get_vec(2), "Invalid channel");
     Response::Integer(db.publish(&channel_name, &message) as i64)
@@ -645,10 +645,10 @@ pub fn command(
         pattern_subscriptions: Option<&mut HashMap<Vec<u8>, usize>>,
         sender: Option<&Sender<PubsubEvent>>
         ) -> Result<Response, ResponseError> {
-    opt_validate!(parser.argc > 0, "Not enough arguments");
+    opt_validate!(parser.argv.len() > 0, "Not enough arguments");
     let command = try_opt_validate!(parser.get_str(0), "Invalid command");
     if command == "select" {
-        opt_validate!(parser.argc == 2, "Wrong number of parameters");
+        opt_validate!(parser.argv.len() == 2, "Wrong number of parameters");
         let dbindex = try_opt_validate!(parser.get_i64(1), "Invalid dbindex") as usize;
         if dbindex > db.size {
             return Ok(Response::Error("dbindex out of range".to_owned()));

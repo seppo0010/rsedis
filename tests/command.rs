@@ -31,7 +31,7 @@ fn getstr(database: &Database, key: &[u8]) -> String {
 #[test]
 fn nocommand() {
     let mut db = Database::new();
-    let parser = Parser::new(b"", 0, Vec::new());
+    let parser = Parser::new(b"", Vec::new());
     let response = command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     match response {
         Response::Error(_) => {},
@@ -42,7 +42,7 @@ fn nocommand() {
 #[test]
 fn set_command() {
     let mut db = Database::new();
-    let parser = Parser::new(b"setkeyvalue", 3, vec!(
+    let parser = Parser::new(b"setkeyvalue", vec!(
                 Argument {pos: 0, len: 3},
                 Argument {pos: 3, len: 3},
                 Argument {pos: 6, len: 5},
@@ -55,7 +55,7 @@ fn set_command() {
 fn get_command() {
     let mut db = Database::new();
     assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
-    let parser = Parser::new(b"getkey", 2, vec!(
+    let parser = Parser::new(b"getkey", vec!(
                 Argument {pos: 0, len: 3},
                 Argument {pos: 3, len: 3},
                 ));
@@ -67,7 +67,7 @@ fn get_command() {
 fn del_command() {
     let mut db = Database::new();
     assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
-    let parser = Parser::new(b"delkeykey2", 3, vec!(
+    let parser = Parser::new(b"delkeykey2", vec!(
                 Argument {pos: 0, len: 3},
                 Argument {pos: 3, len: 3},
                 Argument {pos: 6, len: 4},
@@ -79,7 +79,7 @@ fn del_command() {
 fn exists_command() {
     let mut db = Database::new();
     {
-        let parser = Parser::new(b"existskey", 2, vec!(
+        let parser = Parser::new(b"existskey", vec!(
                     Argument {pos: 0, len: 6},
                     Argument {pos: 6, len: 3},
                     ));
@@ -87,7 +87,7 @@ fn exists_command() {
     }
     assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
     {
-        let parser = Parser::new(b"existskey", 2, vec!(
+        let parser = Parser::new(b"existskey", vec!(
                     Argument {pos: 0, len: 6},
                     Argument {pos: 6, len: 3},
                     ));
@@ -128,14 +128,14 @@ fn serialize_integer() {
 #[test]
 fn append_command() {
     let mut db = Database::new();
-    let parser = Parser::new(b"appendkeyvalue", 3, vec!(
+    let parser = Parser::new(b"appendkeyvalue", vec!(
                 Argument {pos: 0, len: 6},
                 Argument {pos: 6, len: 3},
                 Argument {pos: 9, len: 5},
                 ));
     assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(5));
 
-    let parser = Parser::new(b"appendkeyvalue", 3, vec!(
+    let parser = Parser::new(b"appendkeyvalue", vec!(
                 Argument {pos: 0, len: 6},
                 Argument {pos: 6, len: 3},
                 Argument {pos: 9, len: 5},
@@ -148,7 +148,7 @@ fn append_command() {
 #[test]
 fn incr_command() {
     let mut db = Database::new();
-    let parser = Parser::new(b"incrkey", 2, vec!(
+    let parser = Parser::new(b"incrkey", vec!(
                 Argument {pos: 0, len: 4},
                 Argument {pos: 4, len: 3},
                 ));
@@ -159,7 +159,7 @@ fn incr_command() {
 #[test]
 fn incrby_command() {
     let mut db = Database::new();
-    let parser = Parser::new(b"incrbykey5", 3, vec!(
+    let parser = Parser::new(b"incrbykey5", vec!(
                 Argument {pos: 0, len: 6},
                 Argument {pos: 6, len: 3},
                 Argument {pos: 9, len: 1},
@@ -171,7 +171,7 @@ fn incrby_command() {
 #[test]
 fn decr_command() {
     let mut db = Database::new();
-    let parser = Parser::new(b"decrkey", 2, vec!(
+    let parser = Parser::new(b"decrkey", vec!(
                 Argument {pos: 0, len: 4},
                 Argument {pos: 4, len: 3},
                 ));
@@ -182,7 +182,7 @@ fn decr_command() {
 #[test]
 fn decrby_command() {
     let mut db = Database::new();
-    let parser = Parser::new(b"decrbykey5", 3, vec!(
+    let parser = Parser::new(b"decrbykey5", vec!(
                 Argument {pos: 0, len: 6},
                 Argument {pos: 6, len: 3},
                 Argument {pos: 9, len: 1},
@@ -194,7 +194,7 @@ fn decrby_command() {
 #[test]
 fn lpush_command() {
     let mut db = Database::new();
-    let parser = Parser::new(b"lpushkeyvalue", 3, vec!(
+    let parser = Parser::new(b"lpushkeyvalue", vec!(
                 Argument {pos: 0, len: 5},
                 Argument {pos: 5, len: 3},
                 Argument {pos: 8, len: 5},
@@ -206,7 +206,7 @@ fn lpush_command() {
 #[test]
 fn rpush_command() {
     let mut db = Database::new();
-    let parser = Parser::new(b"rpushkeyvalue", 3, vec!(
+    let parser = Parser::new(b"rpushkeyvalue", vec!(
                 Argument {pos: 0, len: 5},
                 Argument {pos: 5, len: 3},
                 Argument {pos: 8, len: 5},
@@ -219,7 +219,7 @@ fn rpush_command() {
 fn lpop_command() {
     let mut db = Database::new();
     {
-        let parser = Parser::new(b"rpushkeyvalue", 3, vec!(
+        let parser = Parser::new(b"rpushkeyvalue", vec!(
                     Argument {pos: 0, len: 5},
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
@@ -227,7 +227,7 @@ fn lpop_command() {
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
-        let parser = Parser::new(b"rpushkeyvaluf", 3, vec!(
+        let parser = Parser::new(b"rpushkeyvaluf", vec!(
                     Argument {pos: 0, len: 5},
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
@@ -235,7 +235,7 @@ fn lpop_command() {
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
-        let parser = Parser::new(b"lpopkeyvalue", 2, vec!(
+        let parser = Parser::new(b"lpopkeyvalue", vec!(
                     Argument {pos: 0, len: 4},
                     Argument {pos: 4, len: 3},
                     ));
@@ -250,7 +250,7 @@ fn lpop_command() {
 fn rpop_command() {
     let mut db = Database::new();
     {
-        let parser = Parser::new(b"rpushkeyvalue", 3, vec!(
+        let parser = Parser::new(b"rpushkeyvalue", vec!(
                     Argument {pos: 0, len: 5},
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
@@ -258,7 +258,7 @@ fn rpop_command() {
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
-        let parser = Parser::new(b"rpushkeyvaluf", 3, vec!(
+        let parser = Parser::new(b"rpushkeyvaluf", vec!(
                     Argument {pos: 0, len: 5},
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
@@ -266,7 +266,7 @@ fn rpop_command() {
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
-        let parser = Parser::new(b"rpopkeyvalue", 2, vec!(
+        let parser = Parser::new(b"rpopkeyvalue", vec!(
                     Argument {pos: 0, len: 4},
                     Argument {pos: 4, len: 3},
                     ));
@@ -280,7 +280,7 @@ fn rpop_command() {
 fn lindex_command() {
     let mut db = Database::new();
     {
-        let parser = Parser::new(b"rpushkeyvalue", 3, vec!(
+        let parser = Parser::new(b"rpushkeyvalue", vec!(
                     Argument {pos: 0, len: 5},
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
@@ -288,7 +288,7 @@ fn lindex_command() {
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
-        let parser = Parser::new(b"rpushkeyvaluf", 3, vec!(
+        let parser = Parser::new(b"rpushkeyvaluf", vec!(
                     Argument {pos: 0, len: 5},
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
@@ -296,7 +296,7 @@ fn lindex_command() {
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
-        let parser = Parser::new(b"lindexkey0", 3, vec!(
+        let parser = Parser::new(b"lindexkey0", vec!(
                     Argument {pos: 0, len: 6},
                     Argument {pos: 6, len: 3},
                     Argument {pos: 9, len: 1},
@@ -309,7 +309,7 @@ fn lindex_command() {
 fn linsert_command() {
     let mut db = Database::new();
     {
-        let parser = Parser::new(b"rpushkeyvalue", 3, vec!(
+        let parser = Parser::new(b"rpushkeyvalue", vec!(
                     Argument {pos: 0, len: 5},
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
@@ -317,7 +317,7 @@ fn linsert_command() {
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
-        let parser = Parser::new(b"rpushkeyvalug", 3, vec!(
+        let parser = Parser::new(b"rpushkeyvalug", vec!(
                     Argument {pos: 0, len: 5},
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
@@ -325,7 +325,7 @@ fn linsert_command() {
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
-        let parser = Parser::new(b"linsertkeybeforevalugvaluf", 5, vec!(
+        let parser = Parser::new(b"linsertkeybeforevalugvaluf", vec!(
                     Argument {pos: 0, len: 7},
                     Argument {pos: 7, len: 3},
                     Argument {pos: 10, len: 6},
@@ -340,7 +340,7 @@ fn linsert_command() {
 fn llen_command() {
     let mut db = Database::new();
     {
-        let parser = Parser::new(b"rpushkeyvalue", 3, vec!(
+        let parser = Parser::new(b"rpushkeyvalue", vec!(
                     Argument {pos: 0, len: 5},
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
@@ -349,7 +349,7 @@ fn llen_command() {
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
-        let parser = Parser::new(b"llenkey", 2, vec!(
+        let parser = Parser::new(b"llenkey", vec!(
                     Argument {pos: 0, len: 4},
                     Argument {pos: 4, len: 3},
                     ));
@@ -361,7 +361,7 @@ fn llen_command() {
 fn lpushx_command() {
     let mut db = Database::new();
     {
-        let parser = Parser::new(b"lpushxkeyvalue", 3, vec!(
+        let parser = Parser::new(b"lpushxkeyvalue", vec!(
                     Argument {pos: 0, len: 6},
                     Argument {pos: 6, len: 3},
                     Argument {pos: 9, len: 5},
@@ -369,7 +369,7 @@ fn lpushx_command() {
         assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(0));
     }
     {
-        let parser = Parser::new(b"lpushkeyvalue", 3, vec!(
+        let parser = Parser::new(b"lpushkeyvalue", vec!(
                     Argument {pos: 0, len: 5},
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
@@ -377,7 +377,7 @@ fn lpushx_command() {
         assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(1));
     }
     {
-        let parser = Parser::new(b"lpushxkeyvalue", 3, vec!(
+        let parser = Parser::new(b"lpushxkeyvalue", vec!(
                     Argument {pos: 0, len: 6},
                     Argument {pos: 6, len: 3},
                     Argument {pos: 9, len: 5},
@@ -390,7 +390,7 @@ fn lpushx_command() {
 fn lrange_command() {
     let mut db = Database::new();
     {
-        let parser = Parser::new(b"rpushkeyvalue", 3, vec!(
+        let parser = Parser::new(b"rpushkeyvalue", vec!(
                     Argument {pos: 0, len: 5},
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
@@ -398,7 +398,7 @@ fn lrange_command() {
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
-        let parser = Parser::new(b"rpushkeyvaluf", 3, vec!(
+        let parser = Parser::new(b"rpushkeyvaluf", vec!(
                     Argument {pos: 0, len: 5},
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
@@ -406,7 +406,7 @@ fn lrange_command() {
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
-        let parser = Parser::new(b"rpushkeyvalug", 3, vec!(
+        let parser = Parser::new(b"rpushkeyvalug", vec!(
                     Argument {pos: 0, len: 5},
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
@@ -414,7 +414,7 @@ fn lrange_command() {
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
-        let parser = Parser::new(b"lrange key 0 -1", 4, vec!(
+        let parser = Parser::new(b"lrange key 0 -1", vec!(
                     Argument {pos: 0, len: 6},
                     Argument {pos: 7, len: 3},
                     Argument {pos: 11, len: 1},
@@ -432,7 +432,7 @@ fn lrange_command() {
 fn lrem_command() {
     let mut db = Database::new();
     {
-        let parser = Parser::new(b"rpushkeyvalue", 3, vec!(
+        let parser = Parser::new(b"rpushkeyvalue", vec!(
                     Argument {pos: 0, len: 5},
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
@@ -443,7 +443,7 @@ fn lrem_command() {
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
-        let parser = Parser::new(b"lremkey2value", 4, vec!(
+        let parser = Parser::new(b"lremkey2value", vec!(
                     Argument {pos: 0, len: 4},
                     Argument {pos: 4, len: 3},
                     Argument {pos: 7, len: 1},
@@ -452,7 +452,7 @@ fn lrem_command() {
         assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(2));
     }
     {
-        let parser = Parser::new(b"llenkey", 2, vec!(
+        let parser = Parser::new(b"llenkey", vec!(
                     Argument {pos: 0, len: 4},
                     Argument {pos: 4, len: 3},
                     ));
@@ -464,7 +464,7 @@ fn lrem_command() {
 fn lset_command() {
     let mut db = Database::new();
     {
-        let parser = Parser::new(b"rpushkeyvalue", 3, vec!(
+        let parser = Parser::new(b"rpushkeyvalue", vec!(
                     Argument {pos: 0, len: 5},
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
@@ -475,7 +475,7 @@ fn lset_command() {
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
-        let parser = Parser::new(b"lsetkey2valuf", 4, vec!(
+        let parser = Parser::new(b"lsetkey2valuf", vec!(
                     Argument {pos: 0, len: 4},
                     Argument {pos: 4, len: 3},
                     Argument {pos: 7, len: 1},
@@ -484,7 +484,7 @@ fn lset_command() {
         assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Status("OK".to_owned()));
     }
     {
-        let parser = Parser::new(b"lrangekey22", 4, vec!(
+        let parser = Parser::new(b"lrangekey22", vec!(
                     Argument {pos: 0, len: 6},
                     Argument {pos: 6, len: 3},
                     Argument {pos: 9, len: 1},
@@ -500,7 +500,7 @@ fn lset_command() {
 fn rpoplpush_command() {
     let mut db = Database::new();
     {
-        let parser = Parser::new(b"rpushkeyvalue", 3, vec!(
+        let parser = Parser::new(b"rpushkeyvalue", vec!(
                     Argument {pos: 0, len: 5},
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
@@ -508,7 +508,7 @@ fn rpoplpush_command() {
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
-        let parser = Parser::new(b"rpushkeyvaluf", 3, vec!(
+        let parser = Parser::new(b"rpushkeyvaluf", vec!(
                     Argument {pos: 0, len: 5},
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
@@ -516,14 +516,14 @@ fn rpoplpush_command() {
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
-        let parser = Parser::new(b"llenkey2", 2, vec!(
+        let parser = Parser::new(b"llenkey2", vec!(
                     Argument {pos: 0, len: 4},
                     Argument {pos: 4, len: 4},
                     ));
         assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(0));
     }
     {
-        let parser = Parser::new(b"rpoplpushkeykey2", 3, vec!(
+        let parser = Parser::new(b"rpoplpushkeykey2", vec!(
                     Argument {pos: 0, len: 9},
                     Argument {pos: 9, len: 3},
                     Argument {pos: 12, len: 4},
@@ -531,21 +531,21 @@ fn rpoplpush_command() {
         assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Data("valuf".to_owned().into_bytes()));
     }
     {
-        let parser = Parser::new(b"llenkey", 2, vec!(
+        let parser = Parser::new(b"llenkey", vec!(
                     Argument {pos: 0, len: 4},
                     Argument {pos: 4, len: 3},
                     ));
         assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(1));
     }
     {
-        let parser = Parser::new(b"llenkey2", 2, vec!(
+        let parser = Parser::new(b"llenkey2", vec!(
                     Argument {pos: 0, len: 4},
                     Argument {pos: 4, len: 4},
                     ));
         assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(1));
     }
     {
-        let parser = Parser::new(b"rpoplpushkeykey2", 3, vec!(
+        let parser = Parser::new(b"rpoplpushkeykey2", vec!(
                     Argument {pos: 0, len: 9},
                     Argument {pos: 9, len: 3},
                     Argument {pos: 12, len: 4},
@@ -553,14 +553,14 @@ fn rpoplpush_command() {
         assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Data("value".to_owned().into_bytes()));
     }
     {
-        let parser = Parser::new(b"llenkey", 2, vec!(
+        let parser = Parser::new(b"llenkey", vec!(
                     Argument {pos: 0, len: 4},
                     Argument {pos: 4, len: 3},
                     ));
         assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(0));
     }
     {
-        let parser = Parser::new(b"llenkey2", 2, vec!(
+        let parser = Parser::new(b"llenkey2", vec!(
                     Argument {pos: 0, len: 4},
                     Argument {pos: 4, len: 4},
                     ));
@@ -572,7 +572,7 @@ fn rpoplpush_command() {
 fn brpoplpush_nowait() {
     let mut db = Database::new();
     {
-        let parser = Parser::new(b"rpushkeyvalue", 3, vec!(
+        let parser = Parser::new(b"rpushkeyvalue", vec!(
                     Argument {pos: 0, len: 5},
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
@@ -580,7 +580,7 @@ fn brpoplpush_nowait() {
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
-        let parser = Parser::new(b"rpushkeyvaluf", 3, vec!(
+        let parser = Parser::new(b"rpushkeyvaluf", vec!(
                     Argument {pos: 0, len: 5},
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
@@ -588,14 +588,14 @@ fn brpoplpush_nowait() {
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
-        let parser = Parser::new(b"llenkey2", 2, vec!(
+        let parser = Parser::new(b"llenkey2", vec!(
                     Argument {pos: 0, len: 4},
                     Argument {pos: 4, len: 4},
                     ));
         assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(0));
     }
     {
-        let parser = Parser::new(b"brpoplpushkeykey20", 4, vec!(
+        let parser = Parser::new(b"brpoplpushkeykey20", vec!(
                     Argument {pos: 0, len: 10},
                     Argument {pos: 10, len: 3},
                     Argument {pos: 13, len: 4},
@@ -611,7 +611,7 @@ fn brpoplpush_waiting() {
     let (tx, rx) = channel();
     let db2 = db.clone();
     thread::spawn(move || {
-        let parser = Parser::new(b"brpoplpushkey1key20", 4, vec!(
+        let parser = Parser::new(b"brpoplpushkey1key20", vec!(
                     Argument {pos: 0, len: 10},
                     Argument {pos: 10, len: 4},
                     Argument {pos: 14, len: 4},
@@ -632,7 +632,7 @@ fn brpoplpush_waiting() {
     assert_eq!(rx.recv().unwrap(), 1);
 
     {
-        let parser = Parser::new(b"rpushkey1value", 3, vec!(
+        let parser = Parser::new(b"rpushkey1value", vec!(
                     Argument {pos: 0, len: 5},
                     Argument {pos: 5, len: 4},
                     Argument {pos: 9, len: 5},
@@ -641,7 +641,7 @@ fn brpoplpush_waiting() {
         assert_eq!(rx.recv().unwrap(), 2);
     }
     {
-        let parser = Parser::new(b"lrangekey20-1", 4, vec!(
+        let parser = Parser::new(b"lrangekey20-1", vec!(
                     Argument {pos: 0, len: 6},
                     Argument {pos: 6, len: 4},
                     Argument {pos: 10, len: 1},
@@ -657,7 +657,7 @@ fn brpoplpush_waiting() {
 fn brpoplpush_timeout() {
     let mut db = Database::new();
     {
-        let parser = Parser::new(b"brpoplpushkeykey21", 4, vec!(
+        let parser = Parser::new(b"brpoplpushkeykey21", vec!(
                     Argument {pos: 0, len: 10},
                     Argument {pos: 10, len: 3},
                     Argument {pos: 13, len: 4},
@@ -677,7 +677,7 @@ fn brpoplpush_timeout() {
 fn ltrim_command() {
     let mut db = Database::new();
     {
-        let parser = Parser::new(b"rpushkeyvalue", 3, vec!(
+        let parser = Parser::new(b"rpushkeyvalue", vec!(
                     Argument {pos: 0, len: 5},
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
@@ -686,7 +686,7 @@ fn ltrim_command() {
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
-        let parser = Parser::new(b"rpushkeyvaluf", 3, vec!(
+        let parser = Parser::new(b"rpushkeyvaluf", vec!(
                     Argument {pos: 0, len: 5},
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 5},
@@ -695,7 +695,7 @@ fn ltrim_command() {
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
-        let parser = Parser::new(b"ltrimkey1-2", 4, vec!(
+        let parser = Parser::new(b"ltrimkey1-2", vec!(
                     Argument {pos: 0, len: 5},
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 1},
@@ -704,7 +704,7 @@ fn ltrim_command() {
         assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Status("OK".to_owned()));
     }
     {
-        let parser = Parser::new(b"lrangekey0-1", 4, vec!(
+        let parser = Parser::new(b"lrangekey0-1", vec!(
                     Argument {pos: 0, len: 6},
                     Argument {pos: 6, len: 3},
                     Argument {pos: 9, len: 1},
@@ -721,7 +721,7 @@ fn ltrim_command() {
 fn sadd_command() {
     let mut db = Database::new();
     {
-        let parser = Parser::new(b"saddkey11123", 7, vec!(
+        let parser = Parser::new(b"saddkey11123", vec!(
                     Argument {pos: 0, len: 4},
                     Argument {pos: 4, len: 3},
                     Argument {pos: 7, len: 1},
@@ -739,7 +739,7 @@ fn sadd_command() {
 fn scard_command() {
     let mut db = Database::new();
     {
-        let parser = Parser::new(b"saddkey123", 5, vec!(
+        let parser = Parser::new(b"saddkey123", vec!(
                     Argument {pos: 0, len: 4},
                     Argument {pos: 4, len: 3},
                     Argument {pos: 7, len: 1},
@@ -749,7 +749,7 @@ fn scard_command() {
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
-        let parser = Parser::new(b"scardkey", 2, vec!(
+        let parser = Parser::new(b"scardkey", vec!(
                     Argument {pos: 0, len: 5},
                     Argument {pos: 5, len: 3},
                     ));
@@ -761,7 +761,7 @@ fn scard_command() {
 fn sdiff_command() {
     let mut db = Database::new();
     {
-        let parser = Parser::new(b"saddkey123", 5, vec!(
+        let parser = Parser::new(b"saddkey123", vec!(
                     Argument {pos: 0, len: 4},
                     Argument {pos: 4, len: 3},
                     Argument {pos: 7, len: 1},
@@ -771,7 +771,7 @@ fn sdiff_command() {
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
-        let parser = Parser::new(b"sdiffkey", 2, vec!(
+        let parser = Parser::new(b"sdiffkey", vec!(
                     Argument {pos: 0, len: 5},
                     Argument {pos: 5, len: 3},
                     ));
@@ -792,7 +792,7 @@ fn sdiff_command() {
 fn sdiffstore_command() {
     let mut db = Database::new();
     {
-        let parser = Parser::new(b"saddkey123", 5, vec!(
+        let parser = Parser::new(b"saddkey123", vec!(
                     Argument {pos: 0, len: 4},
                     Argument {pos: 4, len: 3},
                     Argument {pos: 7, len: 1},
@@ -802,7 +802,7 @@ fn sdiffstore_command() {
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
-        let parser = Parser::new(b"sdiffstoretargetkey", 3, vec!(
+        let parser = Parser::new(b"sdiffstoretargetkey", vec!(
                     Argument {pos: 0, len: 10},
                     Argument {pos: 10, len: 6},
                     Argument {pos: 16, len: 3},
@@ -822,7 +822,7 @@ fn sdiffstore_command() {
 fn sdiff2_command() {
     let mut db = Database::new();
     {
-        let parser = Parser::new(b"saddkey123", 5, vec!(
+        let parser = Parser::new(b"saddkey123", vec!(
                     Argument {pos: 0, len: 4},
                     Argument {pos: 4, len: 3},
                     Argument {pos: 7, len: 1},
@@ -832,7 +832,7 @@ fn sdiff2_command() {
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
-        let parser = Parser::new(b"saddkey223", 4, vec!(
+        let parser = Parser::new(b"saddkey223", vec!(
                     Argument {pos: 0, len: 4},
                     Argument {pos: 4, len: 4},
                     Argument {pos: 8, len: 1},
@@ -841,7 +841,7 @@ fn sdiff2_command() {
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     }
     {
-        let parser = Parser::new(b"sdiffkeykey2", 3, vec!(
+        let parser = Parser::new(b"sdiffkeykey2", vec!(
                     Argument {pos: 0, len: 5},
                     Argument {pos: 5, len: 3},
                     Argument {pos: 8, len: 4},
@@ -856,7 +856,7 @@ fn select_command() {
     let mut db = Database::new();
     {
         let mut dbindex = 0;
-        let parser = Parser::new(b"select1", 2, vec!(
+        let parser = Parser::new(b"select1", vec!(
                     Argument {pos: 0, len: 6},
                     Argument {pos: 6, len: 1},
                     ));
@@ -869,7 +869,7 @@ fn select_command() {
 fn flushdb_command() {
     let mut db = Database::new();
     {
-        let parser = Parser::new(b"setkeyvalue", 3, vec!(
+        let parser = Parser::new(b"setkeyvalue", vec!(
                     Argument {pos: 0, len: 3},
                     Argument {pos: 3, len: 3},
                     Argument {pos: 6, len: 5},
@@ -877,7 +877,7 @@ fn flushdb_command() {
         assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Status("OK".to_owned()));
     }
     {
-        let parser = Parser::new(b"setkeyvaluf", 3, vec!(
+        let parser = Parser::new(b"setkeyvaluf", vec!(
                     Argument {pos: 0, len: 3},
                     Argument {pos: 3, len: 3},
                     Argument {pos: 6, len: 5},
@@ -885,20 +885,20 @@ fn flushdb_command() {
         assert_eq!(command(&parser, &mut db, &mut 1, None, None, None).unwrap(), Response::Status("OK".to_owned()));
     }
     {
-        let parser = Parser::new(b"flushdb", 1, vec!(
+        let parser = Parser::new(b"flushdb", vec!(
                     Argument {pos: 0, len: 7},
                     ));
         assert_eq!(command(&parser, &mut db, &mut 1, None, None, None).unwrap(), Response::Status("OK".to_owned()));
     }
     {
-        let parser = Parser::new(b"getkey", 2, vec!(
+        let parser = Parser::new(b"getkey", vec!(
                     Argument {pos: 0, len: 3},
                     Argument {pos: 3, len: 3},
                     ));
         assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Data("value".to_owned().into_bytes()));
     }
     {
-        let parser = Parser::new(b"getkey", 2, vec!(
+        let parser = Parser::new(b"getkey", vec!(
                     Argument {pos: 0, len: 3},
                     Argument {pos: 3, len: 3},
                     ));
@@ -910,7 +910,7 @@ fn flushdb_command() {
 fn flushall_command() {
     let mut db = Database::new();
     {
-        let parser = Parser::new(b"setkeyvalue", 3, vec!(
+        let parser = Parser::new(b"setkeyvalue", vec!(
                     Argument {pos: 0, len: 3},
                     Argument {pos: 3, len: 3},
                     Argument {pos: 6, len: 5},
@@ -918,7 +918,7 @@ fn flushall_command() {
         assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Status("OK".to_owned()));
     }
     {
-        let parser = Parser::new(b"setkeyvaluf", 3, vec!(
+        let parser = Parser::new(b"setkeyvaluf", vec!(
                     Argument {pos: 0, len: 3},
                     Argument {pos: 3, len: 3},
                     Argument {pos: 6, len: 5},
@@ -926,20 +926,20 @@ fn flushall_command() {
         assert_eq!(command(&parser, &mut db, &mut 1, None, None, None).unwrap(), Response::Status("OK".to_owned()));
     }
     {
-        let parser = Parser::new(b"flushall", 1, vec!(
+        let parser = Parser::new(b"flushall", vec!(
                     Argument {pos: 0, len: 8},
                     ));
         assert_eq!(command(&parser, &mut db, &mut 1, None, None, None).unwrap(), Response::Status("OK".to_owned()));
     }
     {
-        let parser = Parser::new(b"getkey", 2, vec!(
+        let parser = Parser::new(b"getkey", vec!(
                     Argument {pos: 0, len: 3},
                     Argument {pos: 3, len: 3},
                     ));
         assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Nil);
     }
     {
-        let parser = Parser::new(b"getkey", 2, vec!(
+        let parser = Parser::new(b"getkey", vec!(
                     Argument {pos: 0, len: 3},
                     Argument {pos: 3, len: 3},
                     ));
@@ -955,7 +955,7 @@ fn subscribe_publish_command() {
     let (tx, rx) = channel();
 
     {
-        let parser = Parser::new(b"subscribechannel", 2, vec!(
+        let parser = Parser::new(b"subscribechannel", vec!(
                     Argument {pos: 0, len: 9},
                     Argument {pos: 9, len: 7},
                     ));
@@ -963,7 +963,7 @@ fn subscribe_publish_command() {
     }
 
     {
-        let parser = Parser::new(b"publishchannelhello world", 3, vec!(
+        let parser = Parser::new(b"publishchannelhello world", vec!(
                     Argument {pos: 0, len: 7},
                     Argument {pos: 7, len: 7},
                     Argument {pos: 14, len: 11},
@@ -972,7 +972,7 @@ fn subscribe_publish_command() {
     }
 
     {
-        let parser = Parser::new(b"unsubscribechannel", 2, vec!(
+        let parser = Parser::new(b"unsubscribechannel", vec!(
                     Argument {pos: 0, len: 11},
                     Argument {pos: 11, len: 7},
                     ));

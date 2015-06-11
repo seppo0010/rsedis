@@ -9,7 +9,7 @@ fn parse_valid() {
     let r = parse(message, message.len());
     assert!(r.is_ok());
     let parser = r.unwrap();
-    assert_eq!(parser.argc, 2);
+    assert_eq!(parser.argv.len(), 2);
     assert_eq!(parser.get_str(0).unwrap(), "foo");
     assert_eq!(parser.get_str(1).unwrap(), "barz");
 }
