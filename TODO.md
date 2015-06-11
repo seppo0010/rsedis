@@ -95,10 +95,10 @@
     - [ ] move
     - [ ] rename
     - [ ] renamenx
-    - [ ] expire
-    - [ ] expireat
-    - [ ] pexpire
-    - [ ] pexpireat
+    - [x] expire
+    - [x] expireat
+    - [x] pexpire
+    - [x] pexpireat
     - [ ] keys
     - [ ] scan
     - [ ] dbsize
@@ -110,7 +110,7 @@
     - [ ] bgrewriteaof
     - [ ] shutdown
     - [ ] lastsave
-    - [ ] type
+    - [x] type
     - [ ] multi
     - [ ] exec
     - [ ] discard
@@ -122,9 +122,9 @@
     - [ ] sort
     - [ ] info
     - [ ] monitor
-    - [ ] ttl
-    - [ ] pttl
-    - [ ] persist
+    - [x] ttl
+    - [x] pttl
+    - [x] persist
     - [ ] slaveof
     - [ ] role
     - [ ] debug
