@@ -12,30 +12,20 @@ fn lpush() {
     let value2 = vec![1u8, 5, 6, 7];
     let expected2 = Vec::clone(&value2);
     assert!(database.get_or_create(0, &key).push(value, false).is_ok());
-    match database.get(0, &key) {
-        Some(val) => {
-            match val {
-                &Value::List(ref list) => {
-                    assert_eq!(list.len(), 1);
-                    assert_eq!(list.front(), Some(&expected));
-                }
-                _ => assert!(false),
-            }
+    match database.get(0, &key).unwrap() {
+        &Value::List(ref list) => {
+            assert_eq!(list.len(), 1);
+            assert_eq!(list.front(), Some(&expected));
         }
         _ => assert!(false),
     }
 
     assert!(database.get_or_create(0, &key).push(value2, false).is_ok());
-    match database.get(0, &key) {
-        Some(val) => {
-            match val {
-                &Value::List(ref list) => {
-                    assert_eq!(list.len(), 2);
-                    assert_eq!(list.back(), Some(&expected));
-                    assert_eq!(list.front(), Some(&expected2));
-                }
-                _ => assert!(false),
-            }
+    match database.get(0, &key).unwrap() {
+        &Value::List(ref list) => {
+            assert_eq!(list.len(), 2);
+            assert_eq!(list.back(), Some(&expected));
+            assert_eq!(list.front(), Some(&expected2));
         }
         _ => assert!(false),
     }
