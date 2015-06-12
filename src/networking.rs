@@ -74,32 +74,27 @@ impl Client {
 
     pub fn run(&mut self) {
         #![allow(unused_must_use)]
-        let (stream_tx, rx) = channel();
+        let (stream_tx, rx) = channel::<Response>();
         {
             let mut stream = self.stream.try_clone().unwrap();
             thread::spawn(move || {
                 loop {
-                    let try_recv = rx.recv();
-                    if try_recv.is_err() {
-                        break;
-                    }
-                    let msg:Response = try_recv.unwrap();
-                    let resp = msg.as_bytes();
-                    stream.write(&*resp);
+                    match rx.recv() {
+                        Ok(msg) => stream.write(&*msg.as_bytes()),
+                        Err(_) => break,
+                    };
                 }
             });
         }
-        let (pubsub_tx, pubsub_rx) = channel();
+        let (pubsub_tx, pubsub_rx) = channel::<PubsubEvent>();
         {
             let tx = stream_tx.clone();
             thread::spawn(move || {
                 loop {
-                    let try_recv = pubsub_rx.recv();
-                    if try_recv.is_err() {
-                        break;
-                    }
-                    let msg:PubsubEvent = try_recv.unwrap();
-                    tx.send(msg.as_response());
+                    match pubsub_rx.recv() {
+                        Ok(msg) => tx.send(msg.as_response()),
+                        Err(_) => break,
+                    };
                 }
             });
         }
@@ -108,26 +103,27 @@ impl Client {
         let mut subscriptions = HashMap::new();
         let mut psubscriptions = HashMap::new();
         loop {
-            let result = self.stream.read(&mut buffer);
-            if result.is_err() {
-                break;
-            }
-            let len = result.unwrap();
+            let len = match self.stream.read(&mut buffer) {
+                Ok(r) => r,
+                Err(_) => break,
+            };
             if len == 0 {
                 break;
             }
-            let try_parser = parse(&buffer, len);
-            if try_parser.is_err() {
-                let err = try_parser.unwrap_err();
-                match err {
+            let parser = match parse(&buffer, len) {
+                Ok(p) => p,
+                Err(err) => match err {
                     ParseError::Incomplete => { continue; }
                     _ => { break; }
-                };
-            }
-            let parser = try_parser.unwrap();
+                },
+            };
+
             let mut error = false;
             loop {
-                let mut db = self.db.lock().unwrap();
+                let mut db = match self.db.lock() {
+                    Ok(db) => db,
+                    Err(_) => break,
+                };
                 match command(&parser, &mut *db, &mut dbindex, Some(&mut subscriptions), Some(&mut psubscriptions), Some(&pubsub_tx)) {
                     Ok(response) => {
                         match stream_tx.send(response) {

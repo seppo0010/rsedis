@@ -1,11 +1,19 @@
 use std::fs::File;
 use std::io::BufRead;
 use std::io::BufReader;
+use std::io::Error as IOError;
+use std::num::ParseIntError;
 use std::path::Path;
 
 pub struct Config {
     pub bind: Vec<String>,
     pub port: u16,
+}
+
+#[derive(Debug)]
+pub enum ConfigError {
+    IOError(IOError),
+    ParseIntError(ParseIntError),
 }
 
 impl Config {
@@ -16,15 +24,15 @@ impl Config {
         }
     }
 
-    pub fn new(confpath: Option<String>) -> Config {
+    pub fn new(confpath: Option<String>) -> Result<Config, ConfigError> {
         let mut bind = Vec::new();
         let mut port = 6379;
         match confpath {
             Some(fname) => {
                 let path = Path::new(&*fname);
-                let file = BufReader::new(File::open(&path).unwrap());
+                let file = BufReader::new(try!(File::open(&path)));
                 for line_iter in file.lines() {
-                    let lline = line_iter.unwrap();
+                    let lline = try!(line_iter);
                     let line = lline.trim();
                     if line.len() > 0 && &line[0..0] == "#" {
                         continue;
@@ -33,7 +41,7 @@ impl Config {
                         bind.extend(line[4..].split(' ').filter(|x| x.trim().len() > 0).map(|x| x.trim().to_owned()));
                     }
                     else if &line[0..4] == "port" {
-                        port = line[4..].trim().parse::<u16>().unwrap();
+                        port = try!(line[4..].trim().parse::<u16>());
                     }
                 }
                 if bind.len() == 0 {
@@ -42,13 +50,21 @@ impl Config {
             },
             None => bind.push("127.0.0.1".to_owned()),
         };
-        Config {
+        Ok(Config {
             bind: bind,
             port: port,
-        }
+        })
     }
 
     pub fn addresses(&self) -> Vec<(&str, u16)> {
         self.bind.iter().map(|s| (&s[..], self.port)).collect::<Vec<_>>()
     }
+}
+
+impl From<IOError> for ConfigError {
+    fn from(e: IOError) -> ConfigError { ConfigError::IOError(e) }
+}
+
+impl From<ParseIntError> for ConfigError {
+    fn from(e: ParseIntError) -> ConfigError { ConfigError::ParseIntError(e) }
 }

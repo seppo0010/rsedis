@@ -77,11 +77,9 @@ fn normalize_position(position: i64, _len: usize) -> Result<usize, usize> {
 impl Value {
     pub fn set(&mut self, value: Vec<u8>) -> Result<(), OperationError> {
         if value.len() < 32 { // ought to be enough!
-            let try_utf8 = from_utf8(&*value);
-            if try_utf8.is_ok() {
-                let try_parse = try_utf8.unwrap().parse::<i64>();
-                if try_parse.is_ok() {
-                    *self = Value::Integer(try_parse.unwrap());
+            if let Ok(utf8) = from_utf8(&*value) {
+                if let Ok(i) = utf8.parse::<i64>() {
+                    *self = Value::Integer(i);
                     return Ok(());
                 }
             }
@@ -304,6 +302,7 @@ impl Value {
                     Ok(i) => i,
                     Err(_) => return Err(OperationError::OutOfBoundsError),
                 };
+                // this unwrap is safe because `i` is already validated to be inside the list
                 let el = list.iter_mut().skip(i).next().unwrap();
                 *el = value;
                 return Ok(());

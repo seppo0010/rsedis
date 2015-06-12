@@ -16,7 +16,7 @@ macro_rules! config {
         match create_dir("test") { _ => () }
         match create_dir(dirpath) { _ => () }
         match File::create(filepath.clone()).unwrap().write_all($str) { _ => () }
-        Config::new(Some(filepath))
+        Config::new(Some(filepath)).unwrap()
     })
 }
 
