@@ -1,4 +1,6 @@
 use std::str::from_utf8;
+use std::str::Utf8Error;
+use std::num::ParseIntError;
 use std::error::Error;
 use std::fmt;
 
@@ -14,7 +16,8 @@ pub struct Parser<'a> {
 
 pub enum ParseError {
     Incomplete,
-    BadProtocol
+    BadProtocol,
+    InvalidArgument,
 }
 
 impl fmt::Debug for ParseError {
@@ -32,11 +35,21 @@ impl fmt::Display for ParseError {
 impl Error for ParseError {
     fn description(&self) -> &str {
         match *self {
-            ParseError::Incomplete => "incomplete data",
-            ParseError::BadProtocol => "invalid data",
+            ParseError::Incomplete => "Incomplete data",
+            ParseError::BadProtocol => "Invalid data",
+            ParseError::InvalidArgument => "Invalid argument",
         }
     }
+
     fn cause(&self) -> Option<&Error> { None }
+}
+
+impl From<Utf8Error> for ParseError {
+    fn from(_: Utf8Error) -> ParseError { ParseError::InvalidArgument }
+}
+
+impl From<ParseIntError> for ParseError {
+    fn from(_: ParseIntError) -> ParseError { ParseError::InvalidArgument }
 }
 
 impl<'a> Parser<'a> {
@@ -47,35 +60,24 @@ impl<'a> Parser<'a> {
         };
     }
 
-    pub fn get_i64(&self, pos: usize) -> Result<i64, i32> {
-        let try_str = self.get_str(pos);
-        if try_str.is_err() {
-            return Err(try_str.unwrap_err());
-        }
-        let val = try_str.unwrap().parse::<i64>();
-        if val.is_err() {
-            return Err(2);
-        }
-        return Ok(val.unwrap());
+    pub fn get_i64(&self, pos: usize) -> Result<i64, ParseError> {
+        let s = try!(self.get_str(pos));
+        return Ok(try!(s.parse::<i64>()));
     }
 
-    pub fn get_str(&self, pos: usize) -> Result<&str, i32> {
+    pub fn get_str(&self, pos: usize) -> Result<&str, ParseError> {
         let data = try!(self.get_slice(pos));
-        let res = from_utf8(&data);
-        if res.is_err() {
-            return Err(1);
-        }
-        return Ok(res.unwrap());
+        Ok(try!(from_utf8(&data)))
     }
 
-    pub fn get_vec(&self, pos: usize) -> Result<Vec<u8>, i32> {
+    pub fn get_vec(&self, pos: usize) -> Result<Vec<u8>, ParseError> {
         let data = try!(self.get_slice(pos));
         return Ok(data.to_vec());
     }
 
-    pub fn get_slice(&self, pos: usize) -> Result<&[u8], i32> {
+    pub fn get_slice(&self, pos: usize) -> Result<&[u8], ParseError> {
         if pos >= self.argv.len() {
-            return Err(0);
+            return Err(ParseError::InvalidArgument);
         }
         let arg = &self.argv[pos];
         return Ok(&self.data[arg.pos..arg.pos+arg.len]);

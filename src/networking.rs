@@ -120,8 +120,8 @@ impl Client {
             if try_parser.is_err() {
                 let err = try_parser.unwrap_err();
                 match err {
-                    ParseError::BadProtocol => { break; }
                     ParseError::Incomplete => { continue; }
+                    _ => { break; }
                 };
             }
             let parser = try_parser.unwrap();
