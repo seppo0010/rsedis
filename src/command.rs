@@ -62,9 +62,10 @@ macro_rules! opt_validate {
 
 macro_rules! try_opt_validate {
     ($expr: expr, $err: expr) => ({
-        let res = $expr;
-        opt_validate!(res.is_ok(), $err);
-        res.unwrap()
+        match $expr {
+            Ok(r) => r,
+            Err(_) => return Ok(Response::Error($err.to_string())),
+        }
     })
 }
 
@@ -78,9 +79,10 @@ macro_rules! validate {
 
 macro_rules! try_validate {
     ($expr: expr, $err: expr) => ({
-        let res = $expr;
-        validate!(res.is_ok(), $err);
-        res.unwrap()
+        match $expr {
+            Ok(r) => r,
+            Err(_) => return Response::Error($err.to_string()),
+        }
     })
 }
 
@@ -366,16 +368,18 @@ fn decr(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
 
 fn incrby(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 3, "Wrong number of parameters");
-    let try_increment = parser.get_i64(2);
-    if try_increment.is_err() { return Response::Error("Invalid increment".to_owned()); }
-    return generic_incr(parser, db, dbindex, try_increment.unwrap());
+    match parser.get_i64(2) {
+        Ok(increment) => generic_incr(parser, db, dbindex, increment),
+        Err(_) => Response::Error("Invalid increment".to_owned()),
+    }
 }
 
 fn decrby(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 3, "Wrong number of parameters");
-    let try_increment = parser.get_i64(2);
-    if try_increment.is_err() { return Response::Error("Invalid decrement".to_owned()); }
-    return generic_incr(parser, db, dbindex, -try_increment.unwrap());
+    match parser.get_i64(2) {
+        Ok(decrement) => generic_incr(parser, db, dbindex, -decrement),
+        Err(_) => Response::Error("Invalid increment".to_owned()),
+    }
 }
 
 fn generic_push(parser: &Parser, db: &mut Database, dbindex: usize, right: bool, create: bool) -> Response {
@@ -726,9 +730,13 @@ fn ping(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     #![allow(unused_variables)]
     validate!(parser.argv.len() <= 2, "Wrong number of parameters");
     if parser.argv.len() == 2 {
-        return Response::Data(parser.get_vec(1).unwrap());
+        match parser.get_vec(1) {
+            Ok(r) => Response::Data(r),
+            Err(err) => Response::Error(err.to_string()),
+        }
+    } else {
+        Response::Data(b"PONG".to_vec())
     }
-    return Response::Data(b"PONG".to_vec());
 }
 
 fn subscribe(
