@@ -77,6 +77,35 @@ fn set_command() {
 }
 
 #[test]
+fn setnx_command() {
+    let mut db = Database::new();
+    assert_eq!(command(&parser!(b"setnx key value"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(1));
+    assert_eq!("value", getstr(&db, b"key"));
+    assert_eq!(command(&parser!(b"setnx key valuf"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(0));
+    assert_eq!("value", getstr(&db, b"key"));
+}
+
+#[test]
+fn setex_command() {
+    let mut db = Database::new();
+    assert_eq!(command(&parser!(b"setex key 1234 value"), &mut db, &mut 0, None, None, None).unwrap(), Response::Status("OK".to_owned()));
+    let now = mstime();
+    let exp = db.get_msexpiration(0, &b"key".to_vec()).unwrap().clone();
+    assert!(exp >= now + 1233 * 1000);
+    assert!(exp <= now + 1234 * 1000);
+}
+
+#[test]
+fn psetex_command() {
+    let mut db = Database::new();
+    assert_eq!(command(&parser!(b"psetex key 1234 value"), &mut db, &mut 0, None, None, None).unwrap(), Response::Status("OK".to_owned()));
+    let now = mstime();
+    let exp = db.get_msexpiration(0, &b"key".to_vec()).unwrap().clone();
+    assert!(exp >= now + 1000);
+    assert!(exp <= now + 1234);
+}
+
+#[test]
 fn get_command() {
     let mut db = Database::new();
     assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());

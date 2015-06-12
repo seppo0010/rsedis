@@ -1,9 +1,9 @@
 - commands
     - [x] get
     - [x] set
-    - [ ] setnx
-    - [ ] setex
-    - [ ] psetex
+    - [x] setnx
+    - [x] setex
+    - [x] psetex
     - [x] append
     - [ ] strlen
     - [x] del

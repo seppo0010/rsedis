@@ -84,6 +84,28 @@ macro_rules! try_validate {
     })
 }
 
+fn generic_set(db: &mut Database, dbindex: usize, key: Vec<u8>, val: Vec<u8>, nx: bool, xx: bool, expiration: Option<i64>) -> Result<bool, Response>  {
+    if nx && db.get(dbindex, &key).is_some() {
+        return Ok(false);
+    }
+
+    if xx && db.get(dbindex, &key).is_none() {
+        return Ok(false);
+    }
+
+    match db.get_or_create(dbindex, &key).set(val) {
+        Ok(_) => {
+            db.key_publish(&key);
+            match expiration {
+                Some(msexp) => db.set_msexpiration(dbindex, key, msexp + mstime()),
+                None => (),
+            }
+            Ok(true)
+        }
+        Err(err) => Err(Response::Error(err.to_string())),
+    }
+}
+
 fn set(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() >= 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
@@ -115,24 +137,42 @@ fn set(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
         }
     }
 
-    if nx && db.get(dbindex, &key).is_some() {
-        return Response::Nil;
+    match generic_set(db, dbindex, key, val, nx, xx, expiration) {
+        Ok(updated) => if updated { Response::Status("OK".to_owned()) } else { Response::Nil },
+        Err(r) => r,
     }
+}
 
-    if xx && db.get(dbindex, &key).is_none() {
-        return Response::Nil;
+fn setnx(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() == 3, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let val = try_validate!(parser.get_vec(2), "Invalid value");
+    match generic_set(db, dbindex, key, val, true, false, None) {
+        Ok(updated) => Response::Integer(if updated { 1 } else { 0 }),
+        Err(r) => r
     }
+}
 
-    let r = match db.get_or_create(dbindex, &key).set(val) {
+fn setex(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() == 4, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let exp = try_validate!(parser.get_i64(2), "Invalid expiration");
+    let val = try_validate!(parser.get_vec(3), "Invalid value");
+    match generic_set(db, dbindex, key, val, false, false, Some(exp * 1000)) {
         Ok(_) => Response::Status("OK".to_owned()),
-        Err(err) => Response::Error(err.to_string()),
-    };
-    db.key_publish(&key);
-    match expiration {
-        Some(msexp) => db.set_msexpiration(dbindex, key, msexp + mstime()),
-        None => (),
+        Err(r) => r
     }
-    r
+}
+
+fn psetex(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() == 4, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let exp = try_validate!(parser.get_i64(2), "Invalid value");
+    let val = try_validate!(parser.get_vec(3), "Invalid value");
+    match generic_set(db, dbindex, key, val, false, false, Some(exp)) {
+        Ok(_) => Response::Status("OK".to_owned()),
+        Err(r) => r
+    }
 }
 
 fn exists(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
@@ -795,6 +835,9 @@ pub fn command(
         "persist" => persist(parser, db, dbindex),
         "type" => dbtype(parser, db, dbindex),
         "set" => set(parser, db, dbindex),
+        "setnx" => setnx(parser, db, dbindex),
+        "setex" => setex(parser, db, dbindex),
+        "psetex" => psetex(parser, db, dbindex),
         "del" => del(parser, db, dbindex),
         "append" => append(parser, db, dbindex),
         "get" => get(parser, db, dbindex),
