@@ -115,6 +115,14 @@ fn get_command() {
 }
 
 #[test]
+fn strlen_command() {
+    let mut db = Database::new();
+    assert_eq!(command(&parser!(b"strlen key"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(0));
+    assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
+    assert_eq!(command(&parser!(b"strlen key"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(5));
+}
+
+#[test]
 fn del_command() {
     let mut db = Database::new();
     assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());

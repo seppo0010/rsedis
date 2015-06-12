@@ -5,7 +5,7 @@
     - [x] setex
     - [x] psetex
     - [x] append
-    - [ ] strlen
+    - [x] strlen
     - [x] del
     - [x] exists
     - [ ] setbit

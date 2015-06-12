@@ -328,6 +328,22 @@ fn get(parser: &Parser, db: &Database, dbindex: usize) -> Response {
     }
 }
 
+fn strlen(parser: &Parser, db: &Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() == 2, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let obj = db.get(dbindex, &key);
+    match obj {
+        Some(value) => {
+            match value {
+                &Value::Data(ref data) => return Response::Integer(data.len() as i64),
+                &Value::Integer(ref int) => return Response::Integer(format!("{}", int).len() as i64),
+                _ => panic!("Should be an integer or data"),
+            }
+        }
+        None => return Response::Integer(0),
+    }
+}
+
 fn generic_incr(parser: &Parser, db: &mut Database, dbindex: usize, increment: i64) -> Response {
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let r = match db.get_or_create(dbindex, &key).incr(increment) {
@@ -841,6 +857,7 @@ pub fn command(
         "del" => del(parser, db, dbindex),
         "append" => append(parser, db, dbindex),
         "get" => get(parser, db, dbindex),
+        "strlen" => strlen(parser, db, dbindex),
         "incr" => incr(parser, db, dbindex),
         "decr" => decr(parser, db, dbindex),
         "incrby" => incrby(parser, db, dbindex),
