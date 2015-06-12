@@ -5,6 +5,11 @@ use std::thread;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{Sender, channel};
 
+#[cfg(unix)]
+use libc::funcs::posix88::unistd::fork;
+#[cfg(unix)]
+use libc::funcs::c95::stdlib::exit;
+
 use super::command::command;
 use super::command::{Response, ResponseError};
 use super::database::{Database, PubsubEvent};
@@ -166,9 +171,33 @@ impl Server {
         }
     }
 
+    #[cfg(unix)]
     pub fn run(&mut self) {
-        self.start();
-        self.join();
+        if self.config.daemonize {
+            unsafe {
+                match fork() {
+                    -1 => panic!("Fork failed"),
+                    0 => {
+                        self.start();
+                        self.join();
+                    },
+                    _ => exit(0),
+                };
+            }
+        } else {
+            self.start();
+            self.join();
+        }
+    }
+
+    #[cfg(not(unix))]
+    pub fn run(&mut self) {
+        if self.config.daemonize {
+            panic!("Cannot daemonize in non-unix");
+        } else {
+            self.start();
+            self.join();
+        }
     }
 
     pub fn join(&mut self) {

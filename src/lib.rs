@@ -1,4 +1,6 @@
 extern crate time;
+#[cfg(unix)]
+extern crate libc;
 
 pub mod command;
 pub mod config;

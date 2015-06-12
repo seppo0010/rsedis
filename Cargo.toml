@@ -21,3 +21,9 @@ path = "tests/tests.rs"
 [dependencies]
 time = "0.1"
 rand = "0.3.8"
+
+[target.x86_64-unknown-linux-gnu.dependencies]
+libc ="0.1.8"
+
+[target.x86_64-apple-darwin.dependencies]
+libc ="0.1.8"

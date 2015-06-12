@@ -165,7 +165,7 @@
     - [ ] latency
 - config
     - [ ] include
-    - [ ] daemonize
+    - [x] daemonize
     - [ ] pidfile
     - [x] port
     - [ ] tcp-backlog

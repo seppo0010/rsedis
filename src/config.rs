@@ -6,6 +6,7 @@ use std::num::ParseIntError;
 use std::path::Path;
 
 pub struct Config {
+    pub daemonize: bool,
     pub bind: Vec<String>,
     pub port: u16,
 }
@@ -19,6 +20,7 @@ pub enum ConfigError {
 impl Config {
     pub fn mock(port: u16) -> Config {
         Config {
+            daemonize: false,
             bind: vec!["127.0.0.1".to_owned()],
             port: port,
         }
@@ -27,6 +29,7 @@ impl Config {
     pub fn new(confpath: Option<String>) -> Result<Config, ConfigError> {
         let mut bind = Vec::new();
         let mut port = 6379;
+        let mut daemonize = false;
         match confpath {
             Some(fname) => {
                 let path = Path::new(&*fname);
@@ -34,23 +37,29 @@ impl Config {
                 for line_iter in file.lines() {
                     let lline = try!(line_iter);
                     let line = lline.trim();
-                    if line.len() > 0 && &line[0..0] == "#" {
+                    if line.starts_with("#") {
                         continue;
                     }
-                    if &line[0..4] == "bind" {
-                        bind.extend(line[4..].split(' ').filter(|x| x.trim().len() > 0).map(|x| x.trim().to_owned()));
+
+                    if line.starts_with("bind ") {
+                        bind.extend(line[5..].split(' ').filter(|x| x.trim().len() > 0).map(|x| x.trim().to_owned()));
                     }
-                    else if &line[0..4] == "port" {
-                        port = try!(line[4..].trim().parse::<u16>());
+                    else if line.starts_with("port ") {
+                        port = try!(line[5..].trim().parse::<u16>());
+                    }
+                    else if line.starts_with("daemonize ") {
+                        daemonize = line[9..].trim() == "yes"
                     }
                 }
+
                 if bind.len() == 0 {
-                    bind.push("0.0.0.0".to_owned());
+                    bind.push("127.0.0.1".to_owned());
                 }
             },
             None => bind.push("127.0.0.1".to_owned()),
         };
         Ok(Config {
+            daemonize: daemonize,
             bind: bind,
             port: port,
         })
