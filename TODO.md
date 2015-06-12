@@ -167,9 +167,9 @@
     - [ ] include
     - [ ] daemonize
     - [ ] pidfile
-    - [ ] port
+    - [x] port
     - [ ] tcp-backlog
-    - [ ] bind
+    - [x] bind
     - [ ] unixsocket
     - [ ] unixsocketperm
     - [ ] timeout

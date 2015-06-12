@@ -1,9 +1,12 @@
 extern crate rsedis;
 
 use rsedis::networking::Server;
+use rsedis::config::Config;
+use std::env::args;
 
 fn main() {
     #![allow(dead_code)]
-    let mut server = Server::new(("127.0.0.1", 6379));
+    let config = Config::new(args().nth(1));
+    let mut server = Server::new(config);
     server.run();
 }

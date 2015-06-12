@@ -10,17 +10,18 @@ use super::command::{Response, ResponseError};
 use super::database::{Database, PubsubEvent};
 use super::parser::parse;
 use super::parser::ParseError;
+use super::config::Config;
 
 struct Client {
     stream: TcpStream,
     db: Arc<Mutex<Database>>
 }
 
-pub struct Server<A: ToSocketAddrs + Clone> {
-    addr: A,
+pub struct Server {
+    config: Config,
     db: Arc<Mutex<Database>>,
-    listener_channel: Option<Sender<u8>>,
-    listener_thread: Option<thread::JoinHandle<()>>,
+    listener_channels: Vec<Sender<u8>>,
+    listener_threads: Vec<thread::JoinHandle<()>>,
 }
 
 impl PubsubEvent {
@@ -159,18 +160,14 @@ impl Client {
     }
 }
 
-impl<A: ToSocketAddrs + Clone> Server<A> {
-    pub fn new(addr: A) -> Server<A> {
+impl Server {
+    pub fn new(config: Config) -> Server {
         return Server {
-            addr: addr,
+            config: config,
             db: Arc::new(Mutex::new(Database::new())),
-            listener_channel: None,
-            listener_thread: None,
+            listener_channels: Vec::new(),
+            listener_threads: Vec::new(),
         }
-    }
-
-    fn get_listener(&self) -> TcpListener {
-        return TcpListener::bind(self.addr.clone()).unwrap();
     }
 
     pub fn run(&mut self) {
@@ -180,48 +177,48 @@ impl<A: ToSocketAddrs + Clone> Server<A> {
 
     pub fn join(&mut self) {
         #![allow(unused_must_use)]
-        match self.listener_thread.take() {
-            Some(th) => { th.join(); },
-            _ => {},
+        while self.listener_threads.len() > 0 {
+            self.listener_threads.pop().unwrap().join();
         }
     }
 
     pub fn start(&mut self) {
-        let listener = self.get_listener();
-        let db = self.db.clone();
-        let (tx, rx) = channel();
-        self.listener_channel = Some(tx);
-        let th =  thread::spawn(move || {
-            for stream in listener.incoming() {
-                if rx.try_recv().is_ok() {
-                    // any new message should break
-                    break;
-                }
-                match stream {
-                    Ok(stream) => {
-                        let db1 = db.clone();
-                        thread::spawn(move || {
-                            let mut client = Client::new(stream, db1);
-                            client.run();
-                        });
+        for addr in self.config.addresses() {
+            let (tx, rx) = channel();
+            self.listener_channels.push(tx);
+            let listener = TcpListener::bind(addr).unwrap();
+            let db = self.db.clone();
+            let th =  thread::spawn(move || {
+                for stream in listener.incoming() {
+                    if rx.try_recv().is_ok() {
+                        // any new message should break
+                        break;
                     }
-                    Err(e) => { println!("error {}", e); }
+                    match stream {
+                        Ok(stream) => {
+                            let db1 = db.clone();
+                            thread::spawn(move || {
+                                let mut client = Client::new(stream, db1);
+                                client.run();
+                            });
+                        }
+                        Err(e) => { println!("error {}", e); }
+                    }
                 }
-            }
-        });
-        self.listener_thread = Some(th);
+            });
+            self.listener_threads.push(th);
+        }
     }
 
     pub fn stop(&mut self) {
         #![allow(unused_must_use)]
-        match self.listener_channel {
-            Some(ref sender) => {
-                sender.send(0);
-                for addrs in self.addr.to_socket_addrs().unwrap() {
+        for sender in self.listener_channels.iter() {
+            sender.send(0);
+            for addr in self.config.addresses() {
+                for addrs in addr.to_socket_addrs().unwrap() {
                     TcpStream::connect(addrs);
                 }
-            },
-            _ => {},
+            }
         }
         self.join();
     }

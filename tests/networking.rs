@@ -6,12 +6,13 @@ use std::io::Write;
 use std::io::Read;
 
 use rsedis::networking::Server;
+use rsedis::config::Config;
 
 #[test]
 fn parse_ping() {
     let port = 6379;
 
-    let mut server = Server::new(("127.0.0.1", port));
+    let mut server = Server::new(Config::mock(port));
     server.start();
 
     let addr = format!("127.0.0.1:{}", port);
@@ -32,7 +33,7 @@ fn parse_ping() {
 #[test]
 fn allow_multiwrite() {
     let port = 6380;
-    let mut server = Server::new(("127.0.0.1", port));
+    let mut server = Server::new(Config::mock(port));
     server.start();
 
     let addr = format!("127.0.0.1:{}", port);
@@ -55,7 +56,7 @@ fn allow_multiwrite() {
 #[test]
 fn allow_stop() {
     let port = 6381;
-    let mut server = Server::new(("127.0.0.1", port));
+    let mut server = Server::new(Config::mock(port));
     server.start();
     {
         let addr = format!("127.0.0.1:{}", port);
