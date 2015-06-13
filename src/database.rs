@@ -159,6 +159,34 @@ impl Value {
         Ok(v)
     }
 
+    pub fn setrange(&mut self, _index: i64, data: Vec<u8>) -> Result<usize, OperationError> {
+        match self {
+            &mut Value::Nil => *self = Value::Data(Vec::new()),
+            &mut Value::Integer(i) => *self = Value::Data(format!("{}", i).into_bytes()),
+            &mut Value::Data(_) => (),
+            _ => return Err(OperationError::WrongTypeError),
+        };
+        let mut d = match self {
+            &mut Value::Data(ref mut d) => d,
+            _ => panic!("Value should be data"),
+        };
+        let mut index = match normalize_position(_index, d.len()) {
+            Ok(i) => i,
+            Err(p) => if p == 0 { p } else { _index as usize },
+        };
+        for _ in d.len()..index {
+            d.push(0);
+        }
+        for c in data {
+            d.push(c);
+            if index < d.len() - 1 {
+                d.swap_remove(index);
+            }
+            index += 1;
+        }
+        Ok(d.len())
+    }
+
     pub fn push(&mut self, el: Vec<u8>, right: bool) -> Result<usize, OperationError> {
         let listsize;
         match self {

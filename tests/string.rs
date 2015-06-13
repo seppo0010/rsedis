@@ -137,3 +137,31 @@ fn getrange_data() {
     assert_eq!(value.getrange(-100, -2).unwrap(), vec![1,2]);
     assert_eq!(value.getrange(1, 1).unwrap(), vec![2]);
 }
+
+#[test]
+fn setrange_append() {
+    let mut value = Value::Data(vec![1,2,3]);
+    assert_eq!(value.setrange(3, vec![4, 5, 6]).unwrap(), 6);
+    assert_eq!(value, Value::Data(vec![1,2,3,4,5,6]));
+}
+
+#[test]
+fn setrange_create() {
+    let mut value = Value::Nil;
+    assert_eq!(value.setrange(0, vec![4, 5, 6]).unwrap(), 3);
+    assert_eq!(value, Value::Data(vec![4,5,6]));
+}
+
+#[test]
+fn setrange_padding() {
+    let mut value = Value::Data(vec![1,2,3]);
+    assert_eq!(value.setrange(5, vec![6]).unwrap(), 6);
+    assert_eq!(value, Value::Data(vec![1,2,3,0,0,6]));
+}
+
+#[test]
+fn setrange_intermediate() {
+    let mut value = Value::Data(vec![1,2,3,4,5]);
+    assert_eq!(value.setrange(2, vec![13, 14]).unwrap(), 5);
+    assert_eq!(value, Value::Data(vec![1,2,13,14,5]));
+}
