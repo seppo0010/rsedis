@@ -11,9 +11,9 @@ use rsedis::util::mstime;
 
 macro_rules! config {
     ($str: expr) => ({
-        let dirpath = format!("test/{}", mstime());
+        let dirpath = format!("tmp/{}", mstime());
         let filepath = format!("{}/{}.conf", dirpath, random::<u64>());
-        match create_dir("test") { _ => () }
+        match create_dir("tmp") { _ => () }
         match create_dir(dirpath) { _ => () }
         match File::create(filepath.clone()).unwrap().write_all($str) { _ => () }
         Config::new(Some(filepath)).unwrap()
