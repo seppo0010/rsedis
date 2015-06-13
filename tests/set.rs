@@ -23,6 +23,16 @@ fn srem() {
 }
 
 #[test]
+fn sismember() {
+    let mut value = Value::Nil;
+    let v1 = vec![1, 2, 3, 4];
+
+    assert_eq!(value.sismember(&v1).unwrap(), false);
+    assert_eq!(value.sadd(v1.clone()).unwrap(), true);
+    assert_eq!(value.sismember(&v1).unwrap(), true);
+}
+
+#[test]
 fn scard() {
     let mut value = Value::Nil;
     let v1 = vec![1, 2, 3, 4];

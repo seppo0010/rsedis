@@ -439,6 +439,14 @@ impl Value {
         }
     }
 
+    pub fn sismember(&self, el: &Vec<u8>) -> Result<bool, OperationError> {
+        match self {
+            &Value::Nil => Ok(false),
+            &Value::Set(ref set) => Ok(set.contains(el)),
+            _ => Err(OperationError::WrongTypeError),
+        }
+    }
+
     pub fn scard(&self) -> Result<usize, OperationError> {
         match self {
             &Value::Nil => Ok(0),
