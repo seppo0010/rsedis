@@ -485,6 +485,38 @@ impl Value {
         }
     }
 
+    pub fn spop(&mut self, count: usize) -> Result<Vec<Vec<u8>>, OperationError> {
+        // TODO: implemented in O(n), should be O(1)
+
+        let len = try!(self.scard());
+        if count >= len {
+            let r = {
+                let set = match self {
+                    &mut Value::Nil => return Ok(Vec::new()),
+                    &mut Value::Set(ref mut s) => s,
+                    _ => return Err(OperationError::WrongTypeError),
+                };
+                set.iter().map(|x| x.clone()).collect::<Vec<_>>()
+            };
+            *self = Value::Nil;
+            return Ok(r);
+        }
+
+        let r = try!(self.srandmember(count, false));
+
+        let mut set = match self {
+            &mut Value::Nil => return Ok(Vec::new()),
+            &mut Value::Set(ref mut s) => s,
+            _ => return Err(OperationError::WrongTypeError),
+        };
+
+        for member in r.iter() {
+            set.remove(member);
+        }
+
+        Ok(r)
+    }
+
     pub fn sdiff(&self, sets: &Vec<&Value>) -> Result<HashSet<Vec<u8>>, OperationError> {
         match self {
             &Value::Nil => Ok(HashSet::new()),

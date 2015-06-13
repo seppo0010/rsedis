@@ -117,6 +117,37 @@ fn srandmember_dup() {
 }
 
 #[test]
+fn spop_toomany() {
+    let mut value = Value::Nil;
+    let v1 = vec![1];
+    let v2 = vec![2];
+    let v3 = vec![3];
+
+    value.sadd(v1.clone()).unwrap();
+    value.sadd(v2.clone()).unwrap();
+    value.sadd(v3.clone()).unwrap();
+
+    let mut v = value.spop(10).unwrap();
+    v.sort_by(|a, b| a.cmp(b));
+    assert_eq!(v, [v1, v2, v3]);
+}
+
+#[test]
+fn spop_some() {
+    let mut value = Value::Nil;
+    let v1 = vec![1];
+    let v2 = vec![2];
+    let v3 = vec![3];
+
+    value.sadd(v1.clone()).unwrap();
+    value.sadd(v2.clone()).unwrap();
+    value.sadd(v3.clone()).unwrap();
+
+    let v = value.spop(1).unwrap();
+    assert!(v == [v1] || v == [v2] || v == [v3]);
+}
+
+#[test]
 fn sdiff() {
     let mut value1 = Value::Nil;
     let mut value2 = Value::Nil;
