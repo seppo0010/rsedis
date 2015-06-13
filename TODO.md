@@ -38,7 +38,7 @@
     - [x] smove
     - [x] sismember
     - [x] scard
-    - [ ] spop
+    - [x] spop
     - [x] srandmember
     - [ ] sinter
     - [ ] sinterstore

@@ -755,6 +755,27 @@ fn srandmember(parser: &Parser, db: &Database, dbindex: usize) -> Response {
     }
 }
 
+fn spop(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() == 2 || parser.argv.len() == 3, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let mut value = match db.get_mut(dbindex, &key) {
+        Some(el) => el,
+        None => return if parser.argv.len() == 2 { Response::Nil } else { Response::Array(vec![]) },
+    };
+    if parser.argv.len() == 2 {
+        match value.spop(1) {
+            Ok(els) => if els.len() > 0 { Response::Data(els[0].clone()) } else { Response::Nil },
+            Err(err) => Response::Error(err.to_string()),
+        }
+    } else {
+        let count = try_validate!(parser.get_i64(2), "Invalid count");
+        match value.spop(count as usize) {
+            Ok(els) => Response::Array(els.iter().map(|x| Response::Data(x.clone())).collect::<Vec<_>>()),
+            Err(err) => Response::Error(err.to_string()),
+        }
+    }
+}
+
 fn smove(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 4, "Wrong number of parameters");
     let source_key = try_validate!(parser.get_vec(1), "Invalid key");
@@ -1028,6 +1049,7 @@ pub fn command(
         "srem" => srem(parser, db, dbindex),
         "sismember" => sismember(parser, db, dbindex),
         "srandmember" => srandmember(parser, db, dbindex),
+        "spop" => spop(parser, db, dbindex),
         "smove" => smove(parser, db, dbindex),
         "scard" => scard(parser, db, dbindex),
         "sdiff" => sdiff(parser, db, dbindex),

@@ -751,6 +751,7 @@ fn srandmember_command1() {
             r == Response::Data(b"2".to_vec()) ||
             r == Response::Data(b"3".to_vec())
             );
+    assert_eq!(command(&parser!(b"scard key"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(3));
 }
 
 #[test]
@@ -762,6 +763,31 @@ fn srandmember_command2() {
             r == Response::Array(vec![Response::Data(b"2".to_vec())]) ||
             r == Response::Array(vec![Response::Data(b"3".to_vec())])
             );
+    assert_eq!(command(&parser!(b"scard key"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(3));
+}
+
+#[test]
+fn spop_command1() {
+    let mut db = Database::new();
+    assert_eq!(command(&parser!(b"sadd key 1 2 3"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(3));
+    let r = command(&parser!(b"spop key"), &mut db, &mut 0, None, None, None).unwrap();
+    assert!(r == Response::Data(b"1".to_vec()) ||
+            r == Response::Data(b"2".to_vec()) ||
+            r == Response::Data(b"3".to_vec())
+            );
+    assert_eq!(command(&parser!(b"scard key"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(2));
+}
+
+#[test]
+fn spop_command2() {
+    let mut db = Database::new();
+    assert_eq!(command(&parser!(b"sadd key 1 2 3"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(3));
+    let r = command(&parser!(b"spop key 1"), &mut db, &mut 0, None, None, None).unwrap();
+    assert!(r == Response::Array(vec![Response::Data(b"1".to_vec())]) ||
+            r == Response::Array(vec![Response::Data(b"2".to_vec())]) ||
+            r == Response::Array(vec![Response::Data(b"3".to_vec())])
+            );
+    assert_eq!(command(&parser!(b"scard key"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(2));
 }
 
 #[test]
