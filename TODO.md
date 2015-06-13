@@ -11,7 +11,7 @@
     - [ ] setbit
     - [ ] getbit
     - [ ] setrange
-    - [ ] getrange
+    - [x] getrange
     - [ ] substr
     - [x] incr
     - [x] decr

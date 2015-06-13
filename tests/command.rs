@@ -115,6 +115,14 @@ fn get_command() {
 }
 
 #[test]
+fn getrange_command() {
+    let mut db = Database::new();
+    assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
+    let parser = parser!(b"getrange key 1 -2");
+    assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Data("alu".to_owned().into_bytes()));
+}
+
+#[test]
 fn strlen_command() {
     let mut db = Database::new();
     assert_eq!(command(&parser!(b"strlen key"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(0));

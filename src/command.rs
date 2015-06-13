@@ -330,6 +330,21 @@ fn get(parser: &Parser, db: &Database, dbindex: usize) -> Response {
     }
 }
 
+fn getrange(parser: &Parser, db: &Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() == 4, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let start = try_validate!(parser.get_i64(2), "Invalid range");
+    let stop = try_validate!(parser.get_i64(3), "Invalid range");
+    let obj = db.get(dbindex, &key);
+    match obj {
+        Some(value) => match value.getrange(start, stop) {
+            Ok(r) => Response::Data(r),
+            Err(e) => Response::Error(e.to_string()),
+        },
+        None => return Response::Nil,
+    }
+}
+
 fn strlen(parser: &Parser, db: &Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 2, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
@@ -865,6 +880,8 @@ pub fn command(
         "del" => del(parser, db, dbindex),
         "append" => append(parser, db, dbindex),
         "get" => get(parser, db, dbindex),
+        "getrange" => getrange(parser, db, dbindex),
+        "substr" => getrange(parser, db, dbindex),
         "strlen" => strlen(parser, db, dbindex),
         "incr" => incr(parser, db, dbindex),
         "decr" => decr(parser, db, dbindex),
