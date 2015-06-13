@@ -720,6 +720,21 @@ fn sadd_command() {
 }
 
 #[test]
+fn srem_command() {
+    let mut db = Database::new();
+    {
+        let parser = parser!(b"sadd key 1 1 1 2 3");
+        assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(3));
+    }
+
+    {
+        let parser = parser!(b"srem key 2 3 4");
+        assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(2));
+        assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(0));
+    }
+}
+
+#[test]
 fn scard_command() {
     let mut db = Database::new();
     {

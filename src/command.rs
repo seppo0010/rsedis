@@ -701,6 +701,24 @@ fn sadd(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     return Response::Integer(count);
 }
 
+fn srem(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() > 2, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let mut count = 0;
+    {
+        let el = db.get_or_create(dbindex, &key);
+        for i in 2..parser.argv.len() {
+            let val = try_validate!(parser.get_vec(i), "Invalid value");
+            match el.srem(val) {
+                Ok(removed) => if removed { count += 1 },
+                Err(err) => return Response::Error(err.to_string()),
+            }
+        }
+    }
+    db.key_publish(&key);
+    return Response::Integer(count);
+}
+
 fn scard(parser: &Parser, db: &Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 2, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
@@ -934,6 +952,7 @@ pub fn command(
         "rpoplpush" => rpoplpush(parser, db, dbindex),
         "brpoplpush" => return brpoplpush(parser, db, dbindex),
         "sadd" => sadd(parser, db, dbindex),
+        "srem" => srem(parser, db, dbindex),
         "scard" => scard(parser, db, dbindex),
         "sdiff" => sdiff(parser, db, dbindex),
         "sdiffstore" => sdiffstore(parser, db, dbindex),
