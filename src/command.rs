@@ -709,7 +709,7 @@ fn srem(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
         let el = db.get_or_create(dbindex, &key);
         for i in 2..parser.argv.len() {
             let val = try_validate!(parser.get_vec(i), "Invalid value");
-            match el.srem(val) {
+            match el.srem(&val) {
                 Ok(removed) => if removed { count += 1 },
                 Err(err) => return Response::Error(err.to_string()),
             }
@@ -717,6 +717,43 @@ fn srem(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     }
     db.key_publish(&key);
     return Response::Integer(count);
+}
+
+fn smove(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() == 4, "Wrong number of parameters");
+    let source_key = try_validate!(parser.get_vec(1), "Invalid key");
+    let destination_key = try_validate!(parser.get_vec(2), "Invalid destination");
+    let member = try_validate!(parser.get_vec(3), "Invalid member");
+
+    {
+        match db.get(dbindex, &destination_key) {
+            Some(e) => if !e.is_set() { return Response::Error("Invalid destination".to_owned()); },
+            None => (),
+        }
+    }
+    {
+        let source = match db.get_mut(dbindex, &source_key) {
+            Some(s) => s,
+            None => return Response::Integer(0),
+        };
+
+        match source.srem(&member) {
+            Ok(removed) => if !removed { return Response::Integer(0); },
+            Err(err) => return Response::Error(err.to_string()),
+        }
+    }
+
+    {
+        let destination = db.get_or_create(dbindex, &destination_key);
+        match destination.sadd(member) {
+            Ok(_) => (),
+            Err(err) => panic!("Unexpected failure {}", err.to_string()),
+        }
+    }
+
+    db.key_publish(&source_key);
+    db.key_publish(&destination_key);
+    return Response::Integer(1);
 }
 
 fn scard(parser: &Parser, db: &Database, dbindex: usize) -> Response {
@@ -953,6 +990,7 @@ pub fn command(
         "brpoplpush" => return brpoplpush(parser, db, dbindex),
         "sadd" => sadd(parser, db, dbindex),
         "srem" => srem(parser, db, dbindex),
+        "smove" => smove(parser, db, dbindex),
         "scard" => scard(parser, db, dbindex),
         "sdiff" => sdiff(parser, db, dbindex),
         "sdiffstore" => sdiffstore(parser, db, dbindex),

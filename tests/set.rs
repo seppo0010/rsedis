@@ -16,10 +16,10 @@ fn srem() {
     let mut value = Value::Nil;
     let v1 = vec![1, 2, 3, 4];
 
-    assert_eq!(value.srem(v1.clone()).unwrap(), false);
+    assert_eq!(value.srem(&v1).unwrap(), false);
     assert_eq!(value.sadd(v1.clone()).unwrap(), true);
-    assert_eq!(value.srem(v1.clone()).unwrap(), true);
-    assert_eq!(value.srem(v1.clone()).unwrap(), false);
+    assert_eq!(value.srem(&v1).unwrap(), true);
+    assert_eq!(value.srem(&v1).unwrap(), false);
 }
 
 #[test]

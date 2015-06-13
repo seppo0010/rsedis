@@ -735,6 +735,23 @@ fn srem_command() {
 }
 
 #[test]
+fn smove_command() {
+    let mut db = Database::new();
+    assert_eq!(command(&parser!(b"sadd k1 1 2 3"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(3));
+
+    assert_eq!(command(&parser!(b"smove k1 k2 1"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(1));
+    assert_eq!(command(&parser!(b"smove k1 k2 1"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(0));
+
+    assert_eq!(command(&parser!(b"smove k1 k2 2"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(1));
+    assert_eq!(command(&parser!(b"smove k1 k2 2"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(0));
+
+    assert_eq!(command(&parser!(b"smove k1 k2 5"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(0));
+
+    assert_eq!(command(&parser!(b"set k3 value"), &mut db, &mut 0, None, None, None).unwrap(), Response::Status("OK".to_owned()));
+    assert_eq!(command(&parser!(b"smove k1 k3 3"), &mut db, &mut 0, None, None, None).unwrap(), Response::Error("Invalid destination".to_owned()));
+}
+
+#[test]
 fn scard_command() {
     let mut db = Database::new();
     {

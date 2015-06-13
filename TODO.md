@@ -35,7 +35,7 @@
     - [x] rpoplpush
     - [x] sadd
     - [x] srem
-    - [ ] smove
+    - [x] smove
     - [ ] sismember
     - [x] scard
     - [ ] spop

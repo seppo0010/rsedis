@@ -75,6 +75,35 @@ fn normalize_position(position: i64, _len: usize) -> Result<usize, usize> {
 }
 
 impl Value {
+    pub fn is_nil(&self) -> bool {
+        match self {
+            &Value::Nil => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_string(&self) -> bool {
+        match self {
+            &Value::Data(_) => true,
+            &Value::Integer(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_list(&self) -> bool {
+        match self {
+            &Value::List(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_set(&self) -> bool {
+        match self {
+            &Value::Set(_) => true,
+            _ => false,
+        }
+    }
+
     pub fn set(&mut self, value: Vec<u8>) -> Result<(), OperationError> {
         if value.len() < 32 { // ought to be enough!
             if let Ok(utf8) = from_utf8(&*value) {
@@ -402,10 +431,10 @@ impl Value {
         }
     }
 
-    pub fn srem(&mut self, el: Vec<u8>) -> Result<bool, OperationError> {
+    pub fn srem(&mut self, el: &Vec<u8>) -> Result<bool, OperationError> {
         match self {
             &mut Value::Nil => Ok(false),
-            &mut Value::Set(ref mut set) => Ok(set.remove(&el)),
+            &mut Value::Set(ref mut set) => Ok(set.remove(el)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
