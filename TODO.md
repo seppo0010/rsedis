@@ -34,7 +34,7 @@
     - [x] lrem
     - [x] rpoplpush
     - [x] sadd
-    - [ ] srem
+    - [x] srem
     - [ ] smove
     - [ ] sismember
     - [x] scard
