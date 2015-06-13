@@ -402,6 +402,14 @@ impl Value {
         }
     }
 
+    pub fn srem(&mut self, el: Vec<u8>) -> Result<bool, OperationError> {
+        match self {
+            &mut Value::Nil => Ok(false),
+            &mut Value::Set(ref mut set) => Ok(set.remove(&el)),
+            _ => Err(OperationError::WrongTypeError),
+        }
+    }
+
     pub fn scard(&self) -> Result<usize, OperationError> {
         match self {
             &Value::Nil => Ok(0),
