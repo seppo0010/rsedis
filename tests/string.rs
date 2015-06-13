@@ -8,12 +8,10 @@ use rsedis::util::mstime;
 
 #[test]
 fn set_get() {
-    let mut database = Database::new();
-    let key = vec![1u8];
-    let value = vec![1u8, 2, 3, 4];
-    let expected = Vec::clone(&value);
-    assert!(database.get_or_create(0, &key).set(value).is_ok());
-    assert_eq!(database.get(0, &key).unwrap(), &Value::Data(expected));
+    let s = vec![1u8, 2, 3, 4];
+    let mut value = Value::Nil;
+    value.set(s.clone()).unwrap();
+    assert_eq!(value, Value::Data(s));
 }
 
 #[test]
@@ -25,41 +23,32 @@ fn get_empty() {
 
 #[test]
 fn set_set_get() {
-    let mut database = Database::new();
-    let key = vec![1u8];
-    assert!(database.get_or_create(0, &key).set(vec![0u8, 0, 0]).is_ok());
-    let value = vec![1u8, 2, 3, 4];
-    let expected = Vec::clone(&value);
-    assert!(database.get_or_create(0, &key).set(value).is_ok());
-    assert_eq!(database.get(0, &key).unwrap(), &Value::Data(expected));
+    let s = vec![1, 2, 3, 4];
+    let mut value = Value::Data(vec![0, 0, 0]);
+    value.set(s.clone()).unwrap();
+    assert_eq!(value, Value::Data(s));
 }
 
 #[test]
 fn append_append_get() {
-    let mut database = Database::new();
-    let key = vec![1u8];
-    assert_eq!(database.get_or_create(0, &key).append(vec![0u8, 0, 0]).unwrap(), 3);
-    assert_eq!(database.get_or_create(0, &key).append(vec![1u8, 2, 3, 4]).unwrap(), 7);
-    assert_eq!(database.get(0, &key).unwrap(), &Value::Data(vec![0u8, 0, 0, 1, 2, 3, 4]));
+    let mut value = Value::Nil;
+    assert_eq!(value.append(vec![0, 0, 0]).unwrap(), 3);
+    assert_eq!(value.append(vec![1, 2, 3, 4]).unwrap(), 7);
+    assert_eq!(value, Value::Data(vec![0u8, 0, 0, 1, 2, 3, 4]));
 }
 
 #[test]
 fn set_number() {
-    let mut database = Database::new();
-    let key = vec![1u8];
-    let value = b"123".to_vec();
-    assert!(database.get_or_create(0, &key).set(value).is_ok());
-    assert_eq!(database.get(0, &key).unwrap(), &Value::Integer(123));
+    let mut value = Value::Nil;
+    value.set(b"123".to_vec()).unwrap();
+    assert_eq!(value, Value::Integer(123));
 }
 
 #[test]
 fn append_number() {
-    let mut database = Database::new();
-    let key = vec![1u8];
-    let value = b"123".to_vec();
-    assert!(database.get_or_create(0, &key).set(value).is_ok());
-    assert_eq!(database.get_or_create(0, &key).append(b"asd".to_vec()).unwrap(), 6);
-    assert_eq!(database.get(0, &key).unwrap(), &Value::Data(b"123asd".to_vec()));
+    let mut value = Value::Integer(123);
+    assert_eq!(value.append(b"asd".to_vec()).unwrap(), 6);
+    assert_eq!(value, Value::Data(b"123asd".to_vec()));
 }
 
 #[test]
@@ -74,31 +63,31 @@ fn remove_value() {
 
 #[test]
 fn incr_str() {
-    let mut database = Database::new();
-    let key = vec![1u8];
-    let value = b"123".to_vec();
-    assert!(database.get_or_create(0, &key).set(value).is_ok());
-    assert_eq!(database.get_or_create(0, &key).incr(1).unwrap(), 124);
-    assert_eq!(database.get(0, &key).unwrap(), &Value::Integer(124));
+    let mut value = Value::Integer(123);
+    assert_eq!(value.incr(1).unwrap(), 124);
+    assert_eq!(value, Value::Integer(124));
+}
+
+#[test]
+fn incr2_str() {
+    let mut value = Value::Data(b"123".to_vec());
+    assert_eq!(value.incr(1).unwrap(), 124);
+    assert_eq!(value, Value::Integer(124));
 }
 
 #[test]
 fn incr_create_update() {
-    let mut database = Database::new();
-    let key = vec![1u8];
-    assert_eq!(database.get_or_create(0, &key).incr(124).unwrap(), 124);
-    assert_eq!(database.get(0, &key).unwrap(), &Value::Integer(124));
-    assert_eq!(database.get_or_create(0, &key).incr(1).unwrap(), 125);
-    assert_eq!(database.get(0, &key).unwrap(), &Value::Integer(125));
+    let mut value = Value::Nil;
+    assert_eq!(value.incr(124).unwrap(), 124);
+    assert_eq!(value, Value::Integer(124));
+    assert_eq!(value.incr(1).unwrap(), 125);
+    assert_eq!(value, Value::Integer(125));
 }
 
 #[test]
 fn incr_overflow() {
-    let mut database = Database::new();
-    let key = vec![1u8];
-    let value = format!("{}", std::i64::MAX).into_bytes();
-    assert!(database.get_or_create(0, &key).set(value).is_ok());
-    assert!(database.get_or_create(0, &key).incr(1).is_err());
+    let mut value = Value::Integer(std::i64::MAX);
+    assert!(value.incr(1).is_err());
 }
 
 #[test]
