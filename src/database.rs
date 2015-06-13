@@ -1,5 +1,6 @@
 use std::fmt;
 use std::error::Error;
+use std::collections::Bound::Included;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::collections::LinkedList;
@@ -551,14 +552,14 @@ impl Value {
                 if xx {
                     return Ok(false);
                 }
-                let mut zset = SkipMap::new();
+                let mut smap = SkipMap::new();
                 let mut hmap = HashMap::new();
-                zset.insert(Float::new(s), el.clone());
+                smap.insert(Float::new(s), el.clone());
                 hmap.insert(el, Float::new(s));
-                *self = Value::SortedSet(zset, hmap);
+                *self = Value::SortedSet(smap, hmap);
                 Ok(true)
             },
-            &mut Value::SortedSet(ref mut zset, ref mut hmap) => {
+            &mut Value::SortedSet(ref mut smap, ref mut hmap) => {
                 let contains = hmap.contains_key(&el);
                 if contains && nx {
                     return Ok(false);
@@ -572,7 +573,7 @@ impl Value {
                         return Ok(false);
                     }
                 }
-                zset.insert(Float::new(s), el.clone());
+                smap.insert(Float::new(s), el.clone());
                 hmap.insert(el, Float::new(s));
                 if ch {
                     Ok(true)
@@ -582,6 +583,15 @@ impl Value {
             },
             _ => Err(OperationError::WrongTypeError),
         }
+    }
+
+    pub fn zcount(&self, min: f64, max: f64) -> Result<usize, OperationError> {
+        let smap = match self {
+            &Value::Nil => return Ok(0),
+            &Value::SortedSet(ref smap, _) => smap,
+            _ => return Err(OperationError::WrongTypeError),
+        };
+        Ok(smap.range(Included(&Float::new(min)), Included(&Float::new(max))).collect::<Vec<_>>().len())
     }
 }
 

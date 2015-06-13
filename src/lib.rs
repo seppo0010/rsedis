@@ -1,3 +1,5 @@
+#![feature(collections)]
+
 extern crate rand;
 extern crate skiplist;
 extern crate time;
