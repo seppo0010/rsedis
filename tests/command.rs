@@ -115,6 +115,20 @@ fn get_command() {
 }
 
 #[test]
+fn mget_command() {
+    let mut db = Database::new();
+    assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
+    let parser = parser!(b"mget key key2");
+    assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(),
+            Response::Array(
+            vec![
+                Response::Data("value".to_owned().into_bytes()),
+                Response::Nil,
+            ])
+            );
+}
+
+#[test]
 fn getrange_command() {
     let mut db = Database::new();
     assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());

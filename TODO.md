@@ -15,7 +15,7 @@
     - [x] substr
     - [x] incr
     - [x] decr
-    - [ ] mget
+    - [x] mget
     - [x] rpush
     - [x] lpush
     - [x] rpushx

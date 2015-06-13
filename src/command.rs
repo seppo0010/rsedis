@@ -314,9 +314,7 @@ fn append(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     r
 }
 
-fn get(parser: &Parser, db: &Database, dbindex: usize) -> Response {
-    validate!(parser.argv.len() == 2, "Wrong number of parameters");
-    let key = try_validate!(parser.get_vec(1), "Invalid key");
+fn generic_get(db: &Database, dbindex: usize, key: Vec<u8>) -> Response {
     let obj = db.get(dbindex, &key);
     match obj {
         Some(value) => {
@@ -328,6 +326,22 @@ fn get(parser: &Parser, db: &Database, dbindex: usize) -> Response {
         }
         None => return Response::Nil,
     }
+}
+
+fn get(parser: &Parser, db: &Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() == 2, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    generic_get(db, dbindex, key)
+}
+
+fn mget(parser: &Parser, db: &Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() >= 2, "Wrong number of parameters");
+    let mut responses = Vec::with_capacity(parser.argv.len() - 1);
+    for i in 1..parser.argv.len() {
+        let key = try_validate!(parser.get_vec(i), "Invalid key");
+        responses.push(generic_get(db, dbindex, key));
+    }
+    Response::Array(responses)
 }
 
 fn getrange(parser: &Parser, db: &Database, dbindex: usize) -> Response {
@@ -892,6 +906,7 @@ pub fn command(
         "append" => append(parser, db, dbindex),
         "get" => get(parser, db, dbindex),
         "getrange" => getrange(parser, db, dbindex),
+        "mget" => mget(parser, db, dbindex),
         "substr" => getrange(parser, db, dbindex),
         "setrange" => setrange(parser, db, dbindex),
         "strlen" => strlen(parser, db, dbindex),
