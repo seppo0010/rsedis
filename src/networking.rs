@@ -5,10 +5,12 @@ use std::thread;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{Sender, channel};
 
-#[cfg(unix)]
-use libc::funcs::posix88::unistd::fork;
-#[cfg(unix)]
-use libc::funcs::c95::stdlib::exit;
+#[cfg(unix)] use std::path::Path;
+#[cfg(unix)] use std::fs::File;
+
+#[cfg(unix)] use libc::funcs::posix88::unistd::fork;
+#[cfg(unix)] use libc::funcs::c95::stdlib::exit;
+#[cfg(unix)] use libc::funcs::posix88::unistd::getpid;
 
 use super::command::command;
 use super::command::{Response, ResponseError};
@@ -179,6 +181,12 @@ impl Server {
                 match fork() {
                     -1 => panic!("Fork failed"),
                     0 => {
+                        if let Ok(mut fp) = File::create(Path::new(&*self.config.pidfile)) {
+                            match write!(fp, "{}", getpid()) {
+                                // TODO warn on error?
+                                _ => (),
+                            }
+                        }
                         self.start();
                         self.join();
                     },

@@ -8,6 +8,7 @@ use std::path::Path;
 pub struct Config {
     pub daemonize: bool,
     pub databases: u8,
+    pub pidfile: String,
     pub bind: Vec<String>,
     pub port: u16,
 }
@@ -23,6 +24,7 @@ impl Config {
         Config {
             daemonize: false,
             databases: 16,
+            pidfile: "/var/run/sredis.pid".to_owned(),
             bind: vec!["127.0.0.1".to_owned()],
             port: port,
         }
@@ -33,6 +35,7 @@ impl Config {
         let mut port = 6379;
         let mut daemonize = false;
         let mut databases = 16;
+        let mut pidfile = "/var/run/sredis.pid".to_owned();
         match confpath {
             Some(fname) => {
                 let path = Path::new(&*fname);
@@ -51,10 +54,13 @@ impl Config {
                         port = try!(line[5..].trim().parse());
                     }
                     else if line.starts_with("daemonize ") {
-                        daemonize = line[9..].trim() == "yes"
+                        daemonize = line[9..].trim() == "yes";
                     }
                     else if line.starts_with("databases ") {
                         databases = try!(line[9..].trim().parse());
+                    }
+                    else if line.starts_with("pidfile ") {
+                        pidfile = line[8..].trim().to_owned();
                     }
                 }
             },
@@ -68,6 +74,7 @@ impl Config {
         Ok(Config {
             daemonize: daemonize,
             databases: databases,
+            pidfile: pidfile,
             bind: bind,
             port: port,
         })

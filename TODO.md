@@ -166,7 +166,7 @@
 - config
     - [ ] include
     - [x] daemonize
-    - [ ] pidfile
+    - [x] pidfile
     - [x] port
     - [ ] tcp-backlog
     - [x] bind
