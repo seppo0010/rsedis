@@ -10,6 +10,7 @@ use std::sync::mpsc::Sender;
 
 use rand::random;
 
+use super::config::Config;
 use super::util::glob_match;
 use super::util::mstime;
 
@@ -554,24 +555,31 @@ pub struct Database {
     subscriber_id: usize,
 }
 
+fn create_database(size: usize) -> Database {
+    let mut data = Vec::with_capacity(size);
+    let mut data_expiration_ns = Vec::with_capacity(size);
+    for _ in 0..size {
+        data.push(HashMap::new());
+        data_expiration_ns.push(HashMap::new());
+    }
+    return Database {
+        data: data,
+        data_expiration_ns: data_expiration_ns,
+        size: size,
+        subscribers: HashMap::new(),
+        pattern_subscribers: HashMap::new(),
+        key_subscribers: HashMap::new(),
+        subscriber_id: 0,
+    };
+}
+
 impl Database {
-    pub fn new() -> Database {
-        let size = 16;
-        let mut data = Vec::with_capacity(size);
-        let mut data_expiration_ns = Vec::with_capacity(size);
-        for _ in 0..size {
-            data.push(HashMap::new());
-            data_expiration_ns.push(HashMap::new());
-        }
-        return Database {
-            data: data,
-            data_expiration_ns: data_expiration_ns,
-            size: size,
-            subscribers: HashMap::new(),
-            pattern_subscribers: HashMap::new(),
-            key_subscribers: HashMap::new(),
-            subscriber_id: 0,
-        };
+    pub fn mock() -> Database {
+        create_database(16)
+    }
+
+    pub fn new(config: &Config) -> Database {
+        create_database(config.databases as usize)
     }
 
     fn is_expired(&self, index: usize, key: &Vec<u8>) -> bool {

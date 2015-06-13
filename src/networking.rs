@@ -163,9 +163,10 @@ impl Client {
 
 impl Server {
     pub fn new(config: Config) -> Server {
+        let db = Database::new(&config);
         return Server {
             config: config,
-            db: Arc::new(Mutex::new(Database::new())),
+            db: Arc::new(Mutex::new(db)),
             listener_channels: Vec::new(),
             listener_threads: Vec::new(),
         }

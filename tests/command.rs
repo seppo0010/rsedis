@@ -38,7 +38,7 @@ fn getstr(database: &Database, key: &[u8]) -> String {
 
 #[test]
 fn nocommand() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     let parser = Parser::new(b"", Vec::new());
     let response = command(&parser, &mut db, &mut 0, None, None, None).unwrap();
     match response {
@@ -49,7 +49,7 @@ fn nocommand() {
 
 #[test]
 fn set_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     let parser = parser!(b"set key value");
     assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Status("OK".to_owned()));
     assert_eq!("value", getstr(&db, b"key"));
@@ -78,7 +78,7 @@ fn set_command() {
 
 #[test]
 fn setnx_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     assert_eq!(command(&parser!(b"setnx key value"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(1));
     assert_eq!("value", getstr(&db, b"key"));
     assert_eq!(command(&parser!(b"setnx key valuf"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(0));
@@ -87,7 +87,7 @@ fn setnx_command() {
 
 #[test]
 fn setex_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     assert_eq!(command(&parser!(b"setex key 1234 value"), &mut db, &mut 0, None, None, None).unwrap(), Response::Status("OK".to_owned()));
     let now = mstime();
     let exp = db.get_msexpiration(0, &b"key".to_vec()).unwrap().clone();
@@ -97,7 +97,7 @@ fn setex_command() {
 
 #[test]
 fn psetex_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     assert_eq!(command(&parser!(b"psetex key 1234 value"), &mut db, &mut 0, None, None, None).unwrap(), Response::Status("OK".to_owned()));
     let now = mstime();
     let exp = db.get_msexpiration(0, &b"key".to_vec()).unwrap().clone();
@@ -107,7 +107,7 @@ fn psetex_command() {
 
 #[test]
 fn get_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
     let parser = parser!(b"get key");
     assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Data("value".to_owned().into_bytes()));
@@ -116,7 +116,7 @@ fn get_command() {
 
 #[test]
 fn mget_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
     let parser = parser!(b"mget key key2");
     assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(),
@@ -130,7 +130,7 @@ fn mget_command() {
 
 #[test]
 fn getrange_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
     let parser = parser!(b"getrange key 1 -2");
     assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Data("alu".to_owned().into_bytes()));
@@ -138,7 +138,7 @@ fn getrange_command() {
 
 #[test]
 fn setrange_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
     let parser = parser!(b"setrange key 1 i");
     assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(5));
@@ -147,7 +147,7 @@ fn setrange_command() {
 
 #[test]
 fn strlen_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     assert_eq!(command(&parser!(b"strlen key"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(0));
     assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
     assert_eq!(command(&parser!(b"strlen key"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(5));
@@ -155,7 +155,7 @@ fn strlen_command() {
 
 #[test]
 fn del_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
     let parser = parser!(b"del key key2");
     assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(1));
@@ -163,7 +163,7 @@ fn del_command() {
 
 #[test]
 fn exists_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     {
         let parser = parser!(b"exists key");
         assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(0));
@@ -177,7 +177,7 @@ fn exists_command() {
 
 #[test]
 fn expire_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     {
         let parser = parser!(b"expire key 100");
         assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(0));
@@ -195,7 +195,7 @@ fn expire_command() {
 
 #[test]
 fn pexpire_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     {
         let parser = parser!(b"pexpire key 100");
         assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(0));
@@ -213,7 +213,7 @@ fn pexpire_command() {
 
 #[test]
 fn expireat_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     let now = mstime() / 1000;
     let exp_exp = now + 100;
     let qs = format!("expireat key {}", exp_exp);
@@ -233,7 +233,7 @@ fn expireat_command() {
 
 #[test]
 fn pexpireat_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     let now = mstime();
     let exp_exp = now + 100;
     let qs = format!("pexpireat key {}", exp_exp);
@@ -253,7 +253,7 @@ fn pexpireat_command() {
 
 #[test]
 fn ttl_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     let parser = parser!(b"ttl key");
     assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(-2));
     assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
@@ -267,7 +267,7 @@ fn ttl_command() {
 
 #[test]
 fn pttl_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     let parser = parser!(b"pttl key");
     assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(-2));
     assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
@@ -281,7 +281,7 @@ fn pttl_command() {
 
 #[test]
 fn persist_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     let parser = parser!(b"persist key");
     assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(0));
     assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
@@ -292,7 +292,7 @@ fn persist_command() {
 
 #[test]
 fn type_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     let parser = parser!(b"type key");
     assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Data(b"none".to_vec()));
 
@@ -344,7 +344,7 @@ fn serialize_integer() {
 
 #[test]
 fn append_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     let parser = parser!(b"append key value");
     assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(5));
 
@@ -356,7 +356,7 @@ fn append_command() {
 
 #[test]
 fn incr_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     let parser = parser!(b"incr key");
     assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(1));
     assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(2));
@@ -364,7 +364,7 @@ fn incr_command() {
 
 #[test]
 fn incrby_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     let parser = parser!(b"incrby key 5");
     assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(5));
     assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(10));
@@ -372,7 +372,7 @@ fn incrby_command() {
 
 #[test]
 fn decr_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     let parser = parser!(b"decr key");
     assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(-1));
     assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(-2));
@@ -380,7 +380,7 @@ fn decr_command() {
 
 #[test]
 fn decrby_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     let parser = parser!(b"decrby key 5");
     assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(-5));
     assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(-10));
@@ -388,7 +388,7 @@ fn decrby_command() {
 
 #[test]
 fn lpush_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     let parser = parser!(b"lpush key value");
     assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(1));
     assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(2));
@@ -396,7 +396,7 @@ fn lpush_command() {
 
 #[test]
 fn rpush_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     let parser = parser!(b"rpush key value");
     assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(1));
     assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(2));
@@ -404,7 +404,7 @@ fn rpush_command() {
 
 #[test]
 fn lpop_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     {
         let parser = parser!(b"rpush key value");
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
@@ -423,7 +423,7 @@ fn lpop_command() {
 
 #[test]
 fn rpop_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     {
         let parser = parser!(b"rpush key value");
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
@@ -442,7 +442,7 @@ fn rpop_command() {
 
 #[test]
 fn lindex_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     {
         let parser = parser!(b"rpush key value");
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
@@ -459,7 +459,7 @@ fn lindex_command() {
 
 #[test]
 fn linsert_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     {
         let parser = parser!(b"rpush key value");
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
@@ -476,7 +476,7 @@ fn linsert_command() {
 
 #[test]
 fn llen_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     {
         let parser = parser!(b"rpush key value");
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
@@ -490,7 +490,7 @@ fn llen_command() {
 
 #[test]
 fn lpushx_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     {
         let parser = parser!(b"lpushx key value");
         assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(0));
@@ -507,7 +507,7 @@ fn lpushx_command() {
 
 #[test]
 fn lrange_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     {
         let parser = parser!(b"rpush key value");
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
@@ -532,7 +532,7 @@ fn lrange_command() {
 
 #[test]
 fn lrem_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     {
         let parser = parser!(b"rpush key value");
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
@@ -552,7 +552,7 @@ fn lrem_command() {
 
 #[test]
 fn lset_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     {
         let parser = parser!(b"rpush key value");
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
@@ -574,7 +574,7 @@ fn lset_command() {
 
 #[test]
 fn rpoplpush_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     {
         let parser = parser!(b"rpush key value");
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
@@ -615,7 +615,7 @@ fn rpoplpush_command() {
 
 #[test]
 fn brpoplpush_nowait() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     {
         let parser = parser!(b"rpush key value");
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
@@ -636,7 +636,7 @@ fn brpoplpush_nowait() {
 
 #[test]
 fn brpoplpush_waiting() {
-    let db = Arc::new(Mutex::new(Database::new()));
+    let db = Arc::new(Mutex::new(Database::mock()));
     let (tx, rx) = channel();
     let db2 = db.clone();
     thread::spawn(move || {
@@ -670,7 +670,7 @@ fn brpoplpush_waiting() {
 
 #[test]
 fn brpoplpush_timeout() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     {
         let parser = parser!(b"brpoplpush key key2 1");
         let receiver = match command(&parser, &mut db, &mut 0, None, None, None).unwrap_err() {
@@ -685,7 +685,7 @@ fn brpoplpush_timeout() {
 
 #[test]
 fn ltrim_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     {
         let parser = parser!(b"rpush key value");
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
@@ -711,7 +711,7 @@ fn ltrim_command() {
 
 #[test]
 fn sadd_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     {
         let parser = parser!(b"sadd key 1 1 1 2 3");
         assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(3));
@@ -721,7 +721,7 @@ fn sadd_command() {
 
 #[test]
 fn srem_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     {
         let parser = parser!(b"sadd key 1 1 1 2 3");
         assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(3));
@@ -736,7 +736,7 @@ fn srem_command() {
 
 #[test]
 fn sismember_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     assert_eq!(command(&parser!(b"sadd key 1 2 3"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(3));
     assert_eq!(command(&parser!(b"sismember key 2"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(1));
     assert_eq!(command(&parser!(b"sismember key 4"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(0));
@@ -744,7 +744,7 @@ fn sismember_command() {
 
 #[test]
 fn srandmember_command1() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     assert_eq!(command(&parser!(b"sadd key 1 2 3"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(3));
     let r = command(&parser!(b"srandmember key"), &mut db, &mut 0, None, None, None).unwrap();
     assert!(r == Response::Data(b"1".to_vec()) ||
@@ -756,7 +756,7 @@ fn srandmember_command1() {
 
 #[test]
 fn srandmember_command2() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     assert_eq!(command(&parser!(b"sadd key 1 2 3"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(3));
     let r = command(&parser!(b"srandmember key 1"), &mut db, &mut 0, None, None, None).unwrap();
     assert!(r == Response::Array(vec![Response::Data(b"1".to_vec())]) ||
@@ -768,7 +768,7 @@ fn srandmember_command2() {
 
 #[test]
 fn spop_command1() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     assert_eq!(command(&parser!(b"sadd key 1 2 3"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(3));
     let r = command(&parser!(b"spop key"), &mut db, &mut 0, None, None, None).unwrap();
     assert!(r == Response::Data(b"1".to_vec()) ||
@@ -780,7 +780,7 @@ fn spop_command1() {
 
 #[test]
 fn spop_command2() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     assert_eq!(command(&parser!(b"sadd key 1 2 3"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(3));
     let r = command(&parser!(b"spop key 1"), &mut db, &mut 0, None, None, None).unwrap();
     assert!(r == Response::Array(vec![Response::Data(b"1".to_vec())]) ||
@@ -792,7 +792,7 @@ fn spop_command2() {
 
 #[test]
 fn smove_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     assert_eq!(command(&parser!(b"sadd k1 1 2 3"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(3));
 
     assert_eq!(command(&parser!(b"smove k1 k2 1"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(1));
@@ -809,7 +809,7 @@ fn smove_command() {
 
 #[test]
 fn scard_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     {
         let parser = parser!(b"sadd key 1 2 3");
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
@@ -822,7 +822,7 @@ fn scard_command() {
 
 #[test]
 fn sdiff_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     {
         let parser = parser!(b"sadd key 1 2 3");
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
@@ -844,7 +844,7 @@ fn sdiff_command() {
 
 #[test]
 fn sdiffstore_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     {
         let parser = parser!(b"sadd key 1 2 3");
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
@@ -864,7 +864,7 @@ fn sdiffstore_command() {
 
 #[test]
 fn sdiff2_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     {
         let parser = parser!(b"sadd key 1 2 3");
         command(&parser, &mut db, &mut 0, None, None, None).unwrap();
@@ -882,7 +882,7 @@ fn sdiff2_command() {
 
 #[test]
 fn select_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     {
         let mut dbindex = 0;
         let parser = parser!(b"select 1");
@@ -893,7 +893,7 @@ fn select_command() {
 
 #[test]
 fn flushdb_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     {
         let parser = parser!(b"set key value");
         assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Status("OK".to_owned()));
@@ -918,7 +918,7 @@ fn flushdb_command() {
 
 #[test]
 fn flushall_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     {
         let parser = parser!(b"set key value");
         assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Status("OK".to_owned()));
@@ -943,7 +943,7 @@ fn flushall_command() {
 
 #[test]
 fn subscribe_publish_command() {
-    let mut db = Database::new();
+    let mut db = Database::mock();
     let mut subscriptions = HashMap::new();
     let mut psubscriptions = HashMap::new();
     let (tx, rx) = channel();

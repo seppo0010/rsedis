@@ -16,7 +16,7 @@ fn set_get() {
 
 #[test]
 fn get_empty() {
-    let database = Database::new();
+    let database = Database::mock();
     let key = vec![1u8];
     assert!(database.get(0, &key).is_none());
 }
@@ -53,7 +53,7 @@ fn append_number() {
 
 #[test]
 fn remove_value() {
-    let mut database = Database::new();
+    let mut database = Database::mock();
     let key = vec![1u8];
     let value = vec![1u8, 2, 3, 4];
     assert!(database.get_or_create(0, &key).set(value).is_ok());
@@ -92,7 +92,7 @@ fn incr_overflow() {
 
 #[test]
 fn set_expire_get() {
-    let mut database = Database::new();
+    let mut database = Database::mock();
     let key = vec![1u8];
     let value = vec![1u8, 2, 3, 4];
     assert!(database.get_or_create(0, &key).set(value).is_ok());
@@ -102,7 +102,7 @@ fn set_expire_get() {
 
 #[test]
 fn set_will_expire_get() {
-    let mut database = Database::new();
+    let mut database = Database::mock();
     let key = vec![1u8];
     let value = vec![1u8, 2, 3, 4];
     let expected = Vec::clone(&value);

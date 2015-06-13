@@ -52,3 +52,9 @@ fn parse_daemonize_no() {
     let config = config!(b"daemonize no");
     assert!(!config.daemonize);
 }
+
+#[test]
+fn parse_databases() {
+    let config = config!(b"databases 20");
+    assert_eq!(config.databases, 20);
+}

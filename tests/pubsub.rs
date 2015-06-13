@@ -6,7 +6,7 @@ use rsedis::database::{Database, PubsubEvent};
 
 #[test]
 fn pubsub_basic() {
-    let mut database = Database::new();
+    let mut database = Database::mock();
     let channel_name = vec![1u8, 2, 3];
     let message = vec![2u8, 3, 4, 5, 6];
     let (tx, rx) = channel();
@@ -17,7 +17,7 @@ fn pubsub_basic() {
 
 #[test]
 fn unsubscribe() {
-    let mut database = Database::new();
+    let mut database = Database::mock();
     let channel_name = vec![1u8, 2, 3];
     let message = vec![2u8, 3, 4, 5, 6];
     let (tx, rx) = channel();
@@ -29,7 +29,7 @@ fn unsubscribe() {
 
 #[test]
 fn pubsub_pattern() {
-    let mut database = Database::new();
+    let mut database = Database::mock();
     let channel_name = vec![1u8, 2, 3];
     let message = vec![2u8, 3, 4, 5, 6];
     let (tx, rx) = channel();

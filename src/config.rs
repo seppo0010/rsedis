@@ -7,6 +7,7 @@ use std::path::Path;
 
 pub struct Config {
     pub daemonize: bool,
+    pub databases: u8,
     pub bind: Vec<String>,
     pub port: u16,
 }
@@ -21,6 +22,7 @@ impl Config {
     pub fn mock(port: u16) -> Config {
         Config {
             daemonize: false,
+            databases: 16,
             bind: vec!["127.0.0.1".to_owned()],
             port: port,
         }
@@ -30,6 +32,7 @@ impl Config {
         let mut bind = Vec::new();
         let mut port = 6379;
         let mut daemonize = false;
+        let mut databases = 16;
         match confpath {
             Some(fname) => {
                 let path = Path::new(&*fname);
@@ -45,21 +48,26 @@ impl Config {
                         bind.extend(line[5..].split(' ').filter(|x| x.trim().len() > 0).map(|x| x.trim().to_owned()));
                     }
                     else if line.starts_with("port ") {
-                        port = try!(line[5..].trim().parse::<u16>());
+                        port = try!(line[5..].trim().parse());
                     }
                     else if line.starts_with("daemonize ") {
                         daemonize = line[9..].trim() == "yes"
                     }
-                }
-
-                if bind.len() == 0 {
-                    bind.push("127.0.0.1".to_owned());
+                    else if line.starts_with("databases ") {
+                        databases = try!(line[9..].trim().parse());
+                    }
                 }
             },
-            None => bind.push("127.0.0.1".to_owned()),
+            None => (),
         };
+
+        if bind.len() == 0 {
+            bind.push("127.0.0.1".to_owned());
+        }
+
         Ok(Config {
             daemonize: daemonize,
+            databases: databases,
             bind: bind,
             port: port,
         })

@@ -179,7 +179,7 @@
     - [ ] syslog-enabled
     - [ ] syslog-ident
     - [ ] syslog-facility
-    - [ ] databases
+    - [x] databases
     - [ ] save
     - [ ] stop-writes-on-bgsave-error
     - [ ] rdbcompression
