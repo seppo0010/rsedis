@@ -10,7 +10,7 @@
     - [x] exists
     - [ ] setbit
     - [ ] getbit
-    - [ ] setrange
+    - [x] setrange
     - [x] getrange
     - [ ] substr
     - [x] incr

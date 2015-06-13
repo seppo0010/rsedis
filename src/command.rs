@@ -345,6 +345,17 @@ fn getrange(parser: &Parser, db: &Database, dbindex: usize) -> Response {
     }
 }
 
+fn setrange(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() == 4, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let index = try_validate!(parser.get_i64(2), "Invalid index");
+    let value = try_validate!(parser.get_vec(3), "Invalid value");
+    match db.get_or_create(dbindex, &key).setrange(index, value) {
+        Ok(s) => Response::Integer(s as i64),
+        Err(e) => Response::Error(e.to_string()),
+    }
+}
+
 fn strlen(parser: &Parser, db: &Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 2, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
@@ -882,6 +893,7 @@ pub fn command(
         "get" => get(parser, db, dbindex),
         "getrange" => getrange(parser, db, dbindex),
         "substr" => getrange(parser, db, dbindex),
+        "setrange" => setrange(parser, db, dbindex),
         "strlen" => strlen(parser, db, dbindex),
         "incr" => incr(parser, db, dbindex),
         "decr" => decr(parser, db, dbindex),
