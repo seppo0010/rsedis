@@ -879,6 +879,48 @@ fn sdiffstore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     Response::Integer(r)
 }
 
+fn zadd(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    let len = parser.argv.len();
+    validate!(len >= 4, "Wrong number of parameters");
+    let mut nx = false;
+    let mut xx = false;
+    let mut ch = false;
+    let mut i = 2;
+
+    // up to 4 optional flags
+    for _ in 0..4 {
+        let opt = match parser.get_str(i) {
+            Ok(s) => s,
+            Err(_) => break,
+        };
+        i += 1;
+        match &*opt.to_ascii_lowercase() {
+            "nx" => nx = true,
+            "xx" => xx = true,
+            "ch" => ch = true,
+            "incr" => return Response::Error("TODO".to_owned()),
+            _ => {i -= 1; break},
+        }
+    }
+
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let mut count = 0;
+    {
+        let el = db.get_or_create(dbindex, &key);
+        for _ in 0..((len - i) / 2) {
+            let score = try_validate!(parser.get_f64(i), "Invalid score");
+            let val = try_validate!(parser.get_vec(i + 1), "Invalid value");
+            match el.zadd(score, val, nx, xx, ch) {
+                Ok(added) => if added { count += 1 },
+                Err(err) => return Response::Error(err.to_string()),
+            }
+            i += 2; // omg, so ugly `for`
+        }
+    }
+    db.key_publish(&key);
+    return Response::Integer(count);
+}
+
 fn ping(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     #![allow(unused_variables)]
     validate!(parser.argv.len() <= 2, "Wrong number of parameters");
@@ -1055,6 +1097,7 @@ pub fn command(
         "scard" => scard(parser, db, dbindex),
         "sdiff" => sdiff(parser, db, dbindex),
         "sdiffstore" => sdiffstore(parser, db, dbindex),
+        "zadd" => zadd(parser, db, dbindex),
         "subscribe" => return subscribe(parser, db, subscriptions.unwrap(), pattern_subscriptions.unwrap().len(), sender.unwrap()),
         "unsubscribe" => return unsubscribe(parser, db, subscriptions.unwrap(), pattern_subscriptions.unwrap().len(), sender.unwrap()),
         "psubscribe" => return psubscribe(parser, db, subscriptions.unwrap().len(), pattern_subscriptions.unwrap(), sender.unwrap()),

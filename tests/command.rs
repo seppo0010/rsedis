@@ -881,6 +881,17 @@ fn sdiff2_command() {
 }
 
 #[test]
+fn zadd_command() {
+    let mut db = Database::mock();
+    assert_eq!(command(&parser!(b"zadd key 1 a 2 b"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(2));
+    assert_eq!(command(&parser!(b"zadd key 1 a 2 b"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(0));
+    assert_eq!(command(&parser!(b"zadd key XX 2 a 3 b"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(0));
+    assert_eq!(command(&parser!(b"zadd key CH 2 a 2 b 2 c"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(2));
+    assert_eq!(command(&parser!(b"zadd key NX 1 a 2 b 3 c 4 d"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(1));
+    assert_eq!(command(&parser!(b"zadd key XX CH 2 b 2 d 2 e"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(1));
+}
+
+#[test]
 fn select_command() {
     let mut db = Database::mock();
     {
