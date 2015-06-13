@@ -892,6 +892,14 @@ fn zadd_command() {
 }
 
 #[test]
+fn zcount_command() {
+    let mut db = Database::mock();
+    assert_eq!(command(&parser!(b"zadd key 1 a 2 b 3 c 4 d"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(4));
+    assert_eq!(command(&parser!(b"zcount key 2 3"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(2));
+    assert_eq!(command(&parser!(b"zcount key 2 3"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(2));
+}
+
+#[test]
 fn select_command() {
     let mut db = Database::mock();
     {

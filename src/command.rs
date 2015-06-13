@@ -921,6 +921,21 @@ fn zadd(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     return Response::Integer(count);
 }
 
+fn zcount(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() == 4, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let min = try_validate!(parser.get_f64(2), "Invalid min");
+    let max = try_validate!(parser.get_f64(3), "Invalid max");
+    let el = match db.get(dbindex, &key) {
+        Some(e) => e,
+        None => return Response::Integer(0),
+    };
+    match el.zcount(min, max) {
+        Ok(c) => Response::Integer(c as i64),
+        Err(err) => Response::Error(err.to_string()),
+    }
+}
+
 fn ping(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     #![allow(unused_variables)]
     validate!(parser.argv.len() <= 2, "Wrong number of parameters");
@@ -1098,6 +1113,7 @@ pub fn command(
         "sdiff" => sdiff(parser, db, dbindex),
         "sdiffstore" => sdiffstore(parser, db, dbindex),
         "zadd" => zadd(parser, db, dbindex),
+        "zcount" => zcount(parser, db, dbindex),
         "subscribe" => return subscribe(parser, db, subscriptions.unwrap(), pattern_subscriptions.unwrap().len(), sender.unwrap()),
         "unsubscribe" => return unsubscribe(parser, db, subscriptions.unwrap(), pattern_subscriptions.unwrap().len(), sender.unwrap()),
         "psubscribe" => return psubscribe(parser, db, subscriptions.unwrap().len(), pattern_subscriptions.unwrap(), sender.unwrap()),
