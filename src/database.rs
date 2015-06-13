@@ -137,6 +137,28 @@ impl Value {
         return Ok(newval);
     }
 
+    pub fn getrange(&self, _start: i64, _stop: i64) -> Result<Vec<u8>, OperationError> {
+        let s = match self {
+            &Value::Nil => return Ok(Vec::new()),
+            &Value::Integer(ref i) => format!("{}", i).into_bytes(),
+            &Value::Data(ref s) => s.clone(),
+            _ => return Err(OperationError::WrongTypeError),
+        };
+
+        let len = s.len();
+        let start = match normalize_position(_start, len) {
+            Ok(i) => i,
+            Err(i) => if i == 0 { 0 } else { return Ok(Vec::new()); }
+        } as usize;
+        let stop = match normalize_position(_stop, len) {
+            Ok(i) => i,
+            Err(i) => if i == 0 { return Ok(Vec::new()); } else { len }
+        } as usize;
+        let mut v = Vec::with_capacity(stop - start + 1);
+        v.extend(s[start..stop + 1].iter());
+        Ok(v)
+    }
+
     pub fn push(&mut self, el: Vec<u8>, right: bool) -> Result<usize, OperationError> {
         let listsize;
         match self {

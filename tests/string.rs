@@ -121,3 +121,19 @@ fn set_will_expire_get() {
     database.set_msexpiration(0, key.clone(), mstime() + 10000);
     assert_eq!(database.get(0, &key), Some(&Value::Data(expected)));
 }
+
+#[test]
+fn getrange_integer() {
+    let value = Value::Integer(123);
+    assert_eq!(value.getrange(0, -1).unwrap(), "123".to_owned().into_bytes());
+    assert_eq!(value.getrange(-100, -2).unwrap(), "12".to_owned().into_bytes());
+    assert_eq!(value.getrange(1, 1).unwrap(), "2".to_owned().into_bytes());
+}
+
+#[test]
+fn getrange_data() {
+    let value = Value::Data(vec![1,2,3]);
+    assert_eq!(value.getrange(0, -1).unwrap(), vec![1,2,3]);
+    assert_eq!(value.getrange(-100, -2).unwrap(), vec![1,2]);
+    assert_eq!(value.getrange(1, 1).unwrap(), vec![2]);
+}
