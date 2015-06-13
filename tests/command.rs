@@ -735,6 +735,14 @@ fn srem_command() {
 }
 
 #[test]
+fn sismember_command() {
+    let mut db = Database::new();
+    assert_eq!(command(&parser!(b"sadd key 1 2 3"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(3));
+    assert_eq!(command(&parser!(b"sismember key 2"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(1));
+    assert_eq!(command(&parser!(b"sismember key 4"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(0));
+}
+
+#[test]
 fn smove_command() {
     let mut db = Database::new();
     assert_eq!(command(&parser!(b"sadd k1 1 2 3"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(3));

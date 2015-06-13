@@ -719,6 +719,19 @@ fn srem(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     return Response::Integer(count);
 }
 
+fn sismember(parser: &Parser, db: &Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() == 3, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let member = try_validate!(parser.get_vec(2), "Invalid key");
+    Response::Integer(match db.get(dbindex, &key) {
+        Some(el) => match el.sismember(&member) {
+            Ok(e) => if e { 1 } else { 0 },
+            Err(err) => return Response::Error(err.to_string()),
+        },
+        None => 0,
+    })
+}
+
 fn smove(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 4, "Wrong number of parameters");
     let source_key = try_validate!(parser.get_vec(1), "Invalid key");
@@ -990,6 +1003,7 @@ pub fn command(
         "brpoplpush" => return brpoplpush(parser, db, dbindex),
         "sadd" => sadd(parser, db, dbindex),
         "srem" => srem(parser, db, dbindex),
+        "sismember" => sismember(parser, db, dbindex),
         "smove" => smove(parser, db, dbindex),
         "scard" => scard(parser, db, dbindex),
         "sdiff" => sdiff(parser, db, dbindex),

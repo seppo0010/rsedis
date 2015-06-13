@@ -36,7 +36,7 @@
     - [x] sadd
     - [x] srem
     - [x] smove
-    - [ ] sismember
+    - [x] sismember
     - [x] scard
     - [ ] spop
     - [ ] srandmember
