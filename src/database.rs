@@ -8,6 +8,8 @@ use std::str::Utf8Error;
 use std::num::ParseIntError;
 use std::sync::mpsc::Sender;
 
+use rand::random;
+
 use super::util::glob_match;
 use super::util::mstime;
 
@@ -452,6 +454,34 @@ impl Value {
             &Value::Nil => Ok(0),
             &Value::Set(ref set) => Ok(set.len()),
             _ => Err(OperationError::WrongTypeError),
+        }
+    }
+
+    pub fn srandmember(&self, count: usize, allow_duplicates: bool) -> Result<Vec<Vec<u8>>, OperationError> {
+        // TODO: implemented in O(n), should be O(1)
+        let set = match self {
+            &Value::Nil => return Ok(Vec::new()),
+            &Value::Set(ref s) => s,
+            _ => return Err(OperationError::WrongTypeError),
+        };
+
+        if allow_duplicates {
+            let mut r = Vec::new();
+            for _ in 0..count {
+                let pos = random::<usize>() % set.len();
+                r.push(set.iter().skip(pos).take(1).next().unwrap().clone());
+            }
+            return Ok(r);
+        } else {
+            if count >= set.len() {
+                return Ok(set.iter().map(|x| x.clone()).collect::<Vec<_>>());
+            }
+            let mut s = HashSet::new();
+            while s.len() < count {
+                let pos = random::<usize>() % set.len();
+                s.insert(set.iter().skip(pos).take(1).next().unwrap().clone());
+            }
+            return Ok(s.iter().map(|x| x.clone()).collect::<Vec<_>>());
         }
     }
 

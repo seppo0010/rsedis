@@ -1,3 +1,4 @@
+extern crate rand;
 extern crate time;
 #[cfg(unix)]
 extern crate libc;
