@@ -10,3 +10,4 @@ pub mod pubsub;
 pub mod set;
 pub mod string;
 pub mod util;
+pub mod zset;

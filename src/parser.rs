@@ -1,6 +1,7 @@
 use std::str::from_utf8;
 use std::str::Utf8Error;
 use std::num::ParseIntError;
+use std::num::ParseFloatError;
 use std::error::Error;
 use std::fmt;
 
@@ -52,12 +53,22 @@ impl From<ParseIntError> for ParseError {
     fn from(_: ParseIntError) -> ParseError { ParseError::InvalidArgument }
 }
 
+impl From<ParseFloatError> for ParseError {
+    fn from(_: ParseFloatError) -> ParseError { ParseError::InvalidArgument }
+}
+
 impl<'a> Parser<'a> {
     pub fn new(data: &[u8], argv: Vec<Argument>) -> Parser {
         return Parser {
             data: data,
             argv: argv,
         };
+    }
+
+    // TODO: get<T>
+    pub fn get_f64(&self, pos: usize) -> Result<f64, ParseError> {
+        let s = try!(self.get_str(pos));
+        return Ok(try!(s.parse::<f64>()));
     }
 
     pub fn get_i64(&self, pos: usize) -> Result<i64, ParseError> {

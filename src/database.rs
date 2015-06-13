@@ -9,19 +9,21 @@ use std::num::ParseIntError;
 use std::sync::mpsc::Sender;
 
 use rand::random;
+use skiplist::SkipMap;
 
 use super::config::Config;
+use super::util::Float;
 use super::util::glob_match;
 use super::util::mstime;
 
-#[derive(PartialEq)]
-#[derive(Debug)]
+#[derive(PartialEq, Debug)]
 pub enum Value {
     Nil,
     Integer(i64),
     Data(Vec<u8>),
     List(LinkedList<Vec<u8>>),
     Set(HashSet<Vec<u8>>),
+    SortedSet(SkipMap<Float, Vec<u8>>, HashMap<Vec<u8>, Float>),
 }
 
 #[derive(Debug)]
@@ -32,8 +34,7 @@ pub enum OperationError {
     OutOfBoundsError,
 }
 
-#[derive(PartialEq)]
-#[derive(Debug)]
+#[derive(PartialEq, Debug)]
 pub enum PubsubEvent {
     Subscription(Vec<u8>, usize),
     Unsubscription(Vec<u8>, usize),
@@ -542,6 +543,45 @@ impl Value {
 
     pub fn create_set(&mut self, set: HashSet<Vec<u8>>) {
         *self = Value::Set(set);
+    }
+
+    pub fn zadd(&mut self, s: f64, el: Vec<u8>, nx: bool, xx: bool, ch: bool) -> Result<bool, OperationError> {
+        match self {
+            &mut Value::Nil => {
+                if xx {
+                    return Ok(false);
+                }
+                let mut zset = SkipMap::new();
+                let mut hmap = HashMap::new();
+                zset.insert(Float::new(s), el.clone());
+                hmap.insert(el, Float::new(s));
+                *self = Value::SortedSet(zset, hmap);
+                Ok(true)
+            },
+            &mut Value::SortedSet(ref mut zset, ref mut hmap) => {
+                let contains = hmap.contains_key(&el);
+                if contains && nx {
+                    return Ok(false);
+                }
+                if !contains && xx {
+                    return Ok(false);
+                }
+                if contains {
+                    let val = hmap.get(&el).unwrap().get();
+                    if ch && val == &s {
+                        return Ok(false);
+                    }
+                }
+                zset.insert(Float::new(s), el.clone());
+                hmap.insert(el, Float::new(s));
+                if ch {
+                    Ok(true)
+                } else {
+                    Ok(!contains)
+                }
+            },
+            _ => Err(OperationError::WrongTypeError),
+        }
     }
 }
 

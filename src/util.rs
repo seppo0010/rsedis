@@ -1,4 +1,6 @@
 use std::ascii::AsciiExt;
+use std::cmp::Ord;
+use std::cmp::Ordering;
 
 use time::get_time;
 
@@ -137,4 +139,55 @@ pub fn ustime() -> i64 {
 
 pub fn mstime() -> i64 {
     ustime() / 1000
+}
+
+/**
+ * Float is a wrapper around f64 to implement ordering and equality.
+ * f64 does not implement those traits because comparing floats has problems
+ * but in the context of rsedis this basic implementation should be enough.
+ **/
+#[derive(Debug, Clone)]
+pub struct Float {
+    f: f64,
+}
+
+impl Float {
+    pub fn new(f: f64) -> Float {
+        Float {f: f}
+    }
+
+    pub fn get(&self) -> &f64 {
+        &self.f
+    }
+
+    pub fn get_mut(&mut self) -> &mut f64 {
+        &mut self.f
+    }
+}
+
+impl Eq for Float {}
+
+impl PartialEq for Float {
+    fn eq(&self, other: &Self) -> bool {
+        self.f == other.f
+    }
+}
+
+impl Ord for Float {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).unwrap()
+    }
+}
+
+impl PartialOrd for Float {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(if self.f < other.f { Ordering::Less }
+        else if self.f > other.f { Ordering::Greater }
+        else { Ordering::Equal })
+    }
+
+    fn lt(&self, other: &Self) -> bool { self.f < other.f }
+    fn le(&self, other: &Self) -> bool { self.f <= other.f }
+    fn gt(&self, other: &Self) -> bool { self.f > other.f }
+    fn ge(&self, other: &Self) -> bool { self.f >= other.f }
 }

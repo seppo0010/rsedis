@@ -290,6 +290,7 @@ fn dbtype(parser: &Parser, db: &Database, dbindex: usize) -> Response {
                 &Value::Integer(_) => Response::Data("string".to_owned().into_bytes()),
                 &Value::List(_) => Response::Data("list".to_owned().into_bytes()),
                 &Value::Set(_) => Response::Data("set".to_owned().into_bytes()),
+                &Value::SortedSet(_, _) => Response::Data("zset".to_owned().into_bytes()),
             }
         }
         None => Response::Data("none".to_owned().into_bytes()),

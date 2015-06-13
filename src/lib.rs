@@ -1,4 +1,5 @@
 extern crate rand;
+extern crate skiplist;
 extern crate time;
 #[cfg(unix)]
 extern crate libc;
