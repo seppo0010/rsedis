@@ -12,7 +12,7 @@
     - [ ] getbit
     - [x] setrange
     - [x] getrange
-    - [ ] substr
+    - [x] substr
     - [x] incr
     - [x] decr
     - [ ] mget
