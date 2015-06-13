@@ -39,7 +39,7 @@
     - [x] sismember
     - [x] scard
     - [ ] spop
-    - [ ] srandmember
+    - [x] srandmember
     - [ ] sinter
     - [ ] sinterstore
     - [ ] sunion
