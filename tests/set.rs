@@ -1,49 +1,40 @@
 extern crate rsedis;
 
-use rsedis::database::Database;
+use rsedis::database::Value;
 
 #[test]
 fn sadd() {
-    let mut database = Database::new();
-    let key = vec![1u8];
-    let value = vec![1u8, 2, 3, 4];
+    let mut value = Value::Nil;
+    let v1 = vec![1, 2, 3, 4];
 
-    let mut el = database.get_or_create(0, &key);
-    assert_eq!(el.sadd(Vec::clone(&value)).unwrap(), true);
-    assert_eq!(el.sadd(Vec::clone(&value)).unwrap(), false);
+    assert_eq!(value.sadd(v1.clone()).unwrap(), true);
+    assert_eq!(value.sadd(v1.clone()).unwrap(), false);
 }
 
 #[test]
 fn scard() {
-    let mut database = Database::new();
-    let key = vec![1u8];
-    let value = vec![1u8, 2, 3, 4];
+    let mut value = Value::Nil;
+    let v1 = vec![1, 2, 3, 4];
 
-    let mut el = database.get_or_create(0, &key);
-    assert_eq!(el.scard().unwrap(), 0);
-    assert_eq!(el.sadd(Vec::clone(&value)).unwrap(), true);
-    assert_eq!(el.scard().unwrap(), 1);
+    assert_eq!(value.scard().unwrap(), 0);
+    assert_eq!(value.sadd(v1.clone()).unwrap(), true);
+    assert_eq!(value.scard().unwrap(), 1);
 }
 
 #[test]
 fn sdiff() {
-    let mut database = Database::new();
-    let key = vec![1u8];
-    let key2 = vec![2u8];
-    let value1 = vec![1u8, 2, 3, 4];
-    let value2 = vec![1u8, 2, 3, 5];
-    let value3 = vec![1u8, 2, 3, 6];
+    let mut value1 = Value::Nil;
+    let mut value2 = Value::Nil;
+    let v1 = vec![1, 2, 3, 4];
+    let v2 = vec![5, 6, 7, 8];
+    let v3 = vec![0, 9, 1, 2];
 
-    {
-        let mut el = database.get_or_create(0, &key);
-        assert_eq!(el.sadd(Vec::clone(&value1)).unwrap(), true);
-        assert_eq!(el.sadd(Vec::clone(&value2)).unwrap(), true);
-    }
-    {
-        let mut el2 = database.get_or_create(0, &key2);
-        assert_eq!(el2.sadd(Vec::clone(&value1)).unwrap(), true);
-        assert_eq!(el2.sadd(Vec::clone(&value3)).unwrap(), true);
-    }
-    assert_eq!(database.get(0, &key).unwrap().sdiff(&vec![database.get(0, &key2).unwrap()]).unwrap().iter().collect::<Vec<_>>(),
-            vec![&value2]);
+    assert_eq!(value1.sadd(v1.clone()).unwrap(), true);
+    assert_eq!(value1.sadd(v2.clone()).unwrap(), true);
+
+    assert_eq!(value2.sadd(v1.clone()).unwrap(), true);
+    assert_eq!(value2.sadd(v3.clone()).unwrap(), true);
+
+    assert_eq!(value1.sdiff(&vec![&value2]).unwrap().iter().collect::<Vec<_>>(),
+            vec![&v2]);
 }
