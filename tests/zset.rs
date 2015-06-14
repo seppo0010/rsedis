@@ -164,3 +164,15 @@ fn zrem() {
     assert_eq!(value.zrem(v1.clone()).unwrap(), true);
     assert_eq!(value.zrem(v1.clone()).unwrap(), false);
 }
+
+#[test]
+fn zincrby() {
+    let mut value = Value::Nil;
+    let s1 = 1.0;
+    let s2 = 2.0;
+    let v1 = vec![1, 2, 3, 4];
+
+    assert_eq!(value.zincrby(s1.clone(), v1.clone()).unwrap(), s1);
+    assert_eq!(value.zincrby(s2.clone(), v1.clone()).unwrap(), s1 + s2);
+    assert_eq!(value.zincrby(- s1.clone(), v1.clone()).unwrap(), s2);
+}

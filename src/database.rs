@@ -670,6 +670,31 @@ impl Value {
         }
     }
 
+    pub fn zincrby(&mut self, increment: f64, member: Vec<u8>) -> Result<f64, OperationError> {
+        match self {
+            &mut Value::Nil => {
+                match self.zadd(increment.clone(), member, false, false, false) {
+                    Ok(_) => Ok(increment),
+                    Err(err) => Err(err),
+                }
+            },
+            &mut Value::SortedSet(ref mut skiplist, ref mut hmap) => {
+                let mut val = match hmap.get(&member) {
+                    Some(val) => {
+                        skiplist.remove(&SortedSetMember::new(val.clone(), member.clone()));
+                        val.clone()
+                    },
+                    None => 0.0,
+                };
+                val += increment;
+                skiplist.insert(SortedSetMember::new(val.clone(), member.clone()));
+                hmap.insert(member, val.clone());
+                Ok(val)
+            },
+            _ => Err(OperationError::WrongTypeError),
+        }
+    }
+
     pub fn zcount(&self, min: Bound<f64>, max: Bound<f64>) -> Result<usize, OperationError> {
         let skiplist = match self {
             &Value::Nil => return Ok(0),
