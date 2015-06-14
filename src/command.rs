@@ -956,6 +956,23 @@ fn zrange(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     }
 }
 
+fn zrank(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() == 3, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let member = try_validate!(parser.get_vec(2), "Invalid member");
+    let el = match db.get(dbindex, &key) {
+        Some(e) => e,
+        None => return Response::Nil,
+    };
+    match el.zrank(member) {
+        Ok(r) => match r {
+            Some(v) => Response::Integer(v as i64),
+            None => Response::Nil,
+        },
+        Err(err) => Response::Error(err.to_string()),
+    }
+}
+
 fn ping(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     #![allow(unused_variables)]
     validate!(parser.argv.len() <= 2, "Wrong number of parameters");
@@ -1135,6 +1152,7 @@ pub fn command(
         "zadd" => zadd(parser, db, dbindex),
         "zcount" => zcount(parser, db, dbindex),
         "zrange" => zrange(parser, db, dbindex),
+        "zrank" => zrank(parser, db, dbindex),
         "subscribe" => return subscribe(parser, db, subscriptions.unwrap(), pattern_subscriptions.unwrap().len(), sender.unwrap()),
         "unsubscribe" => return unsubscribe(parser, db, subscriptions.unwrap(), pattern_subscriptions.unwrap().len(), sender.unwrap()),
         "psubscribe" => return psubscribe(parser, db, subscriptions.unwrap().len(), pattern_subscriptions.unwrap(), sender.unwrap()),

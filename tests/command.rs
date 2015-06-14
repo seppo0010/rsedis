@@ -921,6 +921,15 @@ fn zrange_command() {
 }
 
 #[test]
+fn zrank_command() {
+    let mut db = Database::mock();
+    assert_eq!(command(&parser!(b"zadd key 1 a 2 b 3 c 4 d"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(4));
+    assert_eq!(command(&parser!(b"zrank key a"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(0));
+    assert_eq!(command(&parser!(b"zrank key b"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(1));
+    assert_eq!(command(&parser!(b"zrank key e"), &mut db, &mut 0, None, None, None).unwrap(), Response::Nil);
+}
+
+#[test]
 fn select_command() {
     let mut db = Database::mock();
     {
