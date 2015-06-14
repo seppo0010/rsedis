@@ -146,6 +146,15 @@ fn setrange_command() {
 }
 
 #[test]
+fn setbit_command() {
+    let mut db = Database::mock();
+    assert_eq!(command(&parser!(b"setbit key 1 0"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(0));
+    assert_eq!(command(&parser!(b"setbit key 1 1"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(0));
+    assert_eq!("@", getstr(&db, b"key"));
+    assert_eq!(command(&parser!(b"setbit key 1 0"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(1));
+}
+
+#[test]
 fn strlen_command() {
     let mut db = Database::mock();
     assert_eq!(command(&parser!(b"strlen key"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(0));

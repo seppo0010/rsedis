@@ -8,7 +8,7 @@
     - [x] strlen
     - [x] del
     - [x] exists
-    - [ ] setbit
+    - [x] setbit
     - [ ] getbit
     - [x] setrange
     - [x] getrange
