@@ -917,7 +917,32 @@ fn zadd(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
             i += 2; // omg, so ugly `for`
         }
     }
-    db.key_publish(&key);
+    if count > 0 {
+        db.key_publish(&key);
+    }
+    return Response::Integer(count);
+}
+
+fn zrem(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() >= 3, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let mut count = 0;
+    {
+        let el = match db.get_mut(dbindex, &key) {
+            Some(el) => el,
+            None => return Response::Integer(0),
+        };
+        for i in 2..parser.argv.len() {
+            let member = try_validate!(parser.get_vec(i), "Invalid member");
+            match el.zrem(member) {
+                Ok(removed) => if removed { count += 1 },
+                Err(err) => return Response::Error(err.to_string()),
+            }
+        }
+    }
+    if count > 0 {
+        db.key_publish(&key);
+    }
     return Response::Integer(count);
 }
 
@@ -1150,6 +1175,7 @@ pub fn command(
         "sdiff" => sdiff(parser, db, dbindex),
         "sdiffstore" => sdiffstore(parser, db, dbindex),
         "zadd" => zadd(parser, db, dbindex),
+        "zrem" => zrem(parser, db, dbindex),
         "zcount" => zcount(parser, db, dbindex),
         "zrange" => zrange(parser, db, dbindex),
         "zrank" => zrank(parser, db, dbindex),

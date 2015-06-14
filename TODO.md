@@ -50,7 +50,7 @@
     - [ ] sscan
     - [ ] zadd
     - [ ] zincrby
-    - [ ] zrem
+    - [x] zrem
     - [ ] zremrangebyscore
     - [ ] zremrangebyrank
     - [ ] zremrangebylex

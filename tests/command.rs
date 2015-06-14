@@ -930,6 +930,14 @@ fn zrank_command() {
 }
 
 #[test]
+fn zrem_command() {
+    let mut db = Database::mock();
+    assert_eq!(command(&parser!(b"zadd key 1 a 2 b 3 c"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(3));
+    assert_eq!(command(&parser!(b"zrem key a b d e"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(2));
+    assert_eq!(command(&parser!(b"zrem key c"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(1));
+}
+
+#[test]
 fn select_command() {
     let mut db = Database::mock();
     {
