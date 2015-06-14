@@ -98,3 +98,27 @@ fn zcount() {
     assert_eq!(value.zcount(Bound::Included(1.5), Bound::Included(2.0)).unwrap(), 1);
     assert_eq!(value.zcount(Bound::Included(5.0), Bound::Included(10.0)).unwrap(), 0);
 }
+
+#[test]
+fn zrange() {
+    let mut value = Value::Nil;
+    let s1 = 0.0;
+    let v1 = vec![1, 2, 3, 4];
+    let s2 = 0.0;
+    let v2 = vec![5, 6, 7, 8];
+    let s3 = 0.0;
+    let v3 = vec![9, 10, 11, 12];
+
+    assert_eq!(value.zadd(s1, v1.clone(), false, false, false).unwrap(), true);
+    assert_eq!(value.zadd(s3, v3.clone(), false, false, false).unwrap(), true);
+    assert_eq!(value.zadd(s2, v2.clone(), false, false, false).unwrap(), true);
+    assert_eq!(value.zrange(0, -1, true).unwrap(), vec![
+            vec![1, 2, 3, 4], vec![48],
+            vec![5, 6, 7, 8], vec![48],
+            vec![9, 10, 11, 12], vec![48]
+            ]);
+    assert_eq!(value.zrange(1, 1, true).unwrap(), vec![
+            vec![5, 6, 7, 8], vec![48],
+            ]);
+    assert_eq!(value.zrange(2, 0, true).unwrap().len(), 0);
+}

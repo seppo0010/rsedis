@@ -622,14 +622,14 @@ impl Value {
                 if xx {
                     return Ok(false);
                 }
-                let mut smap = OrderedSkipList::new();
+                let mut skiplist = OrderedSkipList::new();
                 let mut hmap = HashMap::new();
-                smap.insert(SortedSetMember::new(s.clone(), el.clone()));
+                skiplist.insert(SortedSetMember::new(s.clone(), el.clone()));
                 hmap.insert(el, s);
-                *self = Value::SortedSet(smap, hmap);
+                *self = Value::SortedSet(skiplist, hmap);
                 Ok(true)
             },
-            &mut Value::SortedSet(ref mut smap, ref mut hmap) => {
+            &mut Value::SortedSet(ref mut skiplist, ref mut hmap) => {
                 let contains = hmap.contains_key(&el);
                 if contains && nx {
                     return Ok(false);
@@ -643,7 +643,7 @@ impl Value {
                         return Ok(false);
                     }
                 }
-                smap.insert(SortedSetMember::new(s.clone(), el.clone()));
+                skiplist.insert(SortedSetMember::new(s.clone(), el.clone()));
                 hmap.insert(el, s);
                 if ch {
                     Ok(true)
@@ -656,9 +656,9 @@ impl Value {
     }
 
     pub fn zcount(&self, min: Bound<f64>, max: Bound<f64>) -> Result<usize, OperationError> {
-        let smap = match self {
+        let skiplist = match self {
             &Value::Nil => return Ok(0),
-            &Value::SortedSet(ref smap, _) => smap,
+            &Value::SortedSet(ref skiplist, _) => skiplist,
             _ => return Err(OperationError::WrongTypeError),
         };
         let mut f1 = SortedSetMember::new(0.0, vec![]);
@@ -675,7 +675,37 @@ impl Value {
             Bound::Unbounded => Bound::Unbounded,
         };
 
-        Ok(smap.range(m1, m2).collect::<Vec<_>>().len())
+        Ok(skiplist.range(m1, m2).collect::<Vec<_>>().len())
+    }
+
+    pub fn zrange(&self, _start: i64, _stop: i64, withscores: bool) -> Result<Vec<Vec<u8>>, OperationError> {
+        let skiplist = match self {
+            &Value::Nil => return Ok(vec![]),
+            &Value::SortedSet(ref skiplist, _) => skiplist,
+            _ => return Err(OperationError::WrongTypeError),
+        };
+
+        let len = skiplist.len();
+        let start = match normalize_position(_start, len) {
+            Ok(i) => i,
+            Err(i) => if i == 0 { 0 } else { return Ok(vec![]); },
+        };
+        let stop = match normalize_position(_stop, len) {
+            Ok(i) => i,
+            Err(i) => if i == 0 { return Ok(vec![]); } else { i },
+        };
+        if stop < start {
+            return Ok(vec![]);
+        }
+        let first = skiplist.get(&start).unwrap();
+        let mut r = vec![];
+        for member in skiplist.range(Bound::Included(first), Bound::Unbounded).take(stop - start + 1) {
+            r.push(member.get_vec().clone());
+            if withscores {
+                r.push(format!("{}", member.get_f64()).into_bytes());
+            }
+        }
+        Ok(r)
     }
 }
 
