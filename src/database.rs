@@ -642,6 +642,7 @@ impl Value {
                     if ch && val == &s {
                         return Ok(false);
                     }
+                    skiplist.remove(&SortedSetMember::new(val.clone(), el.clone()));
                 }
                 skiplist.insert(SortedSetMember::new(s.clone(), el.clone()));
                 hmap.insert(el, s);
