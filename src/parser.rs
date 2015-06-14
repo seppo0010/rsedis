@@ -1,3 +1,4 @@
+use std::collections::Bound;
 use std::str::from_utf8;
 use std::str::Utf8Error;
 use std::num::ParseIntError;
@@ -63,6 +64,17 @@ impl<'a> Parser<'a> {
             data: data,
             argv: argv,
         };
+    }
+
+    pub fn get_f64_bound(&self, pos: usize) -> Result<Bound<f64>, ParseError> {
+        let s = try!(self.get_str(pos));
+        if s == "inf" || s == "+inf" || s == "-inf" {
+            return Ok(Bound::Unbounded);
+        }
+        if s.starts_with("(") {
+            return Ok(Bound::Excluded(try!(s[1..].parse::<f64>())));
+        }
+        return Ok(Bound::Included(try!(s.parse::<f64>())));
     }
 
     // TODO: get<T>

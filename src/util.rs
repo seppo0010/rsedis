@@ -163,6 +163,10 @@ impl Float {
     pub fn get_mut(&mut self) -> &mut f64 {
         &mut self.f
     }
+
+    pub fn set(&mut self, f: f64)  {
+        self.f = f;
+    }
 }
 
 impl Eq for Float {}

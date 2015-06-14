@@ -897,6 +897,8 @@ fn zcount_command() {
     assert_eq!(command(&parser!(b"zadd key 1 a 2 b 3 c 4 d"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(4));
     assert_eq!(command(&parser!(b"zcount key 2 3"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(2));
     assert_eq!(command(&parser!(b"zcount key 2 3"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(2));
+    assert_eq!(command(&parser!(b"zcount key (2 3"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(1));
+    assert_eq!(command(&parser!(b"zcount key -inf inf"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(4));
 }
 
 #[test]

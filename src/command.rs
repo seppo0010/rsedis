@@ -924,8 +924,8 @@ fn zadd(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
 fn zcount(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 4, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
-    let min = try_validate!(parser.get_f64(2), "Invalid min");
-    let max = try_validate!(parser.get_f64(3), "Invalid max");
+    let min = try_validate!(parser.get_f64_bound(2), "Invalid min");
+    let max = try_validate!(parser.get_f64_bound(3), "Invalid max");
     let el = match db.get(dbindex, &key) {
         Some(e) => e,
         None => return Response::Integer(0),

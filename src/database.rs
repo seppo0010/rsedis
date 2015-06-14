@@ -1,6 +1,6 @@
 use std::fmt;
 use std::error::Error;
-use std::collections::Bound::Included;
+use std::collections::Bound;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::collections::LinkedList;
@@ -585,13 +585,27 @@ impl Value {
         }
     }
 
-    pub fn zcount(&self, min: f64, max: f64) -> Result<usize, OperationError> {
+    pub fn zcount(&self, min: Bound<f64>, max: Bound<f64>) -> Result<usize, OperationError> {
         let smap = match self {
             &Value::Nil => return Ok(0),
             &Value::SortedSet(ref smap, _) => smap,
             _ => return Err(OperationError::WrongTypeError),
         };
-        Ok(smap.range(Included(&Float::new(min)), Included(&Float::new(max))).collect::<Vec<_>>().len())
+        let mut f1 = Float::new(0.0);
+        let mut f2 = Float::new(0.0);
+        let m1 = match min {
+            Bound::Included(f) => { f1.set(f); Bound::Included(&f1) },
+            Bound::Excluded(f) => { f1.set(f); Bound::Excluded(&f1) },
+            Bound::Unbounded => Bound::Unbounded,
+        };
+
+        let m2 = match max {
+            Bound::Included(f) => { f2.set(f); Bound::Included(&f2) },
+            Bound::Excluded(f) => { f2.set(f); Bound::Excluded(&f2) },
+            Bound::Unbounded => Bound::Unbounded,
+        };
+
+        Ok(smap.range(m1, m2).collect::<Vec<_>>().len())
     }
 }
 

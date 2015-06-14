@@ -1,5 +1,7 @@
 extern crate rsedis;
 
+use std::collections::Bound;
+
 use rsedis::database::Value;
 
 #[test]
@@ -90,8 +92,9 @@ fn zcount() {
 
     assert_eq!(value.zadd(s1, v1.clone(), false, false, false).unwrap(), true);
     assert_eq!(value.zadd(s2, v2.clone(), false, false, false).unwrap(), true);
-    assert_eq!(value.zcount(0.0, 5.0).unwrap(), 2);
-    assert_eq!(value.zcount(1.0, 2.0).unwrap(), 2);
-    assert_eq!(value.zcount(1.5, 2.0).unwrap(), 1);
-    assert_eq!(value.zcount(5.0, 10.0).unwrap(), 0);
+    assert_eq!(value.zcount(Bound::Included(0.0), Bound::Included(5.0)).unwrap(), 2);
+    assert_eq!(value.zcount(Bound::Included(1.0), Bound::Included(2.0)).unwrap(), 2);
+    assert_eq!(value.zcount(Bound::Excluded(1.0), Bound::Excluded(2.0)).unwrap(), 0);
+    assert_eq!(value.zcount(Bound::Included(1.5), Bound::Included(2.0)).unwrap(), 1);
+    assert_eq!(value.zcount(Bound::Included(5.0), Bound::Included(10.0)).unwrap(), 0);
 }

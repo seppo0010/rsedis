@@ -1,3 +1,4 @@
+#![feature(collections)]
 extern crate rsedis;
 extern crate rand;
 
