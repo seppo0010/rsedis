@@ -23,9 +23,9 @@
     - [x] linsert
     - [x] rpop
     - [x] lpop
-    - [ ] brpop
+    - [x] brpop
     - [x] brpoplpush
-    - [ ] blpop
+    - [x] blpop
     - [x] llen
     - [x] lindex
     - [x] lset

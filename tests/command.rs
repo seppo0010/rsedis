@@ -703,6 +703,63 @@ fn brpoplpush_timeout() {
     }
 }
 
+
+#[test]
+fn brpop_nowait() {
+    let mut db = Database::mock();
+    command(&parser!(b"rpush key1 value"), &mut db, &mut 0, None, None, None).unwrap();
+    assert_eq!(command(&parser!(b"brpop key1 key2 0"), &mut db, &mut 0, None, None, None).unwrap(), Response::Array(vec![
+                Response::Data("key1".to_owned().into_bytes()),
+                Response::Data("value".to_owned().into_bytes()),
+                ]));
+}
+
+#[test]
+fn brpop_waiting() {
+    let db = Arc::new(Mutex::new(Database::mock()));
+    let (tx, rx) = channel();
+    let db2 = db.clone();
+    thread::spawn(move || {
+        let parser = parser!(b"brpop key1 key2 0");
+        let r = match command(&parser, &mut db.lock().unwrap(), &mut 0, None, None, None).unwrap_err() {
+            ResponseError::Wait(receiver) => {
+                tx.send(1).unwrap();
+                receiver
+            }
+            _ => panic!("Unexpected error")
+        };
+        r.recv().unwrap();
+        assert_eq!(command(&parser, &mut db.lock().unwrap(), &mut 0, None, None, None).unwrap(),
+            Response::Array(vec![
+                Response::Data("key2".to_owned().into_bytes()),
+                Response::Data("value".to_owned().into_bytes()),
+                ]));
+        tx.send(2).unwrap();
+    });
+    assert_eq!(rx.recv().unwrap(), 1);
+
+    {
+        command(&parser!(b"rpush key2 value"), &mut db2.lock().unwrap(), &mut 0, None, None, None).unwrap();
+        assert_eq!(rx.recv().unwrap(), 2);
+    }
+
+    {
+        assert_eq!(command(&parser!(b"llen key2"), &mut db2.lock().unwrap(), &mut 0, None, None, None).unwrap(), Response::Integer(0));
+    }
+}
+
+#[test]
+fn brpop_timeout() {
+    let mut db = Database::mock();
+    let receiver = match command(&parser!(b"brpop key1 key2 1"), &mut db, &mut 0, None, None, None).unwrap_err() {
+        ResponseError::Wait(receiver) => receiver,
+        _ => panic!("Unexpected response"),
+    };
+    assert!(receiver.try_recv().is_err());
+    thread::sleep_ms(1400);
+    assert_eq!(receiver.try_recv().unwrap(), false);
+}
+
 #[test]
 fn ltrim_command() {
     let mut db = Database::mock();

@@ -588,6 +588,54 @@ fn brpoplpush(parser: &Parser, db: &mut Database, dbindex: usize) -> Result<Resp
     return Err(ResponseError::Wait(rx));
 }
 
+fn generic_bpop(parser: &Parser, db: &mut Database, dbindex: usize, right: bool) -> Result<Response, ResponseError> {
+    #![allow(unused_must_use)]
+    opt_validate!(parser.argv.len() >= 3, "Wrong number of parameters");
+
+    let mut keys = vec![];
+    for i in 1..parser.argv.len() - 1 {
+        let key = try_opt_validate!(parser.get_vec(i), "Invalid key");
+        match db.get_mut(dbindex, &key) {
+            Some(mut list) => match list.pop(right) {
+                Ok(el) => {
+                    match el {
+                        Some(val) => return Ok(Response::Array(vec![
+                                    Response::Data(key),
+                                    Response::Data(val),
+                                    ])),
+                        None => (),
+                    }
+                }
+                Err(err) => return Ok(Response::Error(err.to_string())),
+            },
+            None => (),
+        }
+        keys.push(key);
+    }
+    let timeout = try_opt_validate!(parser.get_i64(parser.argv.len() - 1), "Invalid timeout");
+
+    let (tx, rx) = channel();
+    if timeout > 0 {
+        let txc = tx.clone();
+        thread::spawn(move || {
+            thread::sleep_ms(timeout as u32 * 1000);
+            txc.send(false);
+        });
+    }
+    for key in keys {
+        db.key_subscribe(&key, tx.clone());
+    }
+    return Err(ResponseError::Wait(rx));
+}
+
+fn brpop(parser: &Parser, db: &mut Database, dbindex: usize) -> Result<Response, ResponseError> {
+    generic_bpop(parser, db, dbindex, true)
+}
+
+fn blpop(parser: &Parser, db: &mut Database, dbindex: usize) -> Result<Response, ResponseError> {
+    generic_bpop(parser, db, dbindex, false)
+}
+
 fn lindex(parser: &Parser, db: &Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
@@ -1207,6 +1255,8 @@ pub fn command(
         "ltrim" => ltrim(parser, db, dbindex),
         "rpoplpush" => rpoplpush(parser, db, dbindex),
         "brpoplpush" => return brpoplpush(parser, db, dbindex),
+        "brpop" => return brpop(parser, db, dbindex),
+        "blpop" => return blpop(parser, db, dbindex),
         "sadd" => sadd(parser, db, dbindex),
         "srem" => srem(parser, db, dbindex),
         "sismember" => sismember(parser, db, dbindex),
