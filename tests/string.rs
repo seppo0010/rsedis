@@ -163,3 +163,11 @@ fn setbit() {
     assert_eq!(value.setbit(23, true).unwrap(), false);
     assert_eq!(value.getrange(0, -1).unwrap(), [0u8, 0, 1]);
 }
+
+#[test]
+fn getbit() {
+    let value = Value::Data(vec![1,2,3,4,5]);;
+    assert_eq!(value.getbit(0).unwrap(), false);
+    assert_eq!(value.getbit(23).unwrap(), true);
+    assert_eq!(value.getbit(500).unwrap(), false);
+}

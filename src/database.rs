@@ -292,6 +292,26 @@ impl Value {
         Ok(bitval != 0)
     }
 
+    pub fn getbit(&self, bitoffset: usize) -> Result<bool, OperationError> {
+        let tmp;
+        let d = match self {
+            &Value::Nil => return Ok(false),
+            &Value::Integer(i) => { tmp = format!("{}", i).into_bytes(); &tmp },
+            &Value::Data(ref d) => d,
+            _ => return Err(OperationError::WrongTypeError),
+        };
+
+        let byte = bitoffset >> 3;
+        if byte >= d.len() {
+            return Ok(false);
+        }
+
+        let bit = 7 - (bitoffset & 0x7);;
+        let bitval = d[byte] & (1 << bit);
+
+        Ok(bitval != 0)
+    }
+
     pub fn setrange(&mut self, _index: i64, data: Vec<u8>) -> Result<usize, OperationError> {
         match self {
             &mut Value::Nil => *self = Value::Data(Vec::new()),
