@@ -936,6 +936,26 @@ fn zcount(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     }
 }
 
+fn zrange(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() == 4 || parser.argv.len() == 5, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let start = try_validate!(parser.get_i64(2), "Invalid start");
+    let stop = try_validate!(parser.get_i64(3), "Invalid stop");
+    let withscores = parser.argv.len() == 5;
+    if withscores {
+        let p4 = try_validate!(parser.get_str(4), "Syntax error");
+        validate!(p4.to_ascii_lowercase() == "withscores", "Syntax error");
+    }
+    let el = match db.get(dbindex, &key) {
+        Some(e) => e,
+        None => return Response::Array(Vec::new()),
+    };
+    match el.zrange(start, stop, withscores) {
+        Ok(r) => Response::Array(r.iter().map(|x| Response::Data(x.clone())).collect::<Vec<_>>()),
+        Err(err) => Response::Error(err.to_string()),
+    }
+}
+
 fn ping(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     #![allow(unused_variables)]
     validate!(parser.argv.len() <= 2, "Wrong number of parameters");
@@ -1114,6 +1134,7 @@ pub fn command(
         "sdiffstore" => sdiffstore(parser, db, dbindex),
         "zadd" => zadd(parser, db, dbindex),
         "zcount" => zcount(parser, db, dbindex),
+        "zrange" => zrange(parser, db, dbindex),
         "subscribe" => return subscribe(parser, db, subscriptions.unwrap(), pattern_subscriptions.unwrap().len(), sender.unwrap()),
         "unsubscribe" => return unsubscribe(parser, db, subscriptions.unwrap(), pattern_subscriptions.unwrap().len(), sender.unwrap()),
         "psubscribe" => return psubscribe(parser, db, subscriptions.unwrap().len(), pattern_subscriptions.unwrap(), sender.unwrap()),

@@ -902,6 +902,25 @@ fn zcount_command() {
 }
 
 #[test]
+fn zrange_command() {
+    let mut db = Database::mock();
+    assert_eq!(command(&parser!(b"zadd key 1 a 2 b 3 c 4 d"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(4));
+    assert_eq!(command(&parser!(b"zrange key 0 0"), &mut db, &mut 0, None, None, None).unwrap(), Response::Array(vec![
+                Response::Data(b"a".to_vec()),
+                ]));
+    assert_eq!(command(&parser!(b"zrange key 0 0 withscoreS"), &mut db, &mut 0, None, None, None).unwrap(), Response::Array(vec![
+                Response::Data(b"a".to_vec()),
+                Response::Data(b"1".to_vec()),
+                ]));
+    assert_eq!(command(&parser!(b"zrange key -2 -1 WITHSCORES"), &mut db, &mut 0, None, None, None).unwrap(), Response::Array(vec![
+                Response::Data(b"c".to_vec()),
+                Response::Data(b"3".to_vec()),
+                Response::Data(b"d".to_vec()),
+                Response::Data(b"4".to_vec()),
+                ]));
+}
+
+#[test]
 fn select_command() {
     let mut db = Database::mock();
     {
