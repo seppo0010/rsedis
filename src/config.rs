@@ -30,58 +30,55 @@ impl Config {
         }
     }
 
-    pub fn new(confpath: Option<String>) -> Result<Config, ConfigError> {
-        let mut bind = Vec::new();
-        let mut port = 6379;
-        let mut daemonize = false;
-        let mut databases = 16;
-        let mut pidfile = "/var/run/sredis.pid".to_owned();
-        match confpath {
-            Some(fname) => {
-                let path = Path::new(&*fname);
-                let file = BufReader::new(try!(File::open(&path)));
-                for line_iter in file.lines() {
-                    let lline = try!(line_iter);
-                    let line = lline.trim();
-                    if line.starts_with("#") {
-                        continue;
-                    }
+    pub fn new() -> Config {
+        Config {
+            daemonize: false,
+            databases: 16,
+            pidfile: "/var/run/sredis.pid".to_owned(),
+            bind: vec![],
+            port: 6379,
+        }
+    }
 
-                    if line.starts_with("bind ") {
-                        bind.extend(line[5..].split(' ').filter(|x| x.trim().len() > 0).map(|x| x.trim().to_owned()));
-                    }
-                    else if line.starts_with("port ") {
-                        port = try!(line[5..].trim().parse());
-                    }
-                    else if line.starts_with("daemonize ") {
-                        daemonize = line[9..].trim() == "yes";
-                    }
-                    else if line.starts_with("databases ") {
-                        databases = try!(line[9..].trim().parse());
-                    }
-                    else if line.starts_with("pidfile ") {
-                        pidfile = line[8..].trim().to_owned();
-                    }
-                }
-            },
-            None => (),
-        };
+    pub fn parsefile(&mut self, fname: String) -> Result<(), ConfigError> {
+        let path = Path::new(&*fname);
+        let file = BufReader::new(try!(File::open(&path)));
+        for line_iter in file.lines() {
+            let lline = try!(line_iter);
+            let line = lline.trim();
+            if line.starts_with("#") {
+                continue;
+            }
 
-        if bind.len() == 0 {
-            bind.push("127.0.0.1".to_owned());
+            if line.starts_with("bind ") {
+                self.bind.extend(line[5..].split(' ').filter(|x| x.trim().len() > 0).map(|x| x.trim().to_owned()));
+            }
+            else if line.starts_with("port ") {
+                self.port = try!(line[5..].trim().parse());
+            }
+            else if line.starts_with("daemonize ") {
+                self.daemonize = line[9..].trim() == "yes";
+            }
+            else if line.starts_with("databases ") {
+                self.databases = try!(line[9..].trim().parse());
+            }
+            else if line.starts_with("pidfile ") {
+                self.pidfile = line[8..].trim().to_owned();
+            }
+            else if line.starts_with("include ") {
+                try!(self.parsefile(line[8..].trim().to_owned()));
+            }
         }
 
-        Ok(Config {
-            daemonize: daemonize,
-            databases: databases,
-            pidfile: pidfile,
-            bind: bind,
-            port: port,
-        })
+        Ok(())
     }
 
     pub fn addresses(&self) -> Vec<(&str, u16)> {
-        self.bind.iter().map(|s| (&s[..], self.port)).collect::<Vec<_>>()
+        if self.bind.len() == 0 {
+            vec![("127.0.0.1", self.port)]
+        } else {
+            self.bind.iter().map(|s| (&s[..], self.port)).collect::<Vec<_>>()
+        }
     }
 }
 

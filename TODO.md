@@ -164,7 +164,7 @@
     - [ ] pfdebug
     - [ ] latency
 - config
-    - [ ] include
+    - [x] include
     - [x] daemonize
     - [x] pidfile
     - [x] port

@@ -16,7 +16,9 @@ macro_rules! config {
         match create_dir("tmp") { _ => () }
         match create_dir(dirpath) { _ => () }
         match File::create(filepath.clone()).unwrap().write_all($str) { _ => () }
-        Config::new(Some(filepath)).unwrap()
+        let mut config = Config::new();
+        config.parsefile(filepath).unwrap();
+        config
     })
 }
 
@@ -30,8 +32,8 @@ fn parse_bind() {
 #[test]
 fn parse_port() {
     let config = config!(b"port 12345");
-    assert_eq!(config.bind, vec!["127.0.0.1"]);
     assert_eq!(config.port, 12345);
+    assert_eq!(config.addresses(), vec![("127.0.0.1", 12345)]);
 }
 
 #[test]

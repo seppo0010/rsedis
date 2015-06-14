@@ -6,7 +6,11 @@ use std::env::args;
 
 fn main() {
     #![allow(dead_code)]
-    let config = Config::new(args().nth(1)).unwrap();
+    let mut config = Config::new();
+    match args().nth(1) {
+        Some(f) => config.parsefile(f).unwrap(),
+        None => (),
+    }
     let mut server = Server::new(config);
     server.run();
 }
