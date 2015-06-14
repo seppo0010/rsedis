@@ -11,6 +11,7 @@ pub struct Config {
     pub pidfile: String,
     pub bind: Vec<String>,
     pub port: u16,
+    pub tcp_keepalive: u32,
 }
 
 #[derive(Debug)]
@@ -27,6 +28,7 @@ impl Config {
             pidfile: "/var/run/sredis.pid".to_owned(),
             bind: vec!["127.0.0.1".to_owned()],
             port: port,
+            tcp_keepalive: 0,
         }
     }
 
@@ -37,6 +39,7 @@ impl Config {
             pidfile: "/var/run/sredis.pid".to_owned(),
             bind: vec![],
             port: 6379,
+            tcp_keepalive: 0,
         }
     }
 
@@ -67,6 +70,9 @@ impl Config {
             }
             else if line.starts_with("include ") {
                 try!(self.parsefile(line[8..].trim().to_owned()));
+            }
+            else if line.starts_with("tcp-keepalive ") {
+                self.tcp_keepalive = try!(line[13..].trim().parse());
             }
         }
 

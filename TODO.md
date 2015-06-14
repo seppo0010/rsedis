@@ -173,7 +173,7 @@
     - [ ] unixsocket
     - [ ] unixsocketperm
     - [ ] timeout
-    - [ ] tcp-keepalive
+    - [x] tcp-keepalive
     - [ ] loglevel
     - [ ] logfile
     - [ ] syslog-enabled

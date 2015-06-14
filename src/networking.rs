@@ -217,6 +217,7 @@ impl Server {
     }
 
     pub fn start(&mut self) {
+        let tcp_keepalive = self.config.tcp_keepalive;
         for addr in self.config.addresses() {
             let (tx, rx) = channel();
             self.listener_channels.push(tx);
@@ -232,6 +233,7 @@ impl Server {
                         Ok(stream) => {
                             let db1 = db.clone();
                             thread::spawn(move || {
+                                stream.set_keepalive(if tcp_keepalive > 0 { Some(tcp_keepalive) } else { None }).unwrap();
                                 let mut client = Client::new(stream, db1);
                                 client.run();
                             });

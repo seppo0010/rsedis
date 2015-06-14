@@ -1,3 +1,4 @@
+#![feature(tcp)]
 #![feature(collections)]
 
 extern crate rand;

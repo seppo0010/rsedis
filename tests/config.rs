@@ -60,3 +60,9 @@ fn parse_databases() {
     let config = config!(b"databases 20");
     assert_eq!(config.databases, 20);
 }
+
+#[test]
+fn parse_keepalive() {
+    let config = config!(b"tcp-keepalive 123");
+    assert_eq!(config.tcp_keepalive, 123);
+}
