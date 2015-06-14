@@ -892,6 +892,13 @@ fn zadd_command() {
 }
 
 #[test]
+fn zincrby_command() {
+    let mut db = Database::mock();
+    assert_eq!(command(&parser!(b"zincrby key 3 a"), &mut db, &mut 0, None, None, None).unwrap(), Response::Data(b"3".to_vec()));
+    assert_eq!(command(&parser!(b"zincrby key 4 a"), &mut db, &mut 0, None, None, None).unwrap(), Response::Data(b"7".to_vec()));
+}
+
+#[test]
 fn zcount_command() {
     let mut db = Database::mock();
     assert_eq!(command(&parser!(b"zadd key 1 a 2 b 3 c 4 d"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(4));

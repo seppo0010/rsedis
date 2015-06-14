@@ -923,6 +923,22 @@ fn zadd(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     return Response::Integer(count);
 }
 
+fn zincrby(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() == 4, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let newscore = {
+        let el = db.get_or_create(dbindex, &key);
+        let score = try_validate!(parser.get_f64(2), "Invalid score");
+        let member = try_validate!(parser.get_vec(3), "Invalid member");
+        match el.zincrby(score, member) {
+            Ok(score) => score,
+            Err(err) => return Response::Error(err.to_string()),
+        }
+    };
+    db.key_publish(&key);
+    return Response::Data(format!("{}", newscore).into_bytes());
+}
+
 fn zrem(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() >= 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
@@ -1175,6 +1191,7 @@ pub fn command(
         "sdiff" => sdiff(parser, db, dbindex),
         "sdiffstore" => sdiffstore(parser, db, dbindex),
         "zadd" => zadd(parser, db, dbindex),
+        "zincrby" => zincrby(parser, db, dbindex),
         "zrem" => zrem(parser, db, dbindex),
         "zcount" => zcount(parser, db, dbindex),
         "zrange" => zrange(parser, db, dbindex),

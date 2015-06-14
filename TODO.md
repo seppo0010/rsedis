@@ -49,7 +49,7 @@
     - [ ] smembers
     - [ ] sscan
     - [ ] zadd
-    - [ ] zincrby
+    - [x] zincrby
     - [x] zrem
     - [ ] zremrangebyscore
     - [ ] zremrangebyrank
