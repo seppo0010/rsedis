@@ -9,7 +9,7 @@
     - [x] del
     - [x] exists
     - [x] setbit
-    - [ ] getbit
+    - [x] getbit
     - [x] setrange
     - [x] getrange
     - [x] substr

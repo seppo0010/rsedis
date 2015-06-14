@@ -155,6 +155,17 @@ fn setbit_command() {
 }
 
 #[test]
+fn getbit_command() {
+    let mut db = Database::mock();
+    assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
+    assert_eq!(command(&parser!(b"getbit key 4"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(0));
+    assert_eq!(command(&parser!(b"getbit key 5"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(1));
+    assert_eq!(command(&parser!(b"getbit key 6"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(1));
+    assert_eq!(command(&parser!(b"getbit key 7"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(0));
+    assert_eq!(command(&parser!(b"getbit key 800"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(0));
+}
+
+#[test]
 fn strlen_command() {
     let mut db = Database::mock();
     assert_eq!(command(&parser!(b"strlen key"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(0));
