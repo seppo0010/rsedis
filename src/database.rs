@@ -1,5 +1,7 @@
 use std::fmt;
 use std::error::Error;
+use std::cmp::Ord;
+use std::cmp::Ordering;
 use std::collections::Bound;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -10,13 +12,81 @@ use std::num::ParseIntError;
 use std::sync::mpsc::Sender;
 
 use rand::random;
-use skiplist::SkipMap;
+use skiplist::OrderedSkipList;
 
 use super::config::Config;
-use super::util::Float;
 use super::util::glob_match;
 use super::util::mstime;
 
+
+/**
+ * SortedSetMember is a wrapper around f64 to implement ordering and equality.
+ * f64 does not implement those traits because comparing floats has problems
+ * but in the context of rsedis this basic implementation should be enough.
+ **/
+#[derive(Debug, Clone)]
+pub struct SortedSetMember {
+    f: f64,
+    s: Vec<u8>,
+    // this is useful for inclusion/exclusion comparison
+    // if true, it will ignore `s` and be the highest possible string
+    upper_boundary: bool,
+}
+
+impl SortedSetMember {
+    pub fn new(f: f64, s: Vec<u8>) -> SortedSetMember {
+        SortedSetMember {f: f, s: s, upper_boundary: false}
+    }
+
+    pub fn set_upper_boundary(&mut self, upper_boundary: bool) {
+        self.upper_boundary = upper_boundary;
+    }
+
+    pub fn get_f64(&self) -> &f64 {
+        &self.f
+    }
+
+    pub fn set_f64(&mut self, f: f64)  {
+        self.f = f;
+    }
+
+    pub fn get_vec(&self) -> &Vec<u8> {
+        &self.s
+    }
+
+    pub fn set_vec(&mut self, s: Vec<u8>)  {
+        self.s = s;
+    }
+}
+
+impl Eq for SortedSetMember {}
+
+impl PartialEq for SortedSetMember {
+    fn eq(&self, other: &Self) -> bool {
+        self.f == other.f && self.s == other.s
+    }
+}
+
+impl Ord for SortedSetMember {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).unwrap()
+    }
+}
+
+impl PartialOrd for SortedSetMember {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(if self.f < other.f { Ordering::Less }
+        else if self.f > other.f { Ordering::Greater }
+        else if other.upper_boundary { Ordering::Less }
+        else if self.upper_boundary { Ordering::Greater }
+        else { return self.s.partial_cmp(&other.s) })
+    }
+
+    fn lt(&self, other: &Self) -> bool { self.f < other.f || (self.f == other.f && self.s < other.s) }
+    fn le(&self, other: &Self) -> bool { self.f < other.f || (self.f == other.f && self.s <= other.s) }
+    fn gt(&self, other: &Self) -> bool { self.f > other.f || (self.f == other.f && self.s > other.s) }
+    fn ge(&self, other: &Self) -> bool { self.f > other.f || (self.f == other.f && self.s >= other.s) }
+}
 #[derive(PartialEq, Debug)]
 pub enum Value {
     Nil,
@@ -24,7 +94,7 @@ pub enum Value {
     Data(Vec<u8>),
     List(LinkedList<Vec<u8>>),
     Set(HashSet<Vec<u8>>),
-    SortedSet(SkipMap<Float, Vec<u8>>, HashMap<Vec<u8>, Float>),
+    SortedSet(OrderedSkipList<SortedSetMember>, HashMap<Vec<u8>, f64>),
 }
 
 #[derive(Debug)]
@@ -552,10 +622,10 @@ impl Value {
                 if xx {
                     return Ok(false);
                 }
-                let mut smap = SkipMap::new();
+                let mut smap = OrderedSkipList::new();
                 let mut hmap = HashMap::new();
-                smap.insert(Float::new(s), el.clone());
-                hmap.insert(el, Float::new(s));
+                smap.insert(SortedSetMember::new(s.clone(), el.clone()));
+                hmap.insert(el, s);
                 *self = Value::SortedSet(smap, hmap);
                 Ok(true)
             },
@@ -568,13 +638,13 @@ impl Value {
                     return Ok(false);
                 }
                 if contains {
-                    let val = hmap.get(&el).unwrap().get();
+                    let val = hmap.get(&el).unwrap();
                     if ch && val == &s {
                         return Ok(false);
                     }
                 }
-                smap.insert(Float::new(s), el.clone());
-                hmap.insert(el, Float::new(s));
+                smap.insert(SortedSetMember::new(s.clone(), el.clone()));
+                hmap.insert(el, s);
                 if ch {
                     Ok(true)
                 } else {
@@ -591,17 +661,17 @@ impl Value {
             &Value::SortedSet(ref smap, _) => smap,
             _ => return Err(OperationError::WrongTypeError),
         };
-        let mut f1 = Float::new(0.0);
-        let mut f2 = Float::new(0.0);
+        let mut f1 = SortedSetMember::new(0.0, vec![]);
+        let mut f2 = SortedSetMember::new(0.0, vec![]);
         let m1 = match min {
-            Bound::Included(f) => { f1.set(f); Bound::Included(&f1) },
-            Bound::Excluded(f) => { f1.set(f); Bound::Excluded(&f1) },
+            Bound::Included(f) => { f1.set_f64(f); Bound::Included(&f1) },
+            Bound::Excluded(f) => { f1.set_f64(f); f1.set_upper_boundary(true); Bound::Excluded(&f1) },
             Bound::Unbounded => Bound::Unbounded,
         };
 
         let m2 = match max {
-            Bound::Included(f) => { f2.set(f); Bound::Included(&f2) },
-            Bound::Excluded(f) => { f2.set(f); Bound::Excluded(&f2) },
+            Bound::Included(f) => { f2.set_f64(f); f2.set_upper_boundary(true); Bound::Included(&f2) },
+            Bound::Excluded(f) => { f2.set_f64(f); Bound::Excluded(&f2) },
             Bound::Unbounded => Bound::Unbounded,
         };
 

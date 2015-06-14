@@ -18,8 +18,8 @@ fn zadd_basic() {
     assert_eq!(value.zadd(s1, v2.clone(), false, false, false).unwrap(), false);
     match value {
         Value::SortedSet(_, hs) => {
-            assert_eq!(hs.get(&v1).unwrap().get(), &s1);
-            assert_eq!(hs.get(&v2).unwrap().get(), &s1);
+            assert_eq!(hs.get(&v1).unwrap(), &s1);
+            assert_eq!(hs.get(&v2).unwrap(), &s1);
         },
         _ => panic!("Expected zset"),
     }
@@ -39,8 +39,8 @@ fn zadd_nx() {
     assert_eq!(value.zadd(s1, v2.clone(), true, false, false).unwrap(), false);
     match value {
         Value::SortedSet(_, hs) => {
-            assert_eq!(hs.get(&v1).unwrap().get(), &s1);
-            assert_eq!(hs.get(&v2).unwrap().get(), &s2);
+            assert_eq!(hs.get(&v1).unwrap(), &s1);
+            assert_eq!(hs.get(&v2).unwrap(), &s2);
         },
         _ => panic!("Expected zset"),
     }
@@ -58,7 +58,7 @@ fn zadd_xx() {
     assert_eq!(value.zadd(s2, v1.clone(), false, true, false).unwrap(), false);
     match value {
         Value::SortedSet(_, hs) => {
-            assert_eq!(hs.get(&v1).unwrap().get(), &s2);
+            assert_eq!(hs.get(&v1).unwrap(), &s2);
         },
         _ => panic!("Expected zset"),
     }
@@ -76,7 +76,7 @@ fn zadd_ch() {
     assert_eq!(value.zadd(s2, v1.clone(), false, false, true).unwrap(), true);
     match value {
         Value::SortedSet(_, hs) => {
-            assert_eq!(hs.get(&v1).unwrap().get(), &s2);
+            assert_eq!(hs.get(&v1).unwrap(), &s2);
         },
         _ => panic!("Expected zset"),
     }
