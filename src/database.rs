@@ -616,6 +616,20 @@ impl Value {
         *self = Value::Set(set);
     }
 
+    pub fn zrem(&mut self, member: Vec<u8>) -> Result<bool, OperationError> {
+        let (skiplist, hmap) = match self {
+            &mut Value::Nil => return Ok(false),
+            &mut Value::SortedSet(ref mut skiplist, ref mut hmap) => (skiplist, hmap),
+            _ => return Err(OperationError::WrongTypeError),
+        };
+        let score = match hmap.remove(&member) {
+            Some(val) => val,
+            None => return Ok(false),
+        };
+        skiplist.remove(&SortedSetMember::new(score, member));
+        Ok(true)
+    }
+
     pub fn zadd(&mut self, s: f64, el: Vec<u8>, nx: bool, xx: bool, ch: bool) -> Result<bool, OperationError> {
         match self {
             &mut Value::Nil => {

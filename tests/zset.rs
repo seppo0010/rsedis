@@ -152,3 +152,15 @@ fn zadd_update() {
             vec![1, 2, 3, 4], vec![49],
             ]);
 }
+
+#[test]
+fn zrem() {
+    let mut value = Value::Nil;
+    let s1 = 0.0;
+    let v1 = vec![1, 2, 3, 4];
+
+    assert_eq!(value.zadd(s1, v1.clone(), false, false, false).unwrap(), true);
+    assert_eq!(value.zrem(vec![8u8]).unwrap(), false);
+    assert_eq!(value.zrem(v1.clone()).unwrap(), true);
+    assert_eq!(value.zrem(v1.clone()).unwrap(), false);
+}
