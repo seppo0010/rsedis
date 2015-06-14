@@ -154,3 +154,12 @@ fn setrange_intermediate() {
     assert_eq!(value.setrange(2, vec![13, 14]).unwrap(), 5);
     assert_eq!(value, Value::Data(vec![1,2,13,14,5]));
 }
+
+#[test]
+fn setbit() {
+    let mut value = Value::Nil;
+    assert_eq!(value.setbit(23, false).unwrap(), false);
+    assert_eq!(value.getrange(0, -1).unwrap(), [0u8, 0, 0]);
+    assert_eq!(value.setbit(23, true).unwrap(), false);
+    assert_eq!(value.getrange(0, -1).unwrap(), [0u8, 0, 1]);
+}

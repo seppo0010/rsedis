@@ -263,6 +263,35 @@ impl Value {
         Ok(v)
     }
 
+    pub fn setbit(&mut self, bitoffset: usize, on: bool) -> Result<bool, OperationError> {
+        match self {
+            &mut Value::Nil => *self = Value::Data(Vec::new()),
+            &mut Value::Integer(i) => *self = Value::Data(format!("{}", i).into_bytes()),
+            &mut Value::Data(_) => (),
+            _ => return Err(OperationError::WrongTypeError),
+        };
+        let mut d = match self {
+            &mut Value::Data(ref mut d) => d,
+            _ => panic!("Value should be data"),
+        };
+
+        let byte = bitoffset >> 3;
+
+        while byte + 1 > d.len() {
+            d.push(0);
+        }
+
+        let mut byteval = d[byte];
+        let bit = 7 - (bitoffset & 0x7);
+        let bitval = byteval & (1 << bit);
+
+        byteval &= !(1 << bit);
+        byteval |= (if on { 1 } else { 0 } & 0x1) << bit;
+        d[byte] = byteval;
+
+        Ok(bitval != 0)
+    }
+
     pub fn setrange(&mut self, _index: i64, data: Vec<u8>) -> Result<usize, OperationError> {
         match self {
             &mut Value::Nil => *self = Value::Data(Vec::new()),
