@@ -286,11 +286,10 @@ fn dbtype(parser: &Parser, db: &Database, dbindex: usize) -> Response {
         Some(value) => {
             match value {
                 &Value::Nil => Response::Data("none".to_owned().into_bytes()),
-                &Value::Data(_) => Response::Data("string".to_owned().into_bytes()),
-                &Value::Integer(_) => Response::Data("string".to_owned().into_bytes()),
+                &Value::String(_) => Response::Data("string".to_owned().into_bytes()),
                 &Value::List(_) => Response::Data("list".to_owned().into_bytes()),
                 &Value::Set(_) => Response::Data("set".to_owned().into_bytes()),
-                &Value::SortedSet(_, _) => Response::Data("zset".to_owned().into_bytes()),
+                &Value::SortedSet(_) => Response::Data("zset".to_owned().into_bytes()),
             }
         }
         None => Response::Data("none".to_owned().into_bytes()),
@@ -318,14 +317,11 @@ fn append(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
 fn generic_get(db: &Database, dbindex: usize, key: Vec<u8>) -> Response {
     let obj = db.get(dbindex, &key);
     match obj {
-        Some(value) => {
-            match value {
-                &Value::Data(ref data) => return Response::Data(data.clone()),
-                &Value::Integer(ref int) => return Response::Data(format!("{}", int).into_bytes()),
-                _ => panic!("Should be an integer or data"),
-            }
-        }
-        None => return Response::Nil,
+        Some(value) => match value.get() {
+            Ok(r) => Response::Data(r),
+            Err(err) => Response::Error(err.to_string()),
+        },
+        None => Response::Nil,
     }
 }
 
@@ -401,10 +397,9 @@ fn strlen(parser: &Parser, db: &Database, dbindex: usize) -> Response {
     let obj = db.get(dbindex, &key);
     match obj {
         Some(value) => {
-            match value {
-                &Value::Data(ref data) => return Response::Integer(data.len() as i64),
-                &Value::Integer(ref int) => return Response::Integer(format!("{}", int).len() as i64),
-                _ => panic!("Should be an integer or data"),
+            match value.strlen() {
+                Ok(r) => Response::Integer(r as i64),
+                Err(err) => Response::Error(err.to_string()),
             }
         }
         None => return Response::Integer(0),

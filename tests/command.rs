@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 use rsedis::database::Database;
-use rsedis::database::Value;
+use rsedis::database::{Value, ValueString, ValueSet};
 use rsedis::parser::Parser;
 use rsedis::parser::Argument;
 use rsedis::command::command;
@@ -29,11 +29,12 @@ macro_rules! parser {
 
 fn getstr(database: &Database, key: &[u8]) -> String {
     match database.get(0, &key.to_vec()).unwrap() {
-        &Value::Data(ref bytes) => return from_utf8(bytes).unwrap().to_owned(),
-        &Value::Integer(i) => return format!("{}", i),
+        &Value::String(ref value) => match value {
+            &ValueString::Data(ref bytes) => from_utf8(bytes).unwrap().to_owned(),
+            &ValueString::Integer(i) => format!("{}", i),
+        },
         _ => panic!("Got non-string"),
     }
-    return String::new();
 }
 
 #[test]
@@ -371,7 +372,7 @@ fn append_command() {
     let parser = parser!(b"append key value");
     assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(10));
 
-    assert_eq!(db.get(0, &b"key".to_vec()).unwrap(), &Value::Data(b"valuevalue".to_vec()));
+    assert_eq!(db.get(0, &b"key".to_vec()).unwrap(), &Value::String(ValueString::Data(b"valuevalue".to_vec())));
 }
 
 #[test]
@@ -935,7 +936,7 @@ fn sdiffstore_command() {
         set.insert(b"1".to_vec());
         set.insert(b"2".to_vec());
         set.insert(b"3".to_vec());
-        assert_eq!(db.get(0, &b"target".to_vec()).unwrap(), &Value::Set(set));
+        assert_eq!(db.get(0, &b"target".to_vec()).unwrap(), &Value::Set(ValueSet::Data(set)));
     }
 }
 

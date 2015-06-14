@@ -3,23 +3,24 @@ extern crate rsedis;
 use std::collections::LinkedList;
 
 use rsedis::database::Value;
+use rsedis::database::ValueList;
 
 #[test]
 fn lpush() {
     let v1 = vec![1u8, 2, 3, 4];
     let v2 = vec![1u8, 5, 6, 7];
-    let mut value = Value::List(LinkedList::new());
+    let mut value = Value::List(ValueList::Data(LinkedList::new()));
 
     value.push(v1.clone(), false).unwrap();
     {
-        let list = match value { Value::List(ref l) => l, _ => panic!("Expected list") };
+        let list = match value { Value::List(ref value) => match value { &ValueList::Data(ref l) => l }, _ => panic!("Expected list") };
         assert_eq!(list.len(), 1);
         assert_eq!(list.front(), Some(&v1));
     }
 
     value.push(v2.clone(), false).unwrap();
     {
-        let list = match value { Value::List(ref l) => l, _ => panic!("Expected list") };
+        let list = match value { Value::List(ref value) => match value { &ValueList::Data(ref l) => l }, _ => panic!("Expected list") };
         assert_eq!(list.len(), 2);
         assert_eq!(list.back(), Some(&v1));
         assert_eq!(list.front(), Some(&v2));
@@ -28,7 +29,7 @@ fn lpush() {
 
 #[test]
 fn lpop() {
-    let mut value = Value::List(LinkedList::new());
+    let mut value = Value::List(ValueList::Data(LinkedList::new()));
     let v1 = vec![1, 2, 3, 4];
     let v2 = vec![5, 6, 7, 8];
     value.push(v1.clone(), false).unwrap();
@@ -40,7 +41,7 @@ fn lpop() {
 
 #[test]
 fn lindex() {
-    let mut value = Value::List(LinkedList::new());
+    let mut value = Value::List(ValueList::Data(LinkedList::new()));
     let v1 = vec![1, 2, 3, 4];
     let v2 = vec![5, 6, 7, 8];
     value.push(v1.clone(), false).unwrap();
@@ -57,7 +58,7 @@ fn lindex() {
 
 #[test]
 fn linsert() {
-    let mut value = Value::List(LinkedList::new());
+    let mut value = Value::List(ValueList::Data(LinkedList::new()));
     let v1 = vec![1, 2, 3, 4];
     let v2 = vec![5, 6, 7, 8];
     let v3 = vec![9, 0, 1, 2];
@@ -74,7 +75,7 @@ fn linsert() {
 
 #[test]
 fn llen() {
-    let mut value = Value::List(LinkedList::new());
+    let mut value = Value::List(ValueList::Data(LinkedList::new()));
     let v1 = vec![1, 2, 3, 4];
     let v2 = vec![5, 6, 7, 8];
     let v3 = vec![9, 0, 1, 2];
@@ -88,7 +89,7 @@ fn llen() {
 
 #[test]
 fn lrange() {
-    let mut value = Value::List(LinkedList::new());
+    let mut value = Value::List(ValueList::Data(LinkedList::new()));
     let v1 = vec![1, 2, 3, 4];
     let v2 = vec![5, 6, 7, 8];
     let v3 = vec![9, 0, 1, 2];
@@ -104,7 +105,7 @@ fn lrange() {
 
 #[test]
 fn lrem_left_unlimited() {
-    let mut value = Value::List(LinkedList::new());
+    let mut value = Value::List(ValueList::Data(LinkedList::new()));
     let v1 = vec![1, 2, 3, 4];
     let v2 = vec![5, 6, 7, 8];
     let v3 = vec![9, 0, 1, 2];
@@ -122,7 +123,7 @@ fn lrem_left_unlimited() {
 
 #[test]
 fn lrem_left_limited() {
-    let mut value = Value::List(LinkedList::new());
+    let mut value = Value::List(ValueList::Data(LinkedList::new()));
     let v1 = vec![1, 2, 3, 4];
     let v2 = vec![5, 6, 7, 8];
     value.push(v1.clone(), true).unwrap();
@@ -134,7 +135,7 @@ fn lrem_left_limited() {
     assert_eq!(value.lrem(true, 3, v1.clone()).unwrap(), 3);
     assert_eq!(value.llen().unwrap(), 2);
     {
-        let list = match value { Value::List(ref l) => l, _ => panic!("Expected list") };
+        let list = match value { Value::List(ref value) => match value { &ValueList::Data(ref l) => l }, _ => panic!("Expected list") };
         assert_eq!(list.front().unwrap(), &v2);
     }
     assert_eq!(value.lrem(true, 3, v1.clone()).unwrap(), 1);
@@ -143,7 +144,7 @@ fn lrem_left_limited() {
 
 #[test]
 fn lrem_right_unlimited() {
-    let mut value = Value::List(LinkedList::new());
+    let mut value = Value::List(ValueList::Data(LinkedList::new()));
     let v1 = vec![1, 2, 3, 4];
     let v2 = vec![5, 6, 7, 8];
     let v3 = vec![9, 0, 1, 2];
@@ -161,7 +162,7 @@ fn lrem_right_unlimited() {
 
 #[test]
 fn lrem_right_limited() {
-    let mut value = Value::List(LinkedList::new());
+    let mut value = Value::List(ValueList::Data(LinkedList::new()));
     let v1 = vec![1, 2, 3, 4];
     let v2 = vec![5, 6, 7, 8];
     value.push(v1.clone(), true).unwrap();
@@ -173,7 +174,7 @@ fn lrem_right_limited() {
     assert_eq!(value.lrem(false, 3, v1.clone()).unwrap(), 3);
     assert_eq!(value.llen().unwrap(), 2);
     {
-        let list = match value { Value::List(ref l) => l, _ => panic!("Expected list") };
+        let list = match value { Value::List(ref value) => match value { &ValueList::Data(ref l) => l }, _ => panic!("Expected list") };
         assert_eq!(list.front().unwrap(), &v1);
     }
     assert_eq!(value.lrem(false, 3, v1.clone()).unwrap(), 1);
@@ -182,7 +183,7 @@ fn lrem_right_limited() {
 
 #[test]
 fn lset() {
-    let mut value = Value::List(LinkedList::new());
+    let mut value = Value::List(ValueList::Data(LinkedList::new()));
     let v1 = vec![1, 2, 3, 4];
     let v2 = vec![5, 6, 7, 8];
     let v3 = vec![9, 0, 1, 2];
@@ -199,7 +200,7 @@ fn lset() {
 
 #[test]
 fn ltrim() {
-    let mut value = Value::List(LinkedList::new());
+    let mut value = Value::List(ValueList::Data(LinkedList::new()));
     let v1 = vec![1, 2, 3, 4];
     let v2 = vec![5, 6, 7, 8];
     let v3 = vec![9, 0, 1, 2];

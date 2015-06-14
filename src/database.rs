@@ -90,11 +90,31 @@ impl PartialOrd for SortedSetMember {
 #[derive(PartialEq, Debug)]
 pub enum Value {
     Nil,
+    String(ValueString),
+    List(ValueList),
+    Set(ValueSet),
+    SortedSet(ValueSortedSet),
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub enum ValueString {
     Integer(i64),
     Data(Vec<u8>),
-    List(LinkedList<Vec<u8>>),
-    Set(HashSet<Vec<u8>>),
-    SortedSet(OrderedSkipList<SortedSetMember>, HashMap<Vec<u8>, f64>),
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub enum ValueList {
+    Data(LinkedList<Vec<u8>>),
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub enum ValueSet {
+    Data(HashSet<Vec<u8>>),
+}
+
+#[derive(PartialEq, Debug)]
+pub enum ValueSortedSet {
+    Data(OrderedSkipList<SortedSetMember>, HashMap<Vec<u8>, f64>),
 }
 
 #[derive(Debug)]
@@ -159,8 +179,7 @@ impl Value {
 
     pub fn is_string(&self) -> bool {
         match self {
-            &Value::Data(_) => true,
-            &Value::Integer(_) => true,
+            &Value::String(_) => true,
             _ => false,
         }
     }
@@ -179,34 +198,56 @@ impl Value {
         }
     }
 
-    pub fn set(&mut self, value: Vec<u8>) -> Result<(), OperationError> {
-        if value.len() < 32 { // ought to be enough!
-            if let Ok(utf8) = from_utf8(&*value) {
+    pub fn set(&mut self, newvalue: Vec<u8>) -> Result<(), OperationError> {
+        if newvalue.len() < 32 { // ought to be enough!
+            if let Ok(utf8) = from_utf8(&*newvalue) {
                 if let Ok(i) = utf8.parse::<i64>() {
-                    *self = Value::Integer(i);
+                    *self = Value::String(ValueString::Integer(i));
                     return Ok(());
                 }
             }
         }
-        *self = Value::Data(value);
+        *self = Value::String(ValueString::Data(newvalue));
         return Ok(());
     }
 
-    pub fn append(&mut self, value: Vec<u8>) -> Result<usize, OperationError> {
+    pub fn get(&self) -> Result<Vec<u8>, OperationError> {
+        match self {
+            &Value::String(ref value) => match value {
+                &ValueString::Data(ref data) => Ok(data.clone()),
+                &ValueString::Integer(ref int) => Ok(format!("{}", int).into_bytes()),
+            },
+            _ => Err(OperationError::WrongTypeError),
+        }
+    }
+
+    pub fn strlen(&self) -> Result<usize, OperationError> {
+        match self {
+            &Value::String(ref val) => match val {
+                &ValueString::Data(ref data) => Ok(data.len()),
+                &ValueString::Integer(ref int) => Ok(format!("{}", int).len()),
+            },
+            _ => Err(OperationError::WrongTypeError),
+        }
+    }
+
+    pub fn append(&mut self, newvalue: Vec<u8>) -> Result<usize, OperationError> {
         match self {
             &mut Value::Nil => {
-                let len = value.len();
-                *self = Value::Data(value);
-                return Ok(len);
+                let len = newvalue.len();
+                *self = Value::String(ValueString::Data(newvalue));
+                Ok(len)
             },
-            &mut Value::Data(ref mut data) => { data.extend(value); return Ok(data.len()); },
-            &mut Value::Integer(i) => {
-                let oldstr = format!("{}", i);
-                let len = oldstr.len() + value.len();
-                *self = Value::Data([oldstr.into_bytes(), value].concat());
-                return Ok(len);
+            &mut Value::String(ref mut value) => match value {
+                &mut ValueString::Data(ref mut data) => { data.extend(newvalue); Ok(data.len()) },
+                &mut ValueString::Integer(i) => {
+                    let oldstr = format!("{}", i);
+                    let len = oldstr.len() + newvalue.len();
+                    *value = ValueString::Data([oldstr.into_bytes(), newvalue].concat());
+                    Ok(len)
+                },
             },
-            _ => return Err(OperationError::WrongTypeError),
+            _ => Err(OperationError::WrongTypeError),
         }
     }
 
@@ -216,36 +257,42 @@ impl Value {
             &mut Value::Nil => {
                 newval = incr;
             },
-            &mut Value::Integer(i) => {
-                let tmp_newval = i.checked_add(incr);
-                match tmp_newval {
-                    Some(v) => newval = v,
-                    None => return Err(OperationError::OverflowError),
-                }
-            },
-            &mut Value::Data(ref data) => {
-                if data.len() > 32 {
-                    return Err(OperationError::OverflowError);
-                }
-                let res = try!(from_utf8(&data));
-                let ival = try!(res.parse::<i64>());
-                let tmp_newval = ival.checked_add(incr);
-                match tmp_newval {
-                    Some(v) => newval = v,
-                    None => return Err(OperationError::OverflowError),
+            &mut Value::String(ref mut value) => {
+                match value {
+                    &mut ValueString::Integer(i) => {
+                        let tmp_newval = i.checked_add(incr);
+                        match tmp_newval {
+                            Some(v) => newval = v,
+                            None => return Err(OperationError::OverflowError),
+                        }
+                    },
+                    &mut ValueString::Data(ref data) => {
+                        if data.len() > 32 {
+                            return Err(OperationError::OverflowError);
+                        }
+                        let res = try!(from_utf8(&data));
+                        let ival = try!(res.parse::<i64>());
+                        let tmp_newval = ival.checked_add(incr);
+                        match tmp_newval {
+                            Some(v) => newval = v,
+                            None => return Err(OperationError::OverflowError),
+                        }
+                    },
                 }
             },
             _ => return Err(OperationError::WrongTypeError),
         }
-        *self = Value::Integer(newval);
+        *self = Value::String(ValueString::Integer(newval));
         return Ok(newval);
     }
 
     pub fn getrange(&self, _start: i64, _stop: i64) -> Result<Vec<u8>, OperationError> {
         let s = match self {
             &Value::Nil => return Ok(Vec::new()),
-            &Value::Integer(ref i) => format!("{}", i).into_bytes(),
-            &Value::Data(ref s) => s.clone(),
+            &Value::String(ref value) => match value {
+                &ValueString::Integer(ref i) => format!("{}", i).into_bytes(),
+                &ValueString::Data(ref s) => s.clone(),
+            },
             _ => return Err(OperationError::WrongTypeError),
         };
 
@@ -265,14 +312,21 @@ impl Value {
 
     pub fn setbit(&mut self, bitoffset: usize, on: bool) -> Result<bool, OperationError> {
         match self {
-            &mut Value::Nil => *self = Value::Data(Vec::new()),
-            &mut Value::Integer(i) => *self = Value::Data(format!("{}", i).into_bytes()),
-            &mut Value::Data(_) => (),
+            &mut Value::Nil => *self = Value::String(ValueString::Data(Vec::new())),
+            &mut Value::String(ref mut value) => {
+                match value {
+                    &mut ValueString::Integer(i) => *value = ValueString::Data(format!("{}", i).into_bytes()),
+                    &mut ValueString::Data(_) => (),
+                }
+            }
             _ => return Err(OperationError::WrongTypeError),
         };
         let mut d = match self {
-            &mut Value::Data(ref mut d) => d,
-            _ => panic!("Value should be data"),
+            &mut Value::String(ref mut value) => match value {
+                &mut ValueString::Data(ref mut d) => d,
+                _ => panic!("Value should be data"),
+            },
+            _ => panic!("Value should be string"),
         };
 
         let byte = bitoffset >> 3;
@@ -296,8 +350,10 @@ impl Value {
         let tmp;
         let d = match self {
             &Value::Nil => return Ok(false),
-            &Value::Integer(i) => { tmp = format!("{}", i).into_bytes(); &tmp },
-            &Value::Data(ref d) => d,
+            &Value::String(ref value) => match value {
+                &ValueString::Integer(i) => { tmp = format!("{}", i).into_bytes(); &tmp },
+                &ValueString::Data(ref d) => d,
+            },
             _ => return Err(OperationError::WrongTypeError),
         };
 
@@ -314,14 +370,19 @@ impl Value {
 
     pub fn setrange(&mut self, _index: i64, data: Vec<u8>) -> Result<usize, OperationError> {
         match self {
-            &mut Value::Nil => *self = Value::Data(Vec::new()),
-            &mut Value::Integer(i) => *self = Value::Data(format!("{}", i).into_bytes()),
-            &mut Value::Data(_) => (),
+            &mut Value::Nil => *self = Value::String(ValueString::Data(Vec::new())),
+            &mut Value::String(ref mut value) => match value {
+                &mut ValueString::Integer(i) => *value = ValueString::Data(format!("{}", i).into_bytes()),
+                &mut ValueString::Data(_) => (),
+            },
             _ => return Err(OperationError::WrongTypeError),
         };
         let mut d = match self {
-            &mut Value::Data(ref mut d) => d,
-            _ => panic!("Value should be data"),
+            &mut Value::String(ref mut value) => match value {
+                &mut ValueString::Data(ref mut s) => s,
+                _ => panic!("Value should be data"),
+            },
+            _ => panic!("Value should be string"),
         };
         let mut index = match normalize_position(_index, d.len()) {
             Ok(i) => i,
@@ -346,17 +407,19 @@ impl Value {
             &mut Value::Nil => {
                 let mut list = LinkedList::new();
                 list.push_back(el);
-                *self = Value::List(list);
+                *self = Value::List(ValueList::Data(list));
                 listsize = 1;
             },
-            &mut Value::List(ref mut list) => {
-                if right {
-                    list.push_back(el);
-                } else {
-                    list.push_front(el);
-                }
-                listsize = list.len();
-            }
+            &mut Value::List(ref mut value) => match value {
+                &mut ValueList::Data(ref mut list) => {
+                    if right {
+                        list.push_back(el);
+                    } else {
+                        list.push_front(el);
+                    }
+                    listsize = list.len();
+                },
+            },
             _ => return Err(OperationError::WrongTypeError),
         }
         return Ok(listsize);
@@ -369,14 +432,16 @@ impl Value {
             &mut Value::Nil => {
                 return Ok(None);
             },
-            &mut Value::List(ref mut list) => {
-                if right {
-                    el = list.pop_back();
-                } else {
-                    el = list.pop_front();
-                }
-                clear = list.len() == 0;
-            }
+            &mut Value::List(ref mut value) => match value {
+                &mut ValueList::Data(ref mut list) => {
+                    if right {
+                        el = list.pop_back();
+                    } else {
+                        el = list.pop_front();
+                    }
+                    clear = list.len() == 0;
+                },
+            },
             _ => return Err(OperationError::WrongTypeError),
         }
         if clear {
@@ -386,36 +451,40 @@ impl Value {
     }
 
     pub fn lindex(&self, _index: i64) -> Result<Option<&Vec<u8>>, OperationError> {
-        return match self {
-            &Value::List(ref list) => {
-                let index = match normalize_position(_index, list.len()) {
-                    Ok(i) => i,
-                    Err(_) => return Ok(None),
-                };
-                return Ok(list.iter().nth(index as usize));
+        match self {
+            &Value::List(ref value) => match value {
+                &ValueList::Data(ref list) => {
+                    let index = match normalize_position(_index, list.len()) {
+                        Ok(i) => i,
+                        Err(_) => return Ok(None),
+                    };
+                    Ok(list.iter().nth(index as usize))
+                },
             },
             _ => Err(OperationError::WrongTypeError),
         }
     }
 
-    pub fn linsert(&mut self, before: bool, pivot: Vec<u8>, value: Vec<u8>) -> Result<Option<usize>, OperationError> {
+    pub fn linsert(&mut self, before: bool, pivot: Vec<u8>, newvalue: Vec<u8>) -> Result<Option<usize>, OperationError> {
         match self {
-            &mut Value::List(ref mut list) => {
-                let pos;
-                match list.iter().position(|x| x == &pivot) {
-                    Some(_pos) => {
-                        if before {
-                            pos = _pos;
-                        } else {
-                            pos = _pos + 1;
-                        }
-                    },
-                    None => return Ok(None),
-                }
-                let mut right = list.split_off(pos);
-                list.push_back(value);
-                list.append(&mut right);
-                return Ok(Some(list.len()));
+            &mut Value::List(ref mut value) => match value {
+                &mut ValueList::Data(ref mut list) => {
+                    let pos;
+                    match list.iter().position(|x| x == &pivot) {
+                        Some(_pos) => {
+                            if before {
+                                pos = _pos;
+                            } else {
+                                pos = _pos + 1;
+                            }
+                        },
+                        None => return Ok(None),
+                    }
+                    let mut right = list.split_off(pos);
+                    list.push_back(newvalue);
+                    list.append(&mut right);
+                    return Ok(Some(list.len()));
+                },
             },
             _ => return Err(OperationError::WrongTypeError),
         };
@@ -423,92 +492,100 @@ impl Value {
 
     pub fn llen(&self) -> Result<usize, OperationError> {
         return match self {
-            &Value::List(ref list) => Ok(list.len()),
             &Value::Nil => Ok(0),
+            &Value::List(ref value) => match value {
+                &ValueList::Data(ref list) => Ok(list.len()),
+            },
             _ => Err(OperationError::WrongTypeError),
         };
     }
 
     pub fn lrange(&self, _start: i64, _stop: i64) -> Result<Vec<&Vec<u8>>, OperationError> {
         match self {
-            &Value::List(ref list) => {
-                let len = list.len();
-                let start = match normalize_position(_start, len) {
-                    Ok(i) => i,
-                    Err(i) => if i == 0 { 0 } else { return Ok(Vec::new()); },
-                };
-                let stop = match normalize_position(_stop, len) {
-                    Ok(i) => i,
-                    Err(i) => if i == 0 { return Ok(Vec::new()); } else { i },
-                };
-                return Ok(list.iter().skip(start as usize).take(stop as usize - start as usize + 1).collect());
+            &Value::List(ref value) => match value {
+                &ValueList::Data(ref list) => {
+                    let len = list.len();
+                    let start = match normalize_position(_start, len) {
+                        Ok(i) => i,
+                        Err(i) => if i == 0 { 0 } else { return Ok(Vec::new()); },
+                    };
+                    let stop = match normalize_position(_stop, len) {
+                        Ok(i) => i,
+                        Err(i) => if i == 0 { return Ok(Vec::new()); } else { i },
+                    };
+                    Ok(list.iter().skip(start as usize).take(stop as usize - start as usize + 1).collect::<Vec<_>>())
+                },
             },
-            _ => return Err(OperationError::WrongTypeError),
-        };
+            _ => Err(OperationError::WrongTypeError),
+        }
     }
 
-    pub fn lrem(&mut self, left: bool, limit: usize, value: Vec<u8>) -> Result<usize, OperationError> {
+    pub fn lrem(&mut self, left: bool, limit: usize, newvalue: Vec<u8>) -> Result<usize, OperationError> {
         let mut count = 0;
         let mut newlist = LinkedList::new();
         match self {
-            &mut Value::List(ref mut list) => {
-                if left {
-                    while limit == 0 || count < limit {
-                        match list.pop_front() {
-                            None => break,
-                            Some(el) => {
-                                if el != value {
-                                    newlist.push_back(el);
-                                } else {
-                                    count += 1;
+            &mut Value::List(ref mut value) => match value {
+                &mut ValueList::Data(ref mut list) => {
+                    if left {
+                        while limit == 0 || count < limit {
+                            match list.pop_front() {
+                                None => break,
+                                Some(el) => {
+                                    if el != newvalue {
+                                        newlist.push_back(el);
+                                    } else {
+                                        count += 1;
+                                    }
                                 }
                             }
                         }
-                    }
-                    newlist.append(list);
-                } else {
-                    while limit == 0 || count < limit {
-                        match list.pop_back() {
-                            None => break,
-                            Some(el) => {
-                                if el != value {
-                                    newlist.push_front(el);
-                                } else {
-                                    count += 1;
+                        newlist.append(list);
+                    } else {
+                        while limit == 0 || count < limit {
+                            match list.pop_back() {
+                                None => break,
+                                Some(el) => {
+                                    if el != newvalue {
+                                        newlist.push_front(el);
+                                    } else {
+                                        count += 1;
+                                    }
                                 }
                             }
                         }
+                        // omg, ugly code, let me explain
+                        // append will merge right two lists and clear the parameter
+                        // newlist is the one that will survive after lrem
+                        // but list needs to be at the beginning, so we are merging
+                        // first to list and then to newlist
+                        list.append(&mut newlist);
+                        newlist.append(list);
                     }
-                    // omg, ugly code, let me explain
-                    // append will merge right two lists and clear the parameter
-                    // newlist is the one that will survive after lrem
-                    // but list needs to be at the beginning, so we are merging
-                    // first to list and then to newlist
-                    list.append(&mut newlist);
-                    newlist.append(list);
-                }
+                },
             },
             _ => return Err(OperationError::WrongTypeError),
         };
         if newlist.len() == 0 {
             *self = Value::Nil;
         } else {
-            *self = Value::List(newlist);
+            *self = Value::List(ValueList::Data(newlist));
         }
         return Ok(count);
     }
 
-    pub fn lset(&mut self, index: i64, value: Vec<u8>) -> Result<(), OperationError> {
+    pub fn lset(&mut self, index: i64, newvalue: Vec<u8>) -> Result<(), OperationError> {
         return match self {
-            &mut Value::List(ref mut list) => {
-                let i = match normalize_position(index, list.len()) {
-                    Ok(i) => i,
-                    Err(_) => return Err(OperationError::OutOfBoundsError),
-                };
-                // this unwrap is safe because `i` is already validated to be inside the list
-                let el = list.iter_mut().skip(i).next().unwrap();
-                *el = value;
-                return Ok(());
+            &mut Value::List(ref mut value) => match value {
+                &mut ValueList::Data(ref mut list) => {
+                    let i = match normalize_position(index, list.len()) {
+                        Ok(i) => i,
+                        Err(_) => return Err(OperationError::OutOfBoundsError),
+                    };
+                    // this unwrap is safe because `i` is already validated to be inside the list
+                    let el = list.iter_mut().skip(i).next().unwrap();
+                    *el = newvalue;
+                    Ok(())
+                }
             },
             _ => return Err(OperationError::WrongTypeError),
         }
@@ -517,28 +594,30 @@ impl Value {
     pub fn ltrim(&mut self, _start: i64, _stop: i64) -> Result<(), OperationError> {
         let mut newlist;
         match self {
-            &mut Value::List(ref mut list) => {
-                let len = list.len();
-                let start = match normalize_position(_start, len) {
-                    Ok(i) => i,
-                    Err(i) => if i == 0 { 0 } else {
-                        list.split_off(len);
-                        len
-                    },
-                };
-                let stop = match normalize_position(_stop, len) {
-                    Ok(i) => i,
-                    Err(i) => if i == 0 {
-                        list.split_off(len);
-                        0
-                    } else { i },
-                };
-                list.split_off(stop + 1);
-                newlist = list.split_off(start);
+            &mut Value::List(ref mut value) => match value {
+                &mut ValueList::Data(ref mut list) => {
+                    let len = list.len();
+                    let start = match normalize_position(_start, len) {
+                        Ok(i) => i,
+                        Err(i) => if i == 0 { 0 } else {
+                            list.split_off(len);
+                            len
+                        },
+                    };
+                    let stop = match normalize_position(_stop, len) {
+                        Ok(i) => i,
+                        Err(i) => if i == 0 {
+                            list.split_off(len);
+                            0
+                        } else { i },
+                    };
+                    list.split_off(stop + 1);
+                    newlist = list.split_off(start);
+                }
             },
             _ => return Err(OperationError::WrongTypeError),
         }
-        *self = Value::List(newlist);
+        *self = Value::List(ValueList::Data(newlist));
         return Ok(());
     }
 
@@ -547,10 +626,12 @@ impl Value {
             &mut Value::Nil => {
                 let mut set = HashSet::new();
                 set.insert(el);
-                *self = Value::Set(set);
+                *self = Value::Set(ValueSet::Data(set));
                 Ok(true)
             },
-            &mut Value::Set(ref mut set) => Ok(set.insert(el)),
+            &mut Value::Set(ref mut value) => match value {
+                &mut ValueSet::Data(ref mut set) => Ok(set.insert(el)),
+            },
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -558,7 +639,9 @@ impl Value {
     pub fn srem(&mut self, el: &Vec<u8>) -> Result<bool, OperationError> {
         match self {
             &mut Value::Nil => Ok(false),
-            &mut Value::Set(ref mut set) => Ok(set.remove(el)),
+            &mut Value::Set(ref mut value) => match value {
+                &mut ValueSet::Data(ref mut set) => Ok(set.remove(el)),
+            },
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -566,7 +649,9 @@ impl Value {
     pub fn sismember(&self, el: &Vec<u8>) -> Result<bool, OperationError> {
         match self {
             &Value::Nil => Ok(false),
-            &Value::Set(ref set) => Ok(set.contains(el)),
+            &Value::Set(ref value) => match value {
+                &ValueSet::Data(ref set) => Ok(set.contains(el)),
+            },
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -574,7 +659,9 @@ impl Value {
     pub fn scard(&self) -> Result<usize, OperationError> {
         match self {
             &Value::Nil => Ok(0),
-            &Value::Set(ref set) => Ok(set.len()),
+            &Value::Set(ref value) => match value {
+                &ValueSet::Data(ref set) => Ok(set.len()),
+            },
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -583,7 +670,9 @@ impl Value {
         // TODO: implemented in O(n), should be O(1)
         let set = match self {
             &Value::Nil => return Ok(Vec::new()),
-            &Value::Set(ref s) => s,
+            &Value::Set(ref value) => match value {
+                &ValueSet::Data(ref s) => s,
+            },
             _ => return Err(OperationError::WrongTypeError),
         };
 
@@ -615,7 +704,9 @@ impl Value {
             let r = {
                 let set = match self {
                     &mut Value::Nil => return Ok(Vec::new()),
-                    &mut Value::Set(ref mut s) => s,
+                    &mut Value::Set(ref mut value) => match value {
+                        &mut ValueSet::Data(ref s) => s,
+                    },
                     _ => return Err(OperationError::WrongTypeError),
                 };
                 set.iter().map(|x| x.clone()).collect::<Vec<_>>()
@@ -628,7 +719,9 @@ impl Value {
 
         let mut set = match self {
             &mut Value::Nil => return Ok(Vec::new()),
-            &mut Value::Set(ref mut s) => s,
+            &mut Value::Set(ref mut value) => match value {
+                &mut ValueSet::Data(ref mut s) => s,
+            },
             _ => return Err(OperationError::WrongTypeError),
         };
 
@@ -642,33 +735,39 @@ impl Value {
     pub fn sdiff(&self, sets: &Vec<&Value>) -> Result<HashSet<Vec<u8>>, OperationError> {
         match self {
             &Value::Nil => Ok(HashSet::new()),
-            &Value::Set(ref original_set) => {
-                let mut elements: HashSet<Vec<u8>> = original_set.clone();
-                for value in sets {
-                    match value {
-                        &&Value::Nil => {},
-                        &&Value::Set(ref set) => {
-                            for el in set {
-                                elements.remove(el);
-                            }
-                        },
-                        _ => return Err(OperationError::WrongTypeError),
+            &Value::Set(ref value) => match value {
+                &ValueSet::Data(ref original_set) => {
+                    let mut elements: HashSet<Vec<u8>> = original_set.clone();
+                    for newvalue in sets {
+                        match newvalue {
+                            &&Value::Nil => {},
+                            &&Value::Set(ref value) => match value {
+                                &ValueSet::Data(ref set) => {
+                                    for el in set {
+                                        elements.remove(el);
+                                    }
+                                },
+                            },
+                            _ => return Err(OperationError::WrongTypeError),
+                        }
                     }
-                }
-                Ok(elements)
+                    Ok(elements)
+                },
             },
             _ => Err(OperationError::WrongTypeError),
         }
     }
 
     pub fn create_set(&mut self, set: HashSet<Vec<u8>>) {
-        *self = Value::Set(set);
+        *self = Value::Set(ValueSet::Data(set));
     }
 
     pub fn zrem(&mut self, member: Vec<u8>) -> Result<bool, OperationError> {
         let (skiplist, hmap) = match self {
             &mut Value::Nil => return Ok(false),
-            &mut Value::SortedSet(ref mut skiplist, ref mut hmap) => (skiplist, hmap),
+            &mut Value::SortedSet(ref mut value) => match value {
+                &mut ValueSortedSet::Data(ref mut skiplist, ref mut hmap) => (skiplist, hmap),
+            },
             _ => return Err(OperationError::WrongTypeError),
         };
         let score = match hmap.remove(&member) {
@@ -689,31 +788,33 @@ impl Value {
                 let mut hmap = HashMap::new();
                 skiplist.insert(SortedSetMember::new(s.clone(), el.clone()));
                 hmap.insert(el, s);
-                *self = Value::SortedSet(skiplist, hmap);
+                *self = Value::SortedSet(ValueSortedSet::Data(skiplist, hmap));
                 Ok(true)
             },
-            &mut Value::SortedSet(ref mut skiplist, ref mut hmap) => {
-                let contains = hmap.contains_key(&el);
-                if contains && nx {
-                    return Ok(false);
-                }
-                if !contains && xx {
-                    return Ok(false);
-                }
-                if contains {
-                    let val = hmap.get(&el).unwrap();
-                    if ch && val == &s {
+            &mut Value::SortedSet(ref mut value) => match value {
+                &mut ValueSortedSet::Data(ref mut skiplist, ref mut hmap) => {
+                    let contains = hmap.contains_key(&el);
+                    if contains && nx {
                         return Ok(false);
                     }
-                    skiplist.remove(&SortedSetMember::new(val.clone(), el.clone()));
-                }
-                skiplist.insert(SortedSetMember::new(s.clone(), el.clone()));
-                hmap.insert(el, s);
-                if ch {
-                    Ok(true)
-                } else {
-                    Ok(!contains)
-                }
+                    if !contains && xx {
+                        return Ok(false);
+                    }
+                    if contains {
+                        let val = hmap.get(&el).unwrap();
+                        if ch && val == &s {
+                            return Ok(false);
+                        }
+                        skiplist.remove(&SortedSetMember::new(val.clone(), el.clone()));
+                    }
+                    skiplist.insert(SortedSetMember::new(s.clone(), el.clone()));
+                    hmap.insert(el, s);
+                    if ch {
+                        Ok(true)
+                    } else {
+                        Ok(!contains)
+                    }
+                },
             },
             _ => Err(OperationError::WrongTypeError),
         }
@@ -727,18 +828,20 @@ impl Value {
                     Err(err) => Err(err),
                 }
             },
-            &mut Value::SortedSet(ref mut skiplist, ref mut hmap) => {
-                let mut val = match hmap.get(&member) {
-                    Some(val) => {
-                        skiplist.remove(&SortedSetMember::new(val.clone(), member.clone()));
-                        val.clone()
-                    },
-                    None => 0.0,
-                };
-                val += increment;
-                skiplist.insert(SortedSetMember::new(val.clone(), member.clone()));
-                hmap.insert(member, val.clone());
-                Ok(val)
+            &mut Value::SortedSet(ref mut value) => match value {
+                &mut ValueSortedSet::Data(ref mut skiplist, ref mut hmap) => {
+                    let mut val = match hmap.get(&member) {
+                        Some(val) => {
+                            skiplist.remove(&SortedSetMember::new(val.clone(), member.clone()));
+                            val.clone()
+                        },
+                        None => 0.0,
+                    };
+                    val += increment;
+                    skiplist.insert(SortedSetMember::new(val.clone(), member.clone()));
+                    hmap.insert(member, val.clone());
+                    Ok(val)
+                },
             },
             _ => Err(OperationError::WrongTypeError),
         }
@@ -747,7 +850,9 @@ impl Value {
     pub fn zcount(&self, min: Bound<f64>, max: Bound<f64>) -> Result<usize, OperationError> {
         let skiplist = match self {
             &Value::Nil => return Ok(0),
-            &Value::SortedSet(ref skiplist, _) => skiplist,
+            &Value::SortedSet(ref value) => match value {
+                &ValueSortedSet::Data(ref skiplist, _) => skiplist,
+            },
             _ => return Err(OperationError::WrongTypeError),
         };
         let mut f1 = SortedSetMember::new(0.0, vec![]);
@@ -770,7 +875,9 @@ impl Value {
     pub fn zrange(&self, _start: i64, _stop: i64, withscores: bool) -> Result<Vec<Vec<u8>>, OperationError> {
         let skiplist = match self {
             &Value::Nil => return Ok(vec![]),
-            &Value::SortedSet(ref skiplist, _) => skiplist,
+            &Value::SortedSet(ref value) => match value {
+                &ValueSortedSet::Data(ref skiplist, _) => skiplist,
+            },
             _ => return Err(OperationError::WrongTypeError),
         };
 
@@ -800,7 +907,9 @@ impl Value {
     pub fn zrank(&self, el: Vec<u8>) -> Result<Option<usize>, OperationError> {
         let (skiplist, hashmap) = match self {
             &Value::Nil => return Ok(None),
-            &Value::SortedSet(ref skiplist, ref hashmap) => (skiplist, hashmap),
+            &Value::SortedSet(ref value) => match value {
+                &ValueSortedSet::Data(ref skiplist, ref hashmap) => (skiplist, hashmap),
+            },
             _ => return Err(OperationError::WrongTypeError),
         };
 
