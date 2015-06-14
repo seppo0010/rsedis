@@ -122,3 +122,19 @@ fn zrange() {
             ]);
     assert_eq!(value.zrange(2, 0, true).unwrap().len(), 0);
 }
+
+#[test]
+fn zrank() {
+    let mut value = Value::Nil;
+    let s1 = 0.0;
+    let v1 = vec![1, 2, 3, 4];
+    let s2 = 0.0;
+    let v2 = vec![5, 6, 7, 8];
+    let v3 = vec![9, 10, 11, 12];
+
+    assert_eq!(value.zadd(s1, v1.clone(), false, false, false).unwrap(), true);
+    assert_eq!(value.zadd(s2, v2.clone(), false, false, false).unwrap(), true);
+    assert_eq!(value.zrank(v1.clone()).unwrap(), Some(0));
+    assert_eq!(value.zrank(v2.clone()).unwrap(), Some(1));
+    assert_eq!(value.zrank(v3.clone()).unwrap(), None);
+}

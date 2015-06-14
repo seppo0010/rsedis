@@ -707,6 +707,22 @@ impl Value {
         }
         Ok(r)
     }
+
+    pub fn zrank(&self, el: Vec<u8>) -> Result<Option<usize>, OperationError> {
+        let (skiplist, hashmap) = match self {
+            &Value::Nil => return Ok(None),
+            &Value::SortedSet(ref skiplist, ref hashmap) => (skiplist, hashmap),
+            _ => return Err(OperationError::WrongTypeError),
+        };
+
+        let score = match hashmap.get(&el) {
+            Some(s) => s,
+            None => return Ok(None),
+        };
+
+        let member = SortedSetMember::new(score.clone(), el);
+        return Ok(Some(skiplist.range(Bound::Unbounded, Bound::Included(&member)).collect::<Vec<_>>().len() - 1));
+    }
 }
 
 pub struct Database {
