@@ -666,6 +666,17 @@ impl Value {
         }
     }
 
+    pub fn smembers(&self) -> Result<Vec<Vec<u8>>, OperationError> {
+        match self {
+            &Value::Nil => Ok(vec![]),
+            &Value::Set(ref value) => match value {
+                &ValueSet::Data(ref set) => Ok(set.iter().map(|x| x.clone()).collect::<Vec<_>>()),
+            },
+            _ => Err(OperationError::WrongTypeError),
+        }
+    }
+
+
     pub fn srandmember(&self, count: usize, allow_duplicates: bool) -> Result<Vec<Vec<u8>>, OperationError> {
         // TODO: implemented in O(n), should be O(1)
         let set = match self {

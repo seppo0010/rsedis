@@ -148,6 +148,22 @@ fn spop_some() {
 }
 
 #[test]
+fn smembers() {
+    let mut value = Value::Nil;
+    let v1 = vec![1, 2, 3, 4];
+    let v2 = vec![5, 6, 7, 8];
+    let v3 = vec![9, 10, 11, 12];
+
+    assert_eq!(value.sadd(v1.clone()).unwrap(), true);
+    assert_eq!(value.sadd(v2.clone()).unwrap(), true);
+    assert_eq!(value.sadd(v3.clone()).unwrap(), true);
+
+    let mut v = value.smembers().unwrap();
+    v.sort_by(|a, b| a.cmp(b));
+    assert_eq!(v, [v1, v2, v3]);
+}
+
+#[test]
 fn sdiff() {
     let mut value1 = Value::Nil;
     let mut value2 = Value::Nil;
