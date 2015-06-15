@@ -821,6 +821,23 @@ fn sismember_command() {
 }
 
 #[test]
+fn smembers_command() {
+    let mut db = Database::mock();
+    assert_eq!(command(&parser!(b"sadd key 1 2 3"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(3));
+    match command(&parser!(b"smembers key"), &mut db, &mut 0, None, None, None).unwrap() {
+        Response::Array(ref arr) => {
+            let mut array = arr.iter().map(|x| match x {
+                &Response::Data(ref d) => d.clone(),
+                _ => panic!("Expected data"),
+            }).collect::<Vec<_>>();
+            array.sort_by(|a, b| a.cmp(b));
+            assert_eq!(array, vec![b"1".to_vec(), b"2".to_vec(), b"3".to_vec()]);
+        },
+        _ => panic!("Expected array"),
+    }
+}
+
+#[test]
 fn srandmember_command1() {
     let mut db = Database::mock();
     assert_eq!(command(&parser!(b"sadd key 1 2 3"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(3));

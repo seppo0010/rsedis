@@ -46,7 +46,7 @@
     - [ ] sunionstore
     - [x] sdiff
     - [x] sdiffstore
-    - [ ] smembers
+    - [x] smembers
     - [ ] sscan
     - [ ] zadd
     - [x] zincrby

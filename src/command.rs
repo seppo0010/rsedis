@@ -823,6 +823,19 @@ fn srandmember(parser: &Parser, db: &Database, dbindex: usize) -> Response {
     }
 }
 
+fn smembers(parser: &Parser, db: &Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() == 2, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let value = match db.get(dbindex, &key) {
+        Some(el) => el,
+        None => return Response::Array(vec![]),
+    };
+    match value.smembers() {
+        Ok(els) => Response::Array(els.iter().map(|x| Response::Data(x.clone())).collect::<Vec<_>>()),
+        Err(err) => Response::Error(err.to_string()),
+    }
+}
+
 fn spop(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 2 || parser.argv.len() == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
@@ -1255,6 +1268,7 @@ pub fn command(
         "sadd" => sadd(parser, db, dbindex),
         "srem" => srem(parser, db, dbindex),
         "sismember" => sismember(parser, db, dbindex),
+        "smembers" => smembers(parser, db, dbindex),
         "srandmember" => srandmember(parser, db, dbindex),
         "spop" => spop(parser, db, dbindex),
         "smove" => smove(parser, db, dbindex),
