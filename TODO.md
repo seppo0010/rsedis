@@ -48,7 +48,7 @@
     - [x] sdiffstore
     - [x] smembers
     - [ ] sscan
-    - [ ] zadd
+    - [x] zadd
     - [x] zincrby
     - [x] zrem
     - [ ] zremrangebyscore

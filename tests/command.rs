@@ -291,7 +291,7 @@ fn type_command() {
     assert_eq!(command(&parser!(b"type key"), &mut db, &mut 0, None, None, None).unwrap(), Response::Data(b"set".to_vec()));
 
     assert!(db.remove(0, &b"key".to_vec()).is_some());
-    assert!(db.get_or_create(0, &b"key".to_vec()).zadd(3.0, b"1".to_vec(), false, false, false).is_ok());
+    assert!(db.get_or_create(0, &b"key".to_vec()).zadd(3.0, b"1".to_vec(), false, false, false, false).is_ok());
     assert_eq!(command(&parser!(b"type key"), &mut db, &mut 0, None, None, None).unwrap(), Response::Data(b"zset".to_vec()));
 
     // TODO: hash

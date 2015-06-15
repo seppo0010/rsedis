@@ -834,7 +834,7 @@ impl Value {
         Ok(true)
     }
 
-    pub fn zadd(&mut self, s: f64, el: Vec<u8>, nx: bool, xx: bool, ch: bool) -> Result<bool, OperationError> {
+    pub fn zadd(&mut self, s: f64, el: Vec<u8>, nx: bool, xx: bool, ch: bool, incr: bool) -> Result<bool, OperationError> {
         match self {
             &mut Value::Nil => {
                 if xx {
@@ -849,6 +849,7 @@ impl Value {
             },
             &mut Value::SortedSet(ref mut value) => match value {
                 &mut ValueSortedSet::Data(ref mut skiplist, ref mut hmap) => {
+                    let mut score = s.clone();
                     let contains = hmap.contains_key(&el);
                     if contains && nx {
                         return Ok(false);
@@ -858,13 +859,16 @@ impl Value {
                     }
                     if contains {
                         let val = hmap.get(&el).unwrap();
-                        if ch && val == &s {
+                        if ch && !incr && val == &s {
                             return Ok(false);
                         }
                         skiplist.remove(&SortedSetMember::new(val.clone(), el.clone()));
+                        if incr {
+                            score += val.clone();
+                        }
                     }
-                    skiplist.insert(SortedSetMember::new(s.clone(), el.clone()));
-                    hmap.insert(el, s);
+                    skiplist.insert(SortedSetMember::new(score.clone(), el.clone()));
+                    hmap.insert(el, score);
                     if ch {
                         Ok(true)
                     } else {
@@ -879,7 +883,7 @@ impl Value {
     pub fn zincrby(&mut self, increment: f64, member: Vec<u8>) -> Result<f64, OperationError> {
         match self {
             &mut Value::Nil => {
-                match self.zadd(increment.clone(), member, false, false, false) {
+                match self.zadd(increment.clone(), member, false, false, false, false) {
                     Ok(_) => Ok(increment),
                     Err(err) => Err(err),
                 }

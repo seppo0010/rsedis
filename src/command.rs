@@ -1015,6 +1015,7 @@ fn zadd(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     let mut nx = false;
     let mut xx = false;
     let mut ch = false;
+    let mut incr = false;
     let mut i = 2;
 
     // up to 4 optional flags
@@ -1028,7 +1029,7 @@ fn zadd(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
             "nx" => nx = true,
             "xx" => xx = true,
             "ch" => ch = true,
-            "incr" => return Response::Error("TODO".to_owned()),
+            "incr" => incr = true,
             _ => {i -= 1; break},
         }
     }
@@ -1040,7 +1041,7 @@ fn zadd(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
         for _ in 0..((len - i) / 2) {
             let score = try_validate!(parser.get_f64(i), "Invalid score");
             let val = try_validate!(parser.get_vec(i + 1), "Invalid value");
-            match el.zadd(score, val, nx, xx, ch) {
+            match el.zadd(score, val, nx, xx, ch, incr) {
                 Ok(added) => if added { count += 1 },
                 Err(err) => return Response::Error(err.to_string()),
             }
