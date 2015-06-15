@@ -42,8 +42,8 @@
     - [x] srandmember
     - [x] sinter
     - [x] sinterstore
-    - [ ] sunion
-    - [ ] sunionstore
+    - [x] sunion
+    - [x] sunionstore
     - [x] sdiff
     - [x] sdiffstore
     - [x] smembers

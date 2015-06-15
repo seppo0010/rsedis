@@ -982,6 +982,33 @@ fn sinterstore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     Response::Integer(r)
 }
 
+fn sunion(parser: &Parser, db: &Database, dbindex: usize) -> Response {
+    let (el, sets) = get_values!(1, parser, db, dbindex);
+    return match el.sunion(&sets) {
+        Ok(set) => {
+            Response::Array(set.iter().map(|x| Response::Data(x.clone())).collect::<Vec<_>>())
+        },
+        Err(err) => Response::Error(err.to_string()),
+    }
+}
+
+fn sunionstore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() >= 3, "Wrong number of parameters");
+    let destination_key = try_validate!(parser.get_vec(1), "Invalid destination");
+    let set = {
+        let (el, sets) = get_values!(2, parser, db, dbindex);
+        match el.sunion(&sets) {
+            Ok(set) => set,
+            Err(err) => return Response::Error(err.to_string()),
+        }
+    };
+
+    db.remove(dbindex, &destination_key);
+    let r = set.len() as i64;
+    db.get_or_create(dbindex, &destination_key).create_set(set);
+    Response::Integer(r)
+}
+
 fn zadd(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     let len = parser.argv.len();
     validate!(len >= 4, "Wrong number of parameters");
@@ -1300,6 +1327,8 @@ pub fn command(
         "sdiffstore" => sdiffstore(parser, db, dbindex),
         "sinter" => sinter(parser, db, dbindex),
         "sinterstore" => sinterstore(parser, db, dbindex),
+        "sunion" => sunion(parser, db, dbindex),
+        "sunionstore" => sunionstore(parser, db, dbindex),
         "zadd" => zadd(parser, db, dbindex),
         "zincrby" => zincrby(parser, db, dbindex),
         "zrem" => zrem(parser, db, dbindex),

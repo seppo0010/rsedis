@@ -794,6 +794,52 @@ fn sinterstore_command() {
 }
 
 #[test]
+fn sunion_command() {
+    let mut db = Database::mock();
+    command(&parser!(b"sadd key 1 2 3"), &mut db, &mut 0, None, None, None).unwrap();
+
+    let arr = match command(&parser!(b"sunion key"), &mut db, &mut 0, None, None, None).unwrap() {
+        Response::Array(arr) => arr,
+        _ => panic!("Expected array"),
+    };
+    let mut r = arr.iter().map(|el| match el {
+        &Response::Data(ref el) => el.clone(),
+        _ => panic!("Expected data"),
+    }).collect::<Vec<_>>();
+    r.sort();
+    assert_eq!(r, vec![b"1".to_vec(), b"2".to_vec(), b"3".to_vec()]);
+}
+
+#[test]
+fn sunion2_command() {
+    let mut db = Database::mock();
+    command(&parser!(b"sadd key1 1 2 3"), &mut db, &mut 0, None, None, None).unwrap();
+    command(&parser!(b"sadd key2 2 3 4"), &mut db, &mut 0, None, None, None).unwrap();
+
+    let arr = match command(&parser!(b"sunion key1 key2"), &mut db, &mut 0, None, None, None).unwrap() {
+        Response::Array(arr) => arr,
+        _ => panic!("Expected array"),
+    };
+    let mut r = arr.iter().map(|el| match el {
+        &Response::Data(ref el) => el.clone(),
+        _ => panic!("Expected data"),
+    }).collect::<Vec<_>>();
+    r.sort();
+    assert_eq!(r, vec![b"1".to_vec(), b"2".to_vec(), b"3".to_vec(), b"4".to_vec()]);
+}
+
+#[test]
+fn sunionstore_command() {
+    let mut db = Database::mock();
+    command(&parser!(b"sadd key1 1 2 3"), &mut db, &mut 0, None, None, None).unwrap();
+    command(&parser!(b"sadd key2 2 3 4"), &mut db, &mut 0, None, None, None).unwrap();
+    assert_eq!(command(&parser!(b"sunionstore target key1 key2"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(4));
+
+    let set = vec![b"1".to_vec(), b"2".to_vec(), b"3".to_vec(), b"4".to_vec()].iter().cloned().collect::<HashSet<_>>();
+    assert_eq!(db.get(0, &b"target".to_vec()).unwrap(), &Value::Set(ValueSet::Data(set)));
+}
+
+#[test]
 fn zadd_command() {
     let mut db = Database::mock();
     assert_eq!(command(&parser!(b"zadd key 1 a 2 b"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(2));
