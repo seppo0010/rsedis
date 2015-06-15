@@ -205,3 +205,28 @@ fn sinter() {
 
     assert_eq!(value1.sinter(&vec![&value2, &Value::Nil]).unwrap().len(), 0);
 }
+
+#[test]
+fn sunion() {
+    let mut value1 = Value::Nil;
+    let mut value2 = Value::Nil;
+    let v1 = vec![1, 2, 3, 4];
+    let v2 = vec![5, 6, 7, 8];
+    let v3 = vec![0, 9, 1, 2];
+
+    assert_eq!(value1.sadd(v1.clone()).unwrap(), true);
+    assert_eq!(value1.sadd(v2.clone()).unwrap(), true);
+
+    assert_eq!(value2.sadd(v1.clone()).unwrap(), true);
+    assert_eq!(value2.sadd(v3.clone()).unwrap(), true);
+
+    assert_eq!(value1.sunion(&vec![&value2]).unwrap(),
+            vec![&v1, &v2, &v3].iter().cloned().cloned().collect::<HashSet<_>>());
+
+    let empty:Vec<&Value> = Vec::new();
+    assert_eq!(value1.sunion(&empty).unwrap(),
+            vec![&v1, &v2].iter().cloned().cloned().collect::<HashSet<_>>());
+
+    assert_eq!(value1.sunion(&vec![&value2, &Value::Nil]).unwrap(),
+            vec![&v1, &v2, &v3].iter().cloned().cloned().collect::<HashSet<_>>());
+}

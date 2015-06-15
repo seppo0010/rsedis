@@ -799,6 +799,21 @@ impl Value {
         Ok(result)
     }
 
+    pub fn sunion(&self, sets: &Vec<&Value>) -> Result<HashSet<Vec<u8>>, OperationError> {
+        let mut result = match try!(self.get_set(self)) {
+            Some(s) => s.clone(),
+            None => HashSet::new(),
+        };
+
+        for s in sets.iter() {
+            result = match try!(self.get_set(s)) {
+                Some(set) => result.union(set).cloned().collect(),
+                None => result,
+            };
+        }
+        Ok(result)
+    }
+
     pub fn create_set(&mut self, set: HashSet<Vec<u8>>) {
         *self = Value::Set(ValueSet::Data(set));
     }
