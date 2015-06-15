@@ -918,61 +918,75 @@ fn scard_command() {
 #[test]
 fn sdiff_command() {
     let mut db = Database::mock();
-    {
-        let parser = parser!(b"sadd key 1 2 3");
-        command(&parser, &mut db, &mut 0, None, None, None).unwrap();
-    }
-    {
-        let parser = parser!(b"sdiff key");
-        let arr = match command(&parser, &mut db, &mut 0, None, None, None).unwrap() {
-            Response::Array(arr) => arr,
-            _ => panic!("Expected array"),
-        };
-        let mut r = arr.iter().map(|el| match el {
-            &Response::Data(ref el) => el.clone(),
-            _ => panic!("Expected data"),
-        }).collect::<Vec<_>>();
-        r.sort();
-        assert_eq!(r, vec![b"1".to_vec(), b"2".to_vec(), b"3".to_vec()]);
-    }
+    command(&parser!(b"sadd key 1 2 3"), &mut db, &mut 0, None, None, None).unwrap();
+
+    let arr = match command(&parser!(b"sdiff key"), &mut db, &mut 0, None, None, None).unwrap() {
+        Response::Array(arr) => arr,
+        _ => panic!("Expected array"),
+    };
+    let mut r = arr.iter().map(|el| match el {
+        &Response::Data(ref el) => el.clone(),
+        _ => panic!("Expected data"),
+    }).collect::<Vec<_>>();
+    r.sort();
+    assert_eq!(r, vec![b"1".to_vec(), b"2".to_vec(), b"3".to_vec()]);
 }
 
 #[test]
 fn sdiffstore_command() {
     let mut db = Database::mock();
-    {
-        let parser = parser!(b"sadd key 1 2 3");
-        command(&parser, &mut db, &mut 0, None, None, None).unwrap();
-    }
-    {
-        let parser = parser!(b"sdiffstore target key");
-        assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(3));
-    }
-    {
-        let mut set = HashSet::new();
-        set.insert(b"1".to_vec());
-        set.insert(b"2".to_vec());
-        set.insert(b"3".to_vec());
-        assert_eq!(db.get(0, &b"target".to_vec()).unwrap(), &Value::Set(ValueSet::Data(set)));
-    }
+    command(&parser!(b"sadd key1 1 2 3"), &mut db, &mut 0, None, None, None).unwrap();
+    command(&parser!(b"sadd key2 3 4 5"), &mut db, &mut 0, None, None, None).unwrap();
+    assert_eq!(command(&parser!(b"sdiffstore target key1 key2"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(2));
+
+    let mut set = HashSet::new();
+    set.insert(b"1".to_vec());
+    set.insert(b"2".to_vec());
+    assert_eq!(db.get(0, &b"target".to_vec()).unwrap(), &Value::Set(ValueSet::Data(set)));
 }
 
 #[test]
 fn sdiff2_command() {
     let mut db = Database::mock();
-    {
-        let parser = parser!(b"sadd key 1 2 3");
-        command(&parser, &mut db, &mut 0, None, None, None).unwrap();
-    }
-    {
-        let parser = parser!(b"sadd key2 2 3");
-        command(&parser, &mut db, &mut 0, None, None, None).unwrap();
-    }
-    {
-        let parser = parser!(b"sdiff key key2");
-        assert_eq!(command(&parser, &mut db, &mut 0, None, None, None).unwrap(),
-            Response::Array(vec![Response::Data(b"1".to_vec()),]));
-    }
+    command(&parser!(b"sadd key1 1 2 3"), &mut db, &mut 0, None, None, None).unwrap();
+    command(&parser!(b"sadd key2 2 3"), &mut db, &mut 0, None, None, None).unwrap();
+    assert_eq!(command(&parser!(b"sdiff key1 key2"), &mut db, &mut 0, None, None, None).unwrap(),
+        Response::Array(vec![Response::Data(b"1".to_vec()),]));
+}
+
+#[test]
+fn sinter_command() {
+    let mut db = Database::mock();
+    command(&parser!(b"sadd key 1 2 3"), &mut db, &mut 0, None, None, None).unwrap();
+
+    let arr = match command(&parser!(b"sinter key"), &mut db, &mut 0, None, None, None).unwrap() {
+        Response::Array(arr) => arr,
+        _ => panic!("Expected array"),
+    };
+    let mut r = arr.iter().map(|el| match el {
+        &Response::Data(ref el) => el.clone(),
+        _ => panic!("Expected data"),
+    }).collect::<Vec<_>>();
+    r.sort();
+    assert_eq!(r, vec![b"1".to_vec(), b"2".to_vec(), b"3".to_vec()]);
+}
+
+#[test]
+fn sinter2_command() {
+    let mut db = Database::mock();
+    command(&parser!(b"sadd key1 1 2 3"), &mut db, &mut 0, None, None, None).unwrap();
+    command(&parser!(b"sadd key2 2 3 4 5"), &mut db, &mut 0, None, None, None).unwrap();
+
+    let arr = match command(&parser!(b"sinter key1 key2"), &mut db, &mut 0, None, None, None).unwrap() {
+        Response::Array(arr) => arr,
+        _ => panic!("Expected array"),
+    };
+    let mut r = arr.iter().map(|el| match el {
+        &Response::Data(ref el) => el.clone(),
+        _ => panic!("Expected data"),
+    }).collect::<Vec<_>>();
+    r.sort();
+    assert_eq!(r, vec![b"2".to_vec(), b"3".to_vec()]);
 }
 
 #[test]
