@@ -769,6 +769,36 @@ impl Value {
         }
     }
 
+    fn get_set<'a>(&'a self, val: &'a Value) -> Result<Option<&HashSet<Vec<u8>>>, OperationError> {
+        match val {
+            &Value::Nil => Ok(None),
+            &Value::Set(ref value) => match value {
+                &ValueSet::Data(ref original_set) => {
+                    Ok(Some(original_set))
+                },
+            },
+            _ => Err(OperationError::WrongTypeError),
+        }
+    }
+
+    pub fn sinter(&self, sets: &Vec<&Value>) -> Result<HashSet<Vec<u8>>, OperationError> {
+        let mut result = match try!(self.get_set(self)) {
+            Some(s) => s.clone(),
+            None => return Ok(HashSet::new()),
+        };
+
+        for s in sets.iter() {
+            result = match try!(self.get_set(s)) {
+                Some(set) => result.intersection(set).cloned().collect(),
+                None => return Ok(HashSet::new()),
+            };
+            if result.len() == 0 {
+                break;
+            }
+        }
+        Ok(result)
+    }
+
     pub fn create_set(&mut self, set: HashSet<Vec<u8>>) {
         *self = Value::Set(ValueSet::Data(set));
     }
