@@ -169,6 +169,23 @@ fn normalize_position(position: i64, _len: usize) -> Result<usize, usize> {
     return Ok(pos as usize);
 }
 
+fn is_range_valid<T: Ord>(min: Bound<T>, max: Bound<T>) -> bool {
+    let mut both_in = true;
+    let v1 = match min {
+        Bound::Included(ref v) => v,
+        Bound::Excluded(ref v) => { both_in = false; v },
+        Bound::Unbounded => return true,
+    };
+
+    let v2 = match max {
+        Bound::Included(ref v) => v,
+        Bound::Excluded(ref v) => { both_in = false; v },
+        Bound::Unbounded => return true,
+    };
+
+    return v1 < v2 || (v1 == v2 && both_in);
+}
+
 impl Value {
     pub fn is_nil(&self) -> bool {
         match self {
@@ -956,6 +973,48 @@ impl Value {
         let first = skiplist.get(&start).unwrap();
         let mut r = vec![];
         for member in skiplist.range(Bound::Included(first), Bound::Unbounded).take(stop - start + 1) {
+            r.push(member.get_vec().clone());
+            if withscores {
+                r.push(format!("{}", member.get_f64()).into_bytes());
+            }
+        }
+        Ok(r)
+    }
+
+    pub fn zrangebyscore(&self, min: Bound<f64>, max: Bound<f64>, withscores: bool, offset: usize, count: usize) -> Result<Vec<Vec<u8>>, OperationError> {
+        let skiplist = match self {
+            &Value::Nil => return Ok(vec![]),
+            &Value::SortedSet(ref value) => match value {
+                &ValueSortedSet::Data(ref skiplist, _) => skiplist,
+            },
+            _ => return Err(OperationError::WrongTypeError),
+        };
+
+        // FIXME: duplicated code from ZCOUNT. Trying to create a factory
+        // function for this, but I failed because allocation was going
+        // out of scope.
+        // Probably more function will copy this until I can figure out
+        // a better way.
+        let mut f1 = SortedSetMember::new(0.0, vec![]);
+        let mut f2 = SortedSetMember::new(0.0, vec![]);
+        let m1 = match min {
+            Bound::Included(f) => { f1.set_f64(f); Bound::Included(&f1) },
+            Bound::Excluded(f) => { f1.set_f64(f); f1.set_upper_boundary(true); Bound::Excluded(&f1) },
+            Bound::Unbounded => Bound::Unbounded,
+        };
+
+        let m2 = match max {
+            Bound::Included(f) => { f2.set_f64(f); f2.set_upper_boundary(true); Bound::Included(&f2) },
+            Bound::Excluded(f) => { f2.set_f64(f); Bound::Excluded(&f2) },
+            Bound::Unbounded => Bound::Unbounded,
+        };
+
+        if !is_range_valid(m1, m2) {
+            return Ok(vec![])
+        }
+
+        let mut r = vec![];
+        for member in skiplist.range(m1, m2).skip(offset).take(count) {
             r.push(member.get_vec().clone());
             if withscores {
                 r.push(format!("{}", member.get_f64()).into_bytes());

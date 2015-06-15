@@ -1,5 +1,6 @@
 extern crate rsedis;
 
+use std::usize;
 use std::collections::Bound;
 
 use rsedis::database::{Value, ValueSortedSet};
@@ -135,6 +136,40 @@ fn zrange() {
             vec![5, 6, 7, 8], b"0".to_vec(),
             ]);
     assert_eq!(value.zrange(2, 0, true).unwrap().len(), 0);
+}
+
+#[test]
+fn zrangebyscore() {
+    let mut value = Value::Nil;
+    let s1 = 10.0;
+    let v1 = vec![1, 2, 3, 4];
+    let s2 = 20.0;
+    let v2 = vec![5, 6, 7, 8];
+    let s3 = 30.0;
+    let v3 = vec![9, 10, 11, 12];
+
+    assert_eq!(zadd!(value, s1, v1), true);
+    assert_eq!(zadd!(value, s3, v3), true);
+    assert_eq!(zadd!(value, s2, v2), true);
+    assert_eq!(value.zrangebyscore(Bound::Unbounded, Bound::Unbounded, true, 0, usize::MAX).unwrap(), vec![
+            vec![1, 2, 3, 4], b"10".to_vec(),
+            vec![5, 6, 7, 8], b"20".to_vec(),
+            vec![9, 10, 11, 12], b"30".to_vec(),
+            ]);
+    assert_eq!(value.zrangebyscore(Bound::Excluded(10.0), Bound::Included(20.0), true, 0, usize::MAX).unwrap(), vec![
+            vec![5, 6, 7, 8], b"20".to_vec(),
+            ]);
+    assert_eq!(value.zrangebyscore(Bound::Included(20.0), Bound::Excluded(30.0), true, 0, usize::MAX).unwrap(), vec![
+            vec![5, 6, 7, 8], b"20".to_vec(),
+            ]);
+    assert_eq!(value.zrangebyscore(Bound::Unbounded, Bound::Unbounded, true, 1, 1).unwrap(), vec![
+            vec![5, 6, 7, 8], b"20".to_vec(),
+            ]);
+    assert_eq!(value.zrangebyscore(Bound::Excluded(30.0), Bound::Included(20.0), false, 0, usize::MAX).unwrap().len(), 0);
+    assert_eq!(value.zrangebyscore(Bound::Excluded(30.0), Bound::Excluded(30.0), false, 0, usize::MAX).unwrap().len(), 0);
+    assert_eq!(value.zrangebyscore(Bound::Included(30.0), Bound::Included(30.0), false, 0, usize::MAX).unwrap().len(), 1);
+    assert_eq!(value.zrangebyscore(Bound::Included(30.0), Bound::Excluded(30.0), false, 0, usize::MAX).unwrap().len(), 0);
+    assert_eq!(value.zrangebyscore(Bound::Included(21.0), Bound::Included(22.0), false, 0, usize::MAX).unwrap().len(), 0);
 }
 
 #[test]
