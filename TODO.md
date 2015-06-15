@@ -40,8 +40,8 @@
     - [x] scard
     - [x] spop
     - [x] srandmember
-    - [ ] sinter
-    - [ ] sinterstore
+    - [x] sinter
+    - [x] sinterstore
     - [ ] sunion
     - [ ] sunionstore
     - [x] sdiff
