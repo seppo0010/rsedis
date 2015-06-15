@@ -5,6 +5,7 @@ use std::sync::mpsc::Sender;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::channel;
 use std::thread;
+use std::usize;
 
 use super::database::PubsubEvent;
 use super::database::Database;
@@ -1128,6 +1129,38 @@ fn zrange(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     }
 }
 
+fn zrangebyscore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    let len = parser.argv.len();
+    validate!(len == 4 || len == 5 || len == 7 || len == 8, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let min = try_validate!(parser.get_f64_bound(2), "Invalid min");
+    let max = try_validate!(parser.get_f64_bound(3), "Invalid max");
+    let withscores = len == 5 || len == 8;
+    if withscores {
+        let p4 = try_validate!(parser.get_str(4), "Syntax error");
+        validate!(p4.to_ascii_lowercase() == "withscores", "Syntax error");
+    }
+
+    let mut offset = 0;
+    let mut count = usize::MAX;
+    let limit = len >= 7;
+    if limit {
+        let p = try_validate!(parser.get_str(len - 3), "Syntax error");
+        validate!(p.to_ascii_lowercase() == "limit", "Syntax error");
+        offset = try_validate!(parser.get_i64(len - 2), "Syntax error") as usize;
+        count = try_validate!(parser.get_i64(len - 1), "Syntax error") as usize;
+    }
+
+    let el = match db.get(dbindex, &key) {
+        Some(e) => e,
+        None => return Response::Array(Vec::new()),
+    };
+    match el.zrangebyscore(min, max, withscores, offset, count) {
+        Ok(r) => Response::Array(r.iter().map(|x| Response::Data(x.clone())).collect::<Vec<_>>()),
+        Err(err) => Response::Error(err.to_string()),
+    }
+}
+
 fn zrank(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
@@ -1335,6 +1368,7 @@ pub fn command(
         "zrem" => zrem(parser, db, dbindex),
         "zcount" => zcount(parser, db, dbindex),
         "zrange" => zrange(parser, db, dbindex),
+        "zrangebyscore" => zrangebyscore(parser, db, dbindex),
         "zrank" => zrank(parser, db, dbindex),
         "subscribe" => return subscribe(parser, db, subscriptions.unwrap(), pattern_subscriptions.unwrap().len(), sender.unwrap()),
         "unsubscribe" => return unsubscribe(parser, db, subscriptions.unwrap(), pattern_subscriptions.unwrap().len(), sender.unwrap()),
