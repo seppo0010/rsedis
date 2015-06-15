@@ -990,6 +990,19 @@ fn sinter2_command() {
 }
 
 #[test]
+fn sinterstore_command() {
+    let mut db = Database::mock();
+    command(&parser!(b"sadd key1 1 2 3"), &mut db, &mut 0, None, None, None).unwrap();
+    command(&parser!(b"sadd key2 2 3 5"), &mut db, &mut 0, None, None, None).unwrap();
+    assert_eq!(command(&parser!(b"sinterstore target key1 key2"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(2));
+
+    let mut set = HashSet::new();
+    set.insert(b"2".to_vec());
+    set.insert(b"3".to_vec());
+    assert_eq!(db.get(0, &b"target".to_vec()).unwrap(), &Value::Set(ValueSet::Data(set)));
+}
+
+#[test]
 fn zadd_command() {
     let mut db = Database::mock();
     assert_eq!(command(&parser!(b"zadd key 1 a 2 b"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(2));

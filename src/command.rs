@@ -87,15 +87,15 @@ macro_rules! try_validate {
 }
 
 macro_rules! get_values {
-    ($parser: expr, $db: expr, $dbindex: expr) => ({
-        validate!($parser.argv.len() >= 2, "Wrong number of parameters");
-        let mut sets = Vec::with_capacity($parser.argv.len() - 2);
-        let key = try_validate!($parser.get_vec(1), "Invalid key");
+    ($start: expr, $parser: expr, $db: expr, $dbindex: expr) => ({
+        validate!($parser.argv.len() >= (1 + $start), "Wrong number of parameters");
+        let mut sets = Vec::with_capacity($parser.argv.len() - (1 + $start));
+        let key = try_validate!($parser.get_vec($start), "Invalid key");
         let el = match $db.get($dbindex, &key) {
             Some(e) => e,
             None => return Response::Array(vec![]),
         };
-        for i in 2..$parser.argv.len() {
+        for i in ($start + 1)..$parser.argv.len() {
             let key = try_validate!($parser.get_vec(i), "Invalid key");
             match $db.get($dbindex, &key) {
                 Some(e) => sets.push(e),
@@ -928,7 +928,7 @@ fn scard(parser: &Parser, db: &Database, dbindex: usize) -> Response {
 }
 
 fn sdiff(parser: &Parser, db: &Database, dbindex: usize) -> Response {
-    let (el, sets) = get_values!(parser, db, dbindex);
+    let (el, sets) = get_values!(1, parser, db, dbindex);
 
     match el.sdiff(&sets) {
         Ok(set) => {
@@ -941,20 +941,8 @@ fn sdiff(parser: &Parser, db: &Database, dbindex: usize) -> Response {
 fn sdiffstore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() >= 3, "Wrong number of parameters");
     let destination_key = try_validate!(parser.get_vec(1), "Invalid destination");
-    let key = try_validate!(parser.get_vec(2), "Invalid key");
     let set = {
-        let mut sets = Vec::with_capacity(parser.argv.len() - 3);
-        let el = match db.get(dbindex, &key) {
-            Some(e) => e,
-            None => return Response::Array(vec![]),
-        };
-        for i in 3..parser.argv.len() {
-            let key = try_validate!(parser.get_vec(i), "Invalid key");
-            match db.get(dbindex, &key) {
-                Some(e) => sets.push(e),
-                None => (),
-            };
-        }
+        let (el, sets) = get_values!(2, parser, db, dbindex);
         match el.sdiff(&sets) {
             Ok(set) => set,
             Err(err) => return Response::Error(err.to_string()),
@@ -968,13 +956,30 @@ fn sdiffstore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
 }
 
 fn sinter(parser: &Parser, db: &Database, dbindex: usize) -> Response {
-    let (el, sets) = get_values!(parser, db, dbindex);
+    let (el, sets) = get_values!(1, parser, db, dbindex);
     return match el.sinter(&sets) {
         Ok(set) => {
             Response::Array(set.iter().map(|x| Response::Data(x.clone())).collect::<Vec<_>>())
         },
         Err(err) => Response::Error(err.to_string()),
     }
+}
+
+fn sinterstore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() >= 3, "Wrong number of parameters");
+    let destination_key = try_validate!(parser.get_vec(1), "Invalid destination");
+    let set = {
+        let (el, sets) = get_values!(2, parser, db, dbindex);
+        match el.sinter(&sets) {
+            Ok(set) => set,
+            Err(err) => return Response::Error(err.to_string()),
+        }
+    };
+
+    db.remove(dbindex, &destination_key);
+    let r = set.len() as i64;
+    db.get_or_create(dbindex, &destination_key).create_set(set);
+    Response::Integer(r)
 }
 
 fn zadd(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
@@ -1294,6 +1299,7 @@ pub fn command(
         "sdiff" => sdiff(parser, db, dbindex),
         "sdiffstore" => sdiffstore(parser, db, dbindex),
         "sinter" => sinter(parser, db, dbindex),
+        "sinterstore" => sinterstore(parser, db, dbindex),
         "zadd" => zadd(parser, db, dbindex),
         "zincrby" => zincrby(parser, db, dbindex),
         "zrem" => zrem(parser, db, dbindex),
