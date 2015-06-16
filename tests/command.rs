@@ -912,6 +912,31 @@ fn zrangebyscore_command() {
 }
 
 #[test]
+fn zrevrangebyscore_command() {
+    let mut db = Database::mock();
+    assert_eq!(command(&parser!(b"zadd key 1 a 2 b 3 c 4 d"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(4));
+    assert_eq!(command(&parser!(b"zrevrangebyscore key (2 1"), &mut db, &mut 0, None, None, None).unwrap(), Response::Array(vec![
+                Response::Data(b"a".to_vec()),
+                ]));
+    assert_eq!(command(&parser!(b"zrevrangebyscore key 1 1 withscoreS"), &mut db, &mut 0, None, None, None).unwrap(), Response::Array(vec![
+                Response::Data(b"a".to_vec()),
+                Response::Data(b"1".to_vec()),
+                ]));
+    assert_eq!(command(&parser!(b"zrevrangebyscore key inf (2 WITHSCORES"), &mut db, &mut 0, None, None, None).unwrap(), Response::Array(vec![
+                Response::Data(b"d".to_vec()),
+                Response::Data(b"4".to_vec()),
+                Response::Data(b"c".to_vec()),
+                Response::Data(b"3".to_vec()),
+                ]));
+    assert_eq!(command(&parser!(b"zrevrangebyscore key inf -inf withscores LIMIT 2 10"), &mut db, &mut 0, None, None, None).unwrap(), Response::Array(vec![
+                Response::Data(b"b".to_vec()),
+                Response::Data(b"2".to_vec()),
+                Response::Data(b"a".to_vec()),
+                Response::Data(b"1".to_vec()),
+                ]));
+}
+
+#[test]
 fn zrank_command() {
     let mut db = Database::mock();
     assert_eq!(command(&parser!(b"zadd key 1 a 2 b 3 c 4 d"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(4));

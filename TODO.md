@@ -58,7 +58,7 @@
     - [ ] zinterstore
     - [x] zrange
     - [x] zrangebyscore
-    - [ ] zrevrangebyscore
+    - [x] zrevrangebyscore
     - [ ] zrangebylex
     - [ ] zrevrangebylex
     - [x] zcount

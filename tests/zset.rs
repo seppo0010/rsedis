@@ -151,25 +151,59 @@ fn zrangebyscore() {
     assert_eq!(zadd!(value, s1, v1), true);
     assert_eq!(zadd!(value, s3, v3), true);
     assert_eq!(zadd!(value, s2, v2), true);
-    assert_eq!(value.zrangebyscore(Bound::Unbounded, Bound::Unbounded, true, 0, usize::MAX).unwrap(), vec![
+    assert_eq!(value.zrangebyscore(Bound::Unbounded, Bound::Unbounded, true, 0, usize::MAX, false).unwrap(), vec![
             vec![1, 2, 3, 4], b"10".to_vec(),
             vec![5, 6, 7, 8], b"20".to_vec(),
             vec![9, 10, 11, 12], b"30".to_vec(),
             ]);
-    assert_eq!(value.zrangebyscore(Bound::Excluded(10.0), Bound::Included(20.0), true, 0, usize::MAX).unwrap(), vec![
+    assert_eq!(value.zrangebyscore(Bound::Excluded(10.0), Bound::Included(20.0), true, 0, usize::MAX, false).unwrap(), vec![
             vec![5, 6, 7, 8], b"20".to_vec(),
             ]);
-    assert_eq!(value.zrangebyscore(Bound::Included(20.0), Bound::Excluded(30.0), true, 0, usize::MAX).unwrap(), vec![
+    assert_eq!(value.zrangebyscore(Bound::Included(20.0), Bound::Excluded(30.0), true, 0, usize::MAX, false).unwrap(), vec![
             vec![5, 6, 7, 8], b"20".to_vec(),
             ]);
-    assert_eq!(value.zrangebyscore(Bound::Unbounded, Bound::Unbounded, true, 1, 1).unwrap(), vec![
+    assert_eq!(value.zrangebyscore(Bound::Unbounded, Bound::Unbounded, true, 1, 1, false).unwrap(), vec![
             vec![5, 6, 7, 8], b"20".to_vec(),
             ]);
-    assert_eq!(value.zrangebyscore(Bound::Excluded(30.0), Bound::Included(20.0), false, 0, usize::MAX).unwrap().len(), 0);
-    assert_eq!(value.zrangebyscore(Bound::Excluded(30.0), Bound::Excluded(30.0), false, 0, usize::MAX).unwrap().len(), 0);
-    assert_eq!(value.zrangebyscore(Bound::Included(30.0), Bound::Included(30.0), false, 0, usize::MAX).unwrap().len(), 1);
-    assert_eq!(value.zrangebyscore(Bound::Included(30.0), Bound::Excluded(30.0), false, 0, usize::MAX).unwrap().len(), 0);
-    assert_eq!(value.zrangebyscore(Bound::Included(21.0), Bound::Included(22.0), false, 0, usize::MAX).unwrap().len(), 0);
+    assert_eq!(value.zrangebyscore(Bound::Excluded(30.0), Bound::Included(20.0), false, 0, usize::MAX, false).unwrap().len(), 0);
+    assert_eq!(value.zrangebyscore(Bound::Excluded(30.0), Bound::Excluded(30.0), false, 0, usize::MAX, false).unwrap().len(), 0);
+    assert_eq!(value.zrangebyscore(Bound::Included(30.0), Bound::Included(30.0), false, 0, usize::MAX, false).unwrap().len(), 1);
+    assert_eq!(value.zrangebyscore(Bound::Included(30.0), Bound::Excluded(30.0), false, 0, usize::MAX, false).unwrap().len(), 0);
+    assert_eq!(value.zrangebyscore(Bound::Included(21.0), Bound::Included(22.0), false, 0, usize::MAX, false).unwrap().len(), 0);
+}
+
+#[test]
+fn zrevrangebyscore() {
+    let mut value = Value::Nil;
+    let s1 = 10.0;
+    let v1 = vec![1, 2, 3, 4];
+    let s2 = 20.0;
+    let v2 = vec![5, 6, 7, 8];
+    let s3 = 30.0;
+    let v3 = vec![9, 10, 11, 12];
+
+    assert_eq!(zadd!(value, s1, v1), true);
+    assert_eq!(zadd!(value, s3, v3), true);
+    assert_eq!(zadd!(value, s2, v2), true);
+    assert_eq!(value.zrangebyscore(Bound::Unbounded, Bound::Unbounded, true, 0, usize::MAX, true).unwrap(), vec![
+            vec![9, 10, 11, 12], b"30".to_vec(),
+            vec![5, 6, 7, 8], b"20".to_vec(),
+            vec![1, 2, 3, 4], b"10".to_vec(),
+            ]);
+    assert_eq!(value.zrangebyscore(Bound::Included(20.0), Bound::Excluded(10.0), true, 0, usize::MAX, true).unwrap(), vec![
+            vec![5, 6, 7, 8], b"20".to_vec(),
+            ]);
+    assert_eq!(value.zrangebyscore(Bound::Excluded(30.0), Bound::Included(20.0), true, 0, usize::MAX, true).unwrap(), vec![
+            vec![5, 6, 7, 8], b"20".to_vec(),
+            ]);
+    assert_eq!(value.zrangebyscore(Bound::Unbounded, Bound::Unbounded, true, 1, 1, true).unwrap(), vec![
+            vec![5, 6, 7, 8], b"20".to_vec(),
+            ]);
+    assert_eq!(value.zrangebyscore(Bound::Included(20.0), Bound::Excluded(30.0), false, 0, usize::MAX, true).unwrap().len(), 0);
+    assert_eq!(value.zrangebyscore(Bound::Excluded(30.0), Bound::Excluded(30.0), false, 0, usize::MAX, true).unwrap().len(), 0);
+    assert_eq!(value.zrangebyscore(Bound::Included(30.0), Bound::Included(30.0), false, 0, usize::MAX, true).unwrap().len(), 1);
+    assert_eq!(value.zrangebyscore(Bound::Excluded(30.0), Bound::Included(30.0), false, 0, usize::MAX, true).unwrap().len(), 0);
+    assert_eq!(value.zrangebyscore(Bound::Included(22.0), Bound::Included(21.0), false, 0, usize::MAX, true).unwrap().len(), 0);
 }
 
 #[test]

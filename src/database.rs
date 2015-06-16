@@ -981,7 +981,7 @@ impl Value {
         Ok(r)
     }
 
-    pub fn zrangebyscore(&self, min: Bound<f64>, max: Bound<f64>, withscores: bool, offset: usize, count: usize) -> Result<Vec<Vec<u8>>, OperationError> {
+    pub fn zrangebyscore(&self, _min: Bound<f64>, _max: Bound<f64>, withscores: bool, offset: usize, count: usize, rev: bool) -> Result<Vec<Vec<u8>>, OperationError> {
         let skiplist = match self {
             &Value::Nil => return Ok(vec![]),
             &Value::SortedSet(ref value) => match value {
@@ -997,6 +997,13 @@ impl Value {
         // a better way.
         let mut f1 = SortedSetMember::new(0.0, vec![]);
         let mut f2 = SortedSetMember::new(0.0, vec![]);
+
+        let (min, max) = if rev {
+            (_max, _min)
+        } else {
+            (_min, _max)
+        };
+
         let m1 = match min {
             Bound::Included(f) => { f1.set_f64(f); Bound::Included(&f1) },
             Bound::Excluded(f) => { f1.set_f64(f); f1.set_upper_boundary(true); Bound::Excluded(&f1) },
@@ -1013,14 +1020,30 @@ impl Value {
             return Ok(vec![])
         }
 
+        // FIXME: skiplist crashes when using .range().rev()
         let mut r = vec![];
-        for member in skiplist.range(m1, m2).skip(offset).take(count) {
-            r.push(member.get_vec().clone());
-            if withscores {
-                r.push(format!("{}", member.get_f64()).into_bytes());
+        if rev {
+            let len = skiplist.len();
+            let mut c = count;
+            if c + offset > len {
+                c = len - offset;
             }
+            for member in skiplist.range(m1, m2).skip(skiplist.len() - offset - c).take(c) {
+                if withscores {
+                    r.push(format!("{}", member.get_f64()).into_bytes());
+                }
+                r.push(member.get_vec().clone());
+            }
+            Ok(r.iter().cloned().rev().collect::<Vec<_>>())
+        } else {
+            for member in skiplist.range(m1, m2).skip(offset).take(count) {
+                r.push(member.get_vec().clone());
+                if withscores {
+                    r.push(format!("{}", member.get_f64()).into_bytes());
+                }
+            }
+            Ok(r)
         }
-        Ok(r)
     }
 
     pub fn zrank(&self, el: Vec<u8>) -> Result<Option<usize>, OperationError> {

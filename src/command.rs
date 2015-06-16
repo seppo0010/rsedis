@@ -1129,7 +1129,7 @@ fn zrange(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     }
 }
 
-fn zrangebyscore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn generic_zrangebyscore(parser: &Parser, db: &mut Database, dbindex: usize, rev: bool) -> Response {
     let len = parser.argv.len();
     validate!(len == 4 || len == 5 || len == 7 || len == 8, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
@@ -1155,10 +1155,18 @@ fn zrangebyscore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response
         Some(e) => e,
         None => return Response::Array(Vec::new()),
     };
-    match el.zrangebyscore(min, max, withscores, offset, count) {
+    match el.zrangebyscore(min, max, withscores, offset, count, rev) {
         Ok(r) => Response::Array(r.iter().map(|x| Response::Data(x.clone())).collect::<Vec<_>>()),
         Err(err) => Response::Error(err.to_string()),
     }
+}
+
+fn zrangebyscore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    generic_zrangebyscore(parser, db, dbindex, false)
+}
+
+fn zrevrangebyscore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    generic_zrangebyscore(parser, db, dbindex, true)
 }
 
 fn zrank(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
@@ -1369,6 +1377,7 @@ pub fn command(
         "zcount" => zcount(parser, db, dbindex),
         "zrange" => zrange(parser, db, dbindex),
         "zrangebyscore" => zrangebyscore(parser, db, dbindex),
+        "zrevrangebyscore" => zrevrangebyscore(parser, db, dbindex),
         "zrank" => zrank(parser, db, dbindex),
         "subscribe" => return subscribe(parser, db, subscriptions.unwrap(), pattern_subscriptions.unwrap().len(), sender.unwrap()),
         "unsubscribe" => return unsubscribe(parser, db, subscriptions.unwrap(), pattern_subscriptions.unwrap().len(), sender.unwrap()),
