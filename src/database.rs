@@ -949,7 +949,7 @@ impl Value {
         Ok(skiplist.range(m1, m2).collect::<Vec<_>>().len())
     }
 
-    pub fn zrange(&self, _start: i64, _stop: i64, withscores: bool) -> Result<Vec<Vec<u8>>, OperationError> {
+    pub fn zrange(&self, _start: i64, _stop: i64, withscores: bool, rev: bool) -> Result<Vec<Vec<u8>>, OperationError> {
         let skiplist = match self {
             &Value::Nil => return Ok(vec![]),
             &Value::SortedSet(ref value) => match value {
@@ -959,23 +959,45 @@ impl Value {
         };
 
         let len = skiplist.len();
-        let start = match normalize_position(_start, len) {
-            Ok(i) => i,
-            Err(i) => if i == 0 { 0 } else { return Ok(vec![]); },
+        let (start, stop) = if rev {
+            (match normalize_position(- _stop - 1, len) {
+                Ok(i) => i,
+                Err(i) => if i == 0 { 0 } else { return Ok(vec![]); },
+            },
+            match normalize_position(- _start - 1, len) {
+                Ok(i) => i,
+                Err(i) => if i == 0 { return Ok(vec![]); } else { i },
+            })
+        } else {
+            (match normalize_position(_start, len) {
+                Ok(i) => i,
+                Err(i) => if i == 0 { 0 } else { return Ok(vec![]); },
+            },
+            match normalize_position(_stop, len) {
+                Ok(i) => i,
+                Err(i) => if i == 0 { return Ok(vec![]); } else { i },
+            })
         };
-        let stop = match normalize_position(_stop, len) {
-            Ok(i) => i,
-            Err(i) => if i == 0 { return Ok(vec![]); } else { i },
-        };
+
         if stop < start {
             return Ok(vec![]);
         }
         let first = skiplist.get(&start).unwrap();
         let mut r = vec![];
-        for member in skiplist.range(Bound::Included(first), Bound::Unbounded).take(stop - start + 1) {
-            r.push(member.get_vec().clone());
-            if withscores {
-                r.push(format!("{}", member.get_f64()).into_bytes());
+        if rev {
+            for member in skiplist.range(Bound::Included(first), Bound::Unbounded).take(stop - start + 1) {
+                if withscores {
+                    r.push(format!("{}", member.get_f64()).into_bytes());
+                }
+                r.push(member.get_vec().clone());
+            }
+            r = r.iter().rev().cloned().collect::<Vec<_>>();
+        } else {
+            for member in skiplist.range(Bound::Included(first), Bound::Unbounded).take(stop - start + 1) {
+                r.push(member.get_vec().clone());
+                if withscores {
+                    r.push(format!("{}", member.get_f64()).into_bytes());
+                }
             }
         }
         Ok(r)

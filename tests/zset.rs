@@ -127,15 +127,42 @@ fn zrange() {
     assert_eq!(zadd!(value, s1, v1), true);
     assert_eq!(zadd!(value, s3, v3), true);
     assert_eq!(zadd!(value, s2, v2), true);
-    assert_eq!(value.zrange(0, -1, true).unwrap(), vec![
+    assert_eq!(value.zrange(0, -1, true, false).unwrap(), vec![
             vec![1, 2, 3, 4], b"0".to_vec(),
             vec![5, 6, 7, 8], b"0".to_vec(),
             vec![9, 10, 11, 12], b"0".to_vec(),
             ]);
-    assert_eq!(value.zrange(1, 1, true).unwrap(), vec![
+    assert_eq!(value.zrange(1, 1, true, false).unwrap(), vec![
             vec![5, 6, 7, 8], b"0".to_vec(),
             ]);
-    assert_eq!(value.zrange(2, 0, true).unwrap().len(), 0);
+    assert_eq!(value.zrange(2, 0, true, false).unwrap().len(), 0);
+}
+
+#[test]
+fn zrevrange() {
+    let mut value = Value::Nil;
+    let s1 = 0.0;
+    let v1 = vec![1, 2, 3, 4];
+    let s2 = 0.0;
+    let v2 = vec![5, 6, 7, 8];
+    let s3 = 0.0;
+    let v3 = vec![9, 10, 11, 12];
+
+    assert_eq!(zadd!(value, s1, v1), true);
+    assert_eq!(zadd!(value, s3, v3), true);
+    assert_eq!(zadd!(value, s2, v2), true);
+    assert_eq!(value.zrange(0, -1, true, true).unwrap(), vec![
+            v3.clone(), b"0".to_vec(),
+            v2.clone(), b"0".to_vec(),
+            v1.clone(), b"0".to_vec(),
+            ]);
+    assert_eq!(value.zrange(1, 1, true, true).unwrap(), vec![
+            v2.clone(), b"0".to_vec(),
+            ]);
+    assert_eq!(value.zrange(2, 0, true, true).unwrap().len(), 0);
+    assert_eq!(value.zrange(2, 2, true, true).unwrap(), vec![
+            v1.clone(), b"0".to_vec(),
+            ]);
 }
 
 #[test]
@@ -231,7 +258,7 @@ fn zadd_update() {
 
     assert_eq!(zadd!(value, s1, v1), true);
     assert_eq!(zadd!(value, s2, v1), false);
-    assert_eq!(value.zrange(0, -1, true).unwrap(), vec![
+    assert_eq!(value.zrange(0, -1, true, false).unwrap(), vec![
             vec![1, 2, 3, 4], b"1".to_vec(),
             ]);
 }
@@ -244,9 +271,9 @@ fn zadd_incr() {
     let v1 = vec![1, 2, 3, 4];
 
     assert_eq!(value.zadd(s1, v1.clone(), false, false, false, true).unwrap(), true);
-    assert_eq!(value.zrange(0, -1, true).unwrap(), vec![v1.clone(), b"1".to_vec()]);
+    assert_eq!(value.zrange(0, -1, true, false).unwrap(), vec![v1.clone(), b"1".to_vec()]);
     assert_eq!(value.zadd(incr, v1.clone(), false, false, false, true).unwrap(), false);
-    assert_eq!(value.zrange(0, -1, true).unwrap(), vec![v1.clone(), b"3".to_vec()]);
+    assert_eq!(value.zrange(0, -1, true, false).unwrap(), vec![v1.clone(), b"3".to_vec()]);
 }
 
 #[test]
@@ -257,9 +284,9 @@ fn zadd_incr_ch() {
     let v1 = vec![1, 2, 3, 4];
 
     assert_eq!(value.zadd(s1, v1.clone(), false, false, true, true).unwrap(), true);
-    assert_eq!(value.zrange(0, -1, true).unwrap(), vec![v1.clone(), b"1".to_vec()]);
+    assert_eq!(value.zrange(0, -1, true, false).unwrap(), vec![v1.clone(), b"1".to_vec()]);
     assert_eq!(value.zadd(incr, v1.clone(), false, false, true, true).unwrap(), true);
-    assert_eq!(value.zrange(0, -1, true).unwrap(), vec![v1.clone(), b"3".to_vec()]);
+    assert_eq!(value.zrange(0, -1, true, false).unwrap(), vec![v1.clone(), b"3".to_vec()]);
 }
 
 #[test]

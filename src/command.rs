@@ -1109,7 +1109,7 @@ fn zcount(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     }
 }
 
-fn zrange(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn generic_zrange(parser: &Parser, db: &mut Database, dbindex: usize, rev: bool) -> Response {
     validate!(parser.argv.len() == 4 || parser.argv.len() == 5, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let start = try_validate!(parser.get_i64(2), "Invalid start");
@@ -1123,10 +1123,18 @@ fn zrange(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
         Some(e) => e,
         None => return Response::Array(Vec::new()),
     };
-    match el.zrange(start, stop, withscores) {
+    match el.zrange(start, stop, withscores, rev) {
         Ok(r) => Response::Array(r.iter().map(|x| Response::Data(x.clone())).collect::<Vec<_>>()),
         Err(err) => Response::Error(err.to_string()),
     }
+}
+
+fn zrange(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    generic_zrange(parser, db, dbindex, false)
+}
+
+fn zrevrange(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    generic_zrange(parser, db, dbindex, true)
 }
 
 fn generic_zrangebyscore(parser: &Parser, db: &mut Database, dbindex: usize, rev: bool) -> Response {
@@ -1376,6 +1384,7 @@ pub fn command(
         "zrem" => zrem(parser, db, dbindex),
         "zcount" => zcount(parser, db, dbindex),
         "zrange" => zrange(parser, db, dbindex),
+        "zrevrange" => zrevrange(parser, db, dbindex),
         "zrangebyscore" => zrangebyscore(parser, db, dbindex),
         "zrevrangebyscore" => zrevrangebyscore(parser, db, dbindex),
         "zrank" => zrank(parser, db, dbindex),
