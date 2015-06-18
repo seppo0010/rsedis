@@ -141,7 +141,7 @@ pub fn mstime() -> i64 {
     ustime() / 1000
 }
 
-pub fn splitargs(args: &Vec<u8>) -> Result<Vec<Vec<u8>>, ()> {
+pub fn splitargs(args: &[u8]) -> Result<Vec<Vec<u8>>, ()> {
     let mut i = 0;
     let mut result = Vec::new();
     for _ in args {

@@ -1,14 +1,19 @@
 extern crate rand;
 extern crate time;
+extern crate util;
 
 use std::fs::File;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::Error as IOError;
 use std::num::ParseIntError;
+use std::str::Utf8Error;
 use std::path::Path;
+use std::str::from_utf8;
+use std::str::FromStr;
 
 use time::get_time;
+use util::splitargs;
 
 pub struct Config {
     pub daemonize: bool,
@@ -30,8 +35,34 @@ pub fn mstime() -> i64 {
 
 #[derive(Debug)]
 pub enum ConfigError {
+    InvalidFormat,
+    InvalidParameter,
     IOError(IOError),
-    ParseIntError(ParseIntError),
+}
+
+fn read_string(args: Vec<Vec<u8>>) -> Result<String, ConfigError> {
+    if args.len() != 2 {
+        Err(ConfigError::InvalidFormat)
+    } else {
+        Ok(try!(from_utf8(&*args[1])).to_owned())
+    }
+}
+
+fn read_parse<T>(args: Vec<Vec<u8>>) -> Result<T, ConfigError>
+        where T: FromStr {
+    let s = try!(read_string(args));
+    match s.parse() {
+        Ok(f) => Ok(f),
+        Err(_) => Err(ConfigError::InvalidParameter),
+    }
+}
+
+fn read_bool(args: Vec<Vec<u8>>) -> Result<bool, ConfigError> {
+    Ok(match &*try!(read_string(args)) {
+        "yes" => true,
+        "no" => false,
+        _ => return Err(ConfigError::InvalidFormat),
+    })
 }
 
 impl Config {
@@ -67,27 +98,27 @@ impl Config {
                 continue;
             }
 
-            if line.starts_with("bind ") {
-                self.bind.extend(line[5..].split(' ').filter(|x| x.trim().len() > 0).map(|x| x.trim().to_owned()));
-            }
-            else if line.starts_with("port ") {
-                self.port = try!(line[5..].trim().parse());
-            }
-            else if line.starts_with("daemonize ") {
-                self.daemonize = line[9..].trim() == "yes";
-            }
-            else if line.starts_with("databases ") {
-                self.databases = try!(line[9..].trim().parse());
-            }
-            else if line.starts_with("pidfile ") {
-                self.pidfile = line[8..].trim().to_owned();
-            }
-            else if line.starts_with("include ") {
-                try!(self.parsefile(line[8..].trim().to_owned()));
-            }
-            else if line.starts_with("tcp-keepalive ") {
-                self.tcp_keepalive = try!(line[13..].trim().parse());
-            }
+            let args = match splitargs(line.as_bytes()) {
+                Ok(args) => args,
+                Err(_) => return Err(ConfigError::InvalidFormat),
+            };
+            match &*args[0] {
+                b"bind" => self.bind.extend(args[1..].iter().filter(|x| x.len() > 0).map(|x| match from_utf8(x) {
+                            Ok(s) => s.to_owned(),
+                            Err(_) => "".to_owned(), // TODO: return ConfigError
+                            })),
+                b"port" => self.port = try!(read_parse(args)),
+                b"daemonize" => self.daemonize = try!(read_bool(args)),
+                b"databases" => self.databases = try!(read_parse(args)),
+                b"tcp-keepalive" => self.tcp_keepalive = try!(read_parse(args)),
+                b"pidfile" => self.pidfile = try!(read_string(args)).to_owned(),
+                b"include" => if args.len() != 2 {
+                    return Err(ConfigError::InvalidFormat)
+                } else {
+                    try!(self.parsefile(try!(from_utf8(&*args[1])).to_owned()));
+                },
+                _ => panic!("Unknown configuration {:?}", args[0]),
+            };
         }
 
         Ok(())
@@ -107,9 +138,12 @@ impl From<IOError> for ConfigError {
 }
 
 impl From<ParseIntError> for ConfigError {
-    fn from(e: ParseIntError) -> ConfigError { ConfigError::ParseIntError(e) }
+    fn from(_: ParseIntError) -> ConfigError { ConfigError::InvalidParameter }
 }
 
+impl From<Utf8Error> for ConfigError {
+    fn from(_: Utf8Error) -> ConfigError { ConfigError::InvalidParameter }
+}
 
 #[cfg(test)]
 mod tests {
@@ -174,6 +208,12 @@ mod tests {
     #[test]
     fn parse_keepalive() {
         let config = config!(b"tcp-keepalive 123");
+        assert_eq!(config.tcp_keepalive, 123);
+    }
+
+    #[test]
+    fn parse_keepalive_quotes() {
+        let config = config!(b"tcp-keepalive \"123\"");
         assert_eq!(config.tcp_keepalive, 123);
     }
 }
