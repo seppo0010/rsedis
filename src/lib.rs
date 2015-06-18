@@ -8,9 +8,9 @@ extern crate time;
 extern crate libc;
 
 extern crate config;
+extern crate util;
 
 pub mod command;
 pub mod database;
 pub mod networking;
 pub mod parser;
-pub mod util;

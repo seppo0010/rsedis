@@ -21,6 +21,9 @@ path = "tests/tests.rs"
 [dependencies.config]
 path = "config"
 
+[dependencies.util]
+path = "util"
+
 [dependencies]
 time = "0.1"
 rand = "0.3.8"

@@ -2,9 +2,9 @@ extern crate rsedis;
 
 use std;
 
+use util::mstime;
 use rsedis::database::Database;
 use rsedis::database::{Value, ValueString};
-use rsedis::util::mstime;
 
 #[test]
 fn set_get() {
