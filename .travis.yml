@@ -3,7 +3,14 @@ sudo: false
 rust: nightly
 
 script:
-  - cargo test
+  - cargo test --verbose
+  - cargo test --verbose --package command
+  - cargo test --verbose --package config
+  - cargo test --verbose --package database
+  - cargo test --verbose --package networking
+  - cargo test --verbose --package parser
+  - cargo test --verbose --package response
+  - cargo test --verbose --package util
 
 notifications:
   email: false
