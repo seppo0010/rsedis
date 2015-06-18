@@ -24,6 +24,9 @@ path = "config"
 [dependencies.util]
 path = "util"
 
+[dependencies.parser]
+path = "parser"
+
 [dependencies]
 time = "0.1"
 rand = "0.3.8"

@@ -8,10 +8,10 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 use util::mstime;
+use parser::Parser;
+use parser::Argument;
 use rsedis::database::Database;
 use rsedis::database::{Value, ValueString, ValueSet};
-use rsedis::parser::Parser;
-use rsedis::parser::Argument;
 use rsedis::command::command;
 use rsedis::command::{Response, ResponseError};
 
