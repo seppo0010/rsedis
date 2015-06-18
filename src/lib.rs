@@ -7,8 +7,9 @@ extern crate time;
 #[cfg(unix)]
 extern crate libc;
 
+extern crate config;
+
 pub mod command;
-pub mod config;
 pub mod database;
 pub mod networking;
 pub mod parser;

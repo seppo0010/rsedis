@@ -17,7 +17,7 @@ use super::command::{Response, ResponseError};
 use super::database::{Database, PubsubEvent};
 use super::parser::parse;
 use super::parser::ParseError;
-use super::config::Config;
+use config::Config;
 
 struct Client {
     stream: TcpStream,

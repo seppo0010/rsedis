@@ -14,7 +14,7 @@ use std::sync::mpsc::Sender;
 use rand::random;
 use skiplist::OrderedSkipList;
 
-use super::config::Config;
+use config::Config;
 use super::util::glob_match;
 use super::util::mstime;
 

@@ -18,6 +18,9 @@ name = "rsedis"
 name = "tests"
 path = "tests/tests.rs"
 
+[dependencies.config]
+path = "config"
+
 [dependencies]
 time = "0.1"
 rand = "0.3.8"

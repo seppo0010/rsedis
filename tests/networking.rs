@@ -6,7 +6,7 @@ use std::io::Write;
 use std::io::Read;
 
 use rsedis::networking::Server;
-use rsedis::config::Config;
+use config::Config;
 
 #[test]
 fn parse_ping() {
