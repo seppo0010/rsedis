@@ -7,13 +7,14 @@ use std::sync::mpsc::channel;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-use util::mstime;
+use database::Database;
+use database::{Value, ValueString, ValueSet};
 use parser::Parser;
 use parser::Argument;
-use rsedis::database::Database;
-use rsedis::database::{Value, ValueString, ValueSet};
+use response::{Response, ResponseError};
+use util::mstime;
+
 use rsedis::command::command;
-use rsedis::command::{Response, ResponseError};
 
 macro_rules! parser {
     ($str: expr) => ({

@@ -1,14 +1,11 @@
-#![feature(collections)]
 extern crate config;
+extern crate database;
 extern crate parser;
-extern crate rsedis;
 extern crate rand;
+extern crate response;
+extern crate rsedis;
 extern crate util;
 
 pub mod command;
-pub mod list;
 pub mod networking;
 pub mod pubsub;
-pub mod set;
-pub mod string;
-pub mod zset;

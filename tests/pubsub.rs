@@ -2,7 +2,7 @@ extern crate rsedis;
 
 use std::sync::mpsc::channel;
 
-use rsedis::database::{Database, PubsubEvent};
+use database::{Database, PubsubEvent};
 
 #[test]
 fn pubsub_basic() {

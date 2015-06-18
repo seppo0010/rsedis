@@ -12,12 +12,13 @@ use std::sync::mpsc::{Sender, channel};
 #[cfg(unix)] use libc::funcs::c95::stdlib::exit;
 #[cfg(unix)] use libc::funcs::posix88::unistd::getpid;
 
+use config::Config;
+use database::{Database, PubsubEvent};
+use response::{Response, ResponseError};
+
 use super::command::command;
-use super::command::{Response, ResponseError};
-use super::database::{Database, PubsubEvent};
 use super::parser::parse;
 use super::parser::ParseError;
-use config::Config;
 
 struct Client {
     stream: TcpStream,
@@ -29,46 +30,6 @@ pub struct Server {
     db: Arc<Mutex<Database>>,
     listener_channels: Vec<Sender<u8>>,
     listener_threads: Vec<thread::JoinHandle<()>>,
-}
-
-impl PubsubEvent {
-    pub fn as_response(&self) -> Response {
-        match self {
-            &PubsubEvent::Message(ref channel, ref pattern, ref message) => match pattern {
-                &Some(ref pattern) => Response::Array(vec![
-                        Response::Data(b"message".to_vec()),
-                        Response::Data(channel.clone()),
-                        Response::Data(pattern.clone()),
-                        Response::Data(message.clone()),
-                        ]),
-                &None => Response::Array(vec![
-                        Response::Data(b"message".to_vec()),
-                        Response::Data(channel.clone()),
-                        Response::Data(message.clone()),
-                        ]),
-            },
-            &PubsubEvent::Subscription(ref channel, ref subscriptions) => Response::Array(vec![
-                    Response::Data(b"subscribe".to_vec()),
-                    Response::Data(channel.clone()),
-                    Response::Integer(subscriptions.clone() as i64),
-                    ]),
-            &PubsubEvent::Unsubscription(ref channel, ref subscriptions) => Response::Array(vec![
-                    Response::Data(b"unsubscribe".to_vec()),
-                    Response::Data(channel.clone()),
-                    Response::Integer(subscriptions.clone() as i64),
-                    ]),
-            &PubsubEvent::PatternSubscription(ref pattern, ref subscriptions) => Response::Array(vec![
-                    Response::Data(b"psubscribe".to_vec()),
-                    Response::Data(pattern.clone()),
-                    Response::Integer(subscriptions.clone() as i64),
-                    ]),
-            &PubsubEvent::PatternUnsubscription(ref pattern, ref subscriptions) => Response::Array(vec![
-                    Response::Data(b"punsubscribe".to_vec()),
-                    Response::Data(pattern.clone()),
-                    Response::Integer(subscriptions.clone() as i64),
-                    ]),
-        }
-    }
 }
 
 impl Client {

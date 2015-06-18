@@ -1,0 +1,17 @@
+[package]
+name = "database"
+version = "0.1.0"
+authors = ["Sebastian Waisbrot <seppo0010@gmail.com>"]
+
+[dependencies.config]
+path = "../config"
+
+[dependencies.util]
+path = "../util"
+
+[dependencies.response]
+path = "../response"
+
+[dependencies]
+rand = "0.3.8"
+skiplist = "0.2.4"
