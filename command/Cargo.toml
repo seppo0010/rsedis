@@ -1,0 +1,16 @@
+[package]
+name = "command"
+version = "0.1.0"
+authors = ["Sebastian Waisbrot <seppo0010@gmail.com>"]
+
+[dependencies.parser]
+path = "../parser"
+
+[dependencies.response]
+path = "../response"
+
+[dependencies.database]
+path = "../database"
+
+[dependencies.util]
+path = "../util"

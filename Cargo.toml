@@ -33,6 +33,9 @@ path = "response"
 [dependencies.database]
 path = "database"
 
+[dependencies.command]
+path = "command"
+
 [dependencies]
 time = "0.1"
 rand = "0.3.8"
