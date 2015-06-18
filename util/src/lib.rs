@@ -141,6 +141,85 @@ pub fn mstime() -> i64 {
     ustime() / 1000
 }
 
+pub fn splitargs(args: &Vec<u8>) -> Result<Vec<Vec<u8>>, ()> {
+    let mut i = 0;
+    let mut result = Vec::new();
+    for _ in args {
+        while i < args.len() && (args[i] == 0 || (args[i] as char).is_whitespace()) { i += 1; }
+        if i >=  args.len() { break; }
+        let mut inq = false;
+        let mut insq = false;
+        let mut done = false;
+        let mut current = Vec::new();
+        while !done && i < args.len() {
+            let p = args[i] as char;
+            if inq {
+                if p == '\\' && (args[i + 1] as char) == 'x' {
+                    if let Some(c1) = (args[i + 2] as char).to_digit(16) {
+                        if let Some(c2) = (args[i + 3] as char).to_digit(16) {
+                            current.push((c1 * 16 + c2) as u8);
+                            i += 3;
+                        }
+                    }
+                } else if p == '"'{
+                    // closing quote must be followed by a space or nothing at all
+                    i += 1;
+                    if i != args.len() && !(args[i] as char).is_whitespace() { return Err(()); }
+                    inq = false;
+                    done = true;
+                } else if p == '\\' && i + 1 < args.len() {
+                    i += 1;
+                    let c = match args[i] as char {
+                        'n' => '\n',
+                        'r' => '\r',
+                        't' => '\t',
+                        // FIXME: Rust does not recognize '\a' and '\b'?
+                        'b' => 'b',
+                        'a' => 'a',
+                        c => c as char,
+                    } as u8;
+                    current.push(c);
+                } else {
+                    current.push(args[i]);
+                }
+            } else if insq {
+                if p == '\'' {
+                    // closing quote must be followed by a space or nothing at all
+                    i += 1;
+                    if i != args.len() && !(args[i] as char).is_whitespace() { return Err(()); }
+                    insq = false;
+                    done = true;
+                } else if p == '\\' && i + 1 < args.len() && (args[i + 1] as char == '\'') {
+                    current.push(args[i + 1]);
+                    i += 1;
+                } else {
+                    current.push(args[i]);
+                }
+            } else {
+                match p as char {
+                    ' ' => done = true,
+                    '\t' => done = true,
+                    '\n' => done = true,
+                    '\r' => done = true,
+                    '\0' => done = true,
+                    '"' => inq = true,
+                    '\'' => insq = true,
+                    _ => current.push(args[i]),
+                }
+            }
+            i += 1;
+        }
+        result.push(current);
+        if i >=  args.len() {
+            if inq || insq {
+                return Err(());
+            }
+            break;
+        }
+    }
+    Ok(result)
+}
+
 #[test]
 fn glob_match_empty() {
     assert!(glob_match(&b"".to_vec(), &b"".to_vec(), true));
@@ -182,4 +261,30 @@ fn glob_match_brackets() {
     assert!(!glob_match(&b"[abc]".to_vec(), &b"ab".to_vec(), true));
     assert!(glob_match(&b"[\\]*]".to_vec(), &b"]".to_vec(), true));
     assert!(!glob_match(&b"[\\]*]".to_vec(), &b"a".to_vec(), true));
+}
+
+#[test]
+fn splitargs_quotes() {
+    assert_eq!(splitargs(&b"\"\\x9f\"".to_vec()).unwrap(), vec![vec![159u8]]);
+    assert_eq!(splitargs(&b"\"\"".to_vec()).unwrap(), vec![vec![]]);
+    assert_eq!(splitargs(&b"\"\\thello\\n\"".to_vec()).unwrap(), vec![b"\thello\n".to_vec()]);
+    assert!(splitargs(&b"\"a".to_vec()).is_err());
+}
+
+#[test]
+fn splitargs_singlequotes() {
+    assert_eq!(splitargs(&b"\'\\x9f\'".to_vec()).unwrap(), vec![b"\\x9f".to_vec()]);
+    assert_eq!(splitargs(&b"\'\'".to_vec()).unwrap(), vec![vec![]]);
+    assert_eq!(splitargs(&b"\'\\\'\'".to_vec()).unwrap(), vec![b"'".to_vec()]);
+    assert_eq!(splitargs(&b"\'\\thello\\n\'".to_vec()).unwrap(), vec![b"\\thello\\n".to_vec()]);
+    assert!(splitargs(&b"\'a".to_vec()).is_err());
+}
+
+#[test]
+fn splitargs_misc() {
+    assert_eq!(splitargs(&b"hello world".to_vec()).unwrap(), vec![b"hello".to_vec(), b"world".to_vec()]);
+    assert_eq!(splitargs(&b"\'hello\' world".to_vec()).unwrap(), vec![b"hello".to_vec(), b"world".to_vec()]);
+    assert_eq!(splitargs(&b"\"hello\" world".to_vec()).unwrap(), vec![b"hello".to_vec(), b"world".to_vec()]);
+    assert!(splitargs(&b"\"hello\"world".to_vec()).is_err());
+    assert!(splitargs(&b"\'hello\'world".to_vec()).is_err());
 }
