@@ -36,6 +36,9 @@ path = "database"
 [dependencies.command]
 path = "command"
 
+[dependencies.networking]
+path = "networking"
+
 [dependencies]
 time = "0.1"
 rand = "0.3.8"

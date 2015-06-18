@@ -1,0 +1,28 @@
+[package]
+name = "networking"
+version = "0.1.0"
+authors = ["Sebastian Waisbrot <seppo0010@gmail.com>"]
+
+[dependencies.config]
+path = "../config"
+
+[dependencies.util]
+path = "../util"
+
+[dependencies.parser]
+path = "../parser"
+
+[dependencies.response]
+path = "../response"
+
+[dependencies.database]
+path = "../database"
+
+[dependencies.command]
+path = "../command"
+
+[target.x86_64-unknown-linux-gnu.dependencies]
+libc ="0.1.8"
+
+[target.x86_64-apple-darwin.dependencies]
+libc ="0.1.8"

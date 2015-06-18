@@ -1,7 +1,8 @@
 extern crate rsedis;
 extern crate config;
+extern crate networking;
 
-use rsedis::networking::Server;
+use networking::Server;
 use config::Config;
 use std::env::args;
 
