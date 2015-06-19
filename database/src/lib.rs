@@ -1176,7 +1176,7 @@ impl Database {
 
     fn is_expired(&self, index: usize, key: &Vec<u8>) -> bool {
         match self.data_expiration_ns[index].get(key) {
-            Some(t) => t < &mstime(),
+            Some(t) => t <= &mstime(),
             None => false,
         }
     }

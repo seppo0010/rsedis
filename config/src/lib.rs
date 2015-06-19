@@ -12,7 +12,6 @@ use std::path::Path;
 use std::str::from_utf8;
 use std::str::FromStr;
 
-use time::get_time;
 use util::splitargs;
 
 pub struct Config {
@@ -22,15 +21,6 @@ pub struct Config {
     pub bind: Vec<String>,
     pub port: u16,
     pub tcp_keepalive: u32,
-}
-
-pub fn ustime() -> i64 {
-    let tv = get_time();
-    tv.sec * 1000000 + tv.nsec as i64
-}
-
-pub fn mstime() -> i64 {
-    ustime() / 1000
 }
 
 #[derive(Debug)]
@@ -152,6 +142,8 @@ mod tests {
     use std::fs::create_dir;
     use std::io::Write;
     use rand::random;
+
+    use util::mstime;
 
     macro_rules! config {
         ($str: expr) => ({

@@ -1,6 +1,7 @@
 extern crate time;
 
 use std::ascii::AsciiExt;
+use std::thread::sleep_ms;
 
 use time::get_time;
 
@@ -134,7 +135,7 @@ pub fn glob_match(pattern: &Vec<u8>, element: &Vec<u8>, ignore_case: bool) -> bo
 
 pub fn ustime() -> i64 {
     let tv = get_time();
-    tv.sec * 1000000 + tv.nsec as i64
+    tv.sec * 1000000 + (tv.nsec / 1000) as i64
 }
 
 pub fn mstime() -> i64 {
@@ -218,6 +219,14 @@ pub fn splitargs(args: &[u8]) -> Result<Vec<Vec<u8>>, ()> {
         }
     }
     Ok(result)
+}
+
+#[test]
+fn mstime_sleep() {
+    let start = mstime();
+    sleep_ms(100);
+    let end = mstime();
+    assert!(start < end && start + 100 <= end && start + 500 > end);
 }
 
 #[test]
