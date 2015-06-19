@@ -1,4 +1,4 @@
-#![feature(collections)]
+#![feature(collections_bound)]
 
 use std::collections::Bound;
 use std::str::from_utf8;

@@ -1,4 +1,4 @@
-#![feature(collections)]
+#![feature(collections_bound)]
 
 extern crate config;
 extern crate rand;
