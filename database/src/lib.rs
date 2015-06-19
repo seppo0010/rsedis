@@ -1,4 +1,5 @@
 #![feature(collections_bound)]
+#![feature(drain)]
 
 extern crate config;
 extern crate rand;
@@ -9,6 +10,7 @@ extern crate util;
 pub mod dbutil;
 pub mod error;
 pub mod list;
+pub mod set;
 pub mod string;
 
 use std::usize;
@@ -19,7 +21,6 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::mpsc::{Sender, channel};
 
-use rand::random;
 use skiplist::OrderedSkipList;
 
 use config::Config;
@@ -30,6 +31,7 @@ use util::mstime;
 use dbutil::normalize_position;
 use error::OperationError;
 use list::ValueList;
+use set::ValueSet;
 use string::ValueString;
 
 /**
@@ -107,11 +109,6 @@ pub enum Value {
     List(ValueList),
     Set(ValueSet),
     SortedSet(ValueSortedSet),
-}
-
-#[derive(PartialEq, Debug, Clone)]
-pub enum ValueSet {
-    Data(HashSet<Vec<u8>>),
 }
 
 #[derive(PartialEq, Debug)]
@@ -377,14 +374,12 @@ impl Value {
     pub fn sadd(&mut self, el: Vec<u8>) -> Result<bool, OperationError> {
         match self {
             &mut Value::Nil => {
-                let mut set = HashSet::new();
-                set.insert(el);
-                *self = Value::Set(ValueSet::Data(set));
+                let mut value = ValueSet::new();
+                value.sadd(el);
+                *self = Value::Set(value);
                 Ok(true)
             },
-            &mut Value::Set(ref mut value) => match value {
-                &mut ValueSet::Data(ref mut set) => Ok(set.insert(el)),
-            },
+            &mut Value::Set(ref mut value) => Ok(value.sadd(el)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -392,9 +387,7 @@ impl Value {
     pub fn srem(&mut self, el: &Vec<u8>) -> Result<bool, OperationError> {
         match self {
             &mut Value::Nil => Ok(false),
-            &mut Value::Set(ref mut value) => match value {
-                &mut ValueSet::Data(ref mut set) => Ok(set.remove(el)),
-            },
+            &mut Value::Set(ref mut value) => Ok(value.srem(el)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -402,9 +395,7 @@ impl Value {
     pub fn sismember(&self, el: &Vec<u8>) -> Result<bool, OperationError> {
         match self {
             &Value::Nil => Ok(false),
-            &Value::Set(ref value) => match value {
-                &ValueSet::Data(ref set) => Ok(set.contains(el)),
-            },
+            &Value::Set(ref value) => Ok(value.sismember(el)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -412,9 +403,7 @@ impl Value {
     pub fn scard(&self) -> Result<usize, OperationError> {
         match self {
             &Value::Nil => Ok(0),
-            &Value::Set(ref value) => match value {
-                &ValueSet::Data(ref set) => Ok(set.len()),
-            },
+            &Value::Set(ref value) => Ok(value.scard()),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -422,153 +411,75 @@ impl Value {
     pub fn smembers(&self) -> Result<Vec<Vec<u8>>, OperationError> {
         match self {
             &Value::Nil => Ok(vec![]),
-            &Value::Set(ref value) => match value {
-                &ValueSet::Data(ref set) => Ok(set.iter().map(|x| x.clone()).collect::<Vec<_>>()),
-            },
+            &Value::Set(ref value) => Ok(value.smembers()),
             _ => Err(OperationError::WrongTypeError),
         }
     }
 
 
     pub fn srandmember(&self, count: usize, allow_duplicates: bool) -> Result<Vec<Vec<u8>>, OperationError> {
-        // TODO: implemented in O(n), should be O(1)
-        let set = match self {
-            &Value::Nil => return Ok(Vec::new()),
-            &Value::Set(ref value) => match value {
-                &ValueSet::Data(ref s) => s,
-            },
-            _ => return Err(OperationError::WrongTypeError),
-        };
-
-        if allow_duplicates {
-            let mut r = Vec::new();
-            for _ in 0..count {
-                let pos = random::<usize>() % set.len();
-                r.push(set.iter().skip(pos).take(1).next().unwrap().clone());
-            }
-            return Ok(r);
-        } else {
-            if count >= set.len() {
-                return Ok(set.iter().map(|x| x.clone()).collect::<Vec<_>>());
-            }
-            let mut s = HashSet::new();
-            while s.len() < count {
-                let pos = random::<usize>() % set.len();
-                s.insert(set.iter().skip(pos).take(1).next().unwrap().clone());
-            }
-            return Ok(s.iter().map(|x| x.clone()).collect::<Vec<_>>());
+        match self {
+            &Value::Nil => Ok(Vec::new()),
+            &Value::Set(ref value) => Ok(value.srandmember(count, allow_duplicates)),
+            _ => Err(OperationError::WrongTypeError),
         }
     }
 
     pub fn spop(&mut self, count: usize) -> Result<Vec<Vec<u8>>, OperationError> {
-        // TODO: implemented in O(n), should be O(1)
-
-        let len = try!(self.scard());
-        if count >= len {
-            let r = {
-                let set = match self {
-                    &mut Value::Nil => return Ok(Vec::new()),
-                    &mut Value::Set(ref mut value) => match value {
-                        &mut ValueSet::Data(ref s) => s,
-                    },
-                    _ => return Err(OperationError::WrongTypeError),
-                };
-                set.iter().map(|x| x.clone()).collect::<Vec<_>>()
-            };
-            *self = Value::Nil;
-            return Ok(r);
+        match self {
+            &mut Value::Nil => Ok(Vec::new()),
+            &mut Value::Set(ref mut value) => Ok(value.spop(count)),
+            _ => Err(OperationError::WrongTypeError),
         }
-
-        let r = try!(self.srandmember(count, false));
-
-        let mut set = match self {
-            &mut Value::Nil => return Ok(Vec::new()),
-            &mut Value::Set(ref mut value) => match value {
-                &mut ValueSet::Data(ref mut s) => s,
-            },
-            _ => return Err(OperationError::WrongTypeError),
-        };
-
-        for member in r.iter() {
-            set.remove(member);
-        }
-
-        Ok(r)
     }
 
-    pub fn sdiff(&self, sets: &Vec<&Value>) -> Result<HashSet<Vec<u8>>, OperationError> {
+    fn get_set_list<'a>(&'a self, set_values: &Vec<&'a Value>, default: &'a ValueSet) -> Result<Vec<&ValueSet>, OperationError> {
+        let mut sets = Vec::with_capacity(set_values.len());
+        for value in set_values {
+            sets.push(match value {
+                &&Value::Nil => default,
+                &&Value::Set(ref value) => value,
+                _ => return Err(OperationError::WrongTypeError),
+            });
+        }
+        Ok(sets)
+    }
+
+    pub fn sdiff(&self, set_values: &Vec<&Value>) -> Result<HashSet<Vec<u8>>, OperationError> {
+        let emptyset = ValueSet::new();
+        let sets = try!(self.get_set_list(set_values, &emptyset));
+
         match self {
             &Value::Nil => Ok(HashSet::new()),
-            &Value::Set(ref value) => match value {
-                &ValueSet::Data(ref original_set) => {
-                    let mut elements: HashSet<Vec<u8>> = original_set.clone();
-                    for newvalue in sets {
-                        match newvalue {
-                            &&Value::Nil => {},
-                            &&Value::Set(ref value) => match value {
-                                &ValueSet::Data(ref set) => {
-                                    for el in set {
-                                        elements.remove(el);
-                                    }
-                                },
-                            },
-                            _ => return Err(OperationError::WrongTypeError),
-                        }
-                    }
-                    Ok(elements)
-                },
-            },
+            &Value::Set(ref value) => Ok(value.sdiff(sets)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
 
-    fn get_set<'a>(&'a self, val: &'a Value) -> Result<Option<&HashSet<Vec<u8>>>, OperationError> {
-        match val {
-            &Value::Nil => Ok(None),
-            &Value::Set(ref value) => match value {
-                &ValueSet::Data(ref original_set) => {
-                    Ok(Some(original_set))
-                },
-            },
+    pub fn sinter(&self, set_values: &Vec<&Value>) -> Result<HashSet<Vec<u8>>, OperationError> {
+        let emptyset = ValueSet::new();
+        let sets = try!(self.get_set_list(set_values, &emptyset));
+
+        match self {
+            &Value::Nil => Ok(HashSet::new()),
+            &Value::Set(ref value) => Ok(value.sinter(sets)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
 
-    pub fn sinter(&self, sets: &Vec<&Value>) -> Result<HashSet<Vec<u8>>, OperationError> {
-        let mut result = match try!(self.get_set(self)) {
-            Some(s) => s.clone(),
-            None => return Ok(HashSet::new()),
-        };
+    pub fn sunion(&self, set_values: &Vec<&Value>) -> Result<HashSet<Vec<u8>>, OperationError> {
+        let emptyset = ValueSet::new();
+        let sets = try!(self.get_set_list(set_values, &emptyset));
 
-        for s in sets.iter() {
-            result = match try!(self.get_set(s)) {
-                Some(set) => result.intersection(set).cloned().collect(),
-                None => return Ok(HashSet::new()),
-            };
-            if result.len() == 0 {
-                break;
-            }
+        match self {
+            &Value::Nil => Ok(HashSet::new()),
+            &Value::Set(ref value) => Ok(value.sunion(sets)),
+            _ => Err(OperationError::WrongTypeError),
         }
-        Ok(result)
-    }
-
-    pub fn sunion(&self, sets: &Vec<&Value>) -> Result<HashSet<Vec<u8>>, OperationError> {
-        let mut result = match try!(self.get_set(self)) {
-            Some(s) => s.clone(),
-            None => HashSet::new(),
-        };
-
-        for s in sets.iter() {
-            result = match try!(self.get_set(s)) {
-                Some(set) => result.union(set).cloned().collect(),
-                None => result,
-            };
-        }
-        Ok(result)
     }
 
     pub fn create_set(&mut self, set: HashSet<Vec<u8>>) {
-        *self = Value::Set(ValueSet::Data(set));
+        *self = Value::Set(ValueSet::create_with_hashset(set));
     }
 
     pub fn zrem(&mut self, member: Vec<u8>) -> Result<bool, OperationError> {

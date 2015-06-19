@@ -16,7 +16,7 @@ use std::usize;
 
 use database::PubsubEvent;
 use database::Database;
-use database::{Value, ValueSet};
+use database::Value;
 use response::{Response, ResponseError};
 use parser::{Parser, Argument};
 use util::mstime;
@@ -2083,7 +2083,9 @@ fn sdiffstore_command() {
     assert_eq!(command(&parser!(b"sdiffstore target key1 key2"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(2));
 
     let set = vec![b"1".to_vec(), b"2".to_vec()].iter().cloned().collect::<HashSet<_>>();
-    assert_eq!(db.get(0, &b"target".to_vec()).unwrap(), &Value::Set(ValueSet::Data(set)));
+    let mut set2 = Value::Nil;
+    set2.create_set(set);
+    assert_eq!(db.get(0, &b"target".to_vec()).unwrap(), &set2);
 }
 
 #[test]
@@ -2138,7 +2140,9 @@ fn sinterstore_command() {
     assert_eq!(command(&parser!(b"sinterstore target key1 key2"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(2));
 
     let set = vec![b"3".to_vec(), b"2".to_vec()].iter().cloned().collect::<HashSet<_>>();
-    assert_eq!(db.get(0, &b"target".to_vec()).unwrap(), &Value::Set(ValueSet::Data(set)));
+    let mut set2 = Value::Nil;
+    set2.create_set(set);
+    assert_eq!(db.get(0, &b"target".to_vec()).unwrap(), &set2);
 }
 
 #[test]
@@ -2184,7 +2188,9 @@ fn sunionstore_command() {
     assert_eq!(command(&parser!(b"sunionstore target key1 key2"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(4));
 
     let set = vec![b"1".to_vec(), b"2".to_vec(), b"3".to_vec(), b"4".to_vec()].iter().cloned().collect::<HashSet<_>>();
-    assert_eq!(db.get(0, &b"target".to_vec()).unwrap(), &Value::Set(ValueSet::Data(set)));
+    let mut set2 = Value::Nil;
+    set2.create_set(set);
+    assert_eq!(db.get(0, &b"target".to_vec()).unwrap(), &set2);
 }
 
 #[test]
