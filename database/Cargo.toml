@@ -12,6 +12,8 @@ path = "../util"
 [dependencies.response]
 path = "../response"
 
+[dependencies.skiplist]
+git = "https://github.com/seppo0010/rust-skiplist"
+
 [dependencies]
 rand = "0.3.8"
-skiplist = "0.2.4"

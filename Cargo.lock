@@ -10,7 +10,7 @@ dependencies = [
  "parser 0.1.0",
  "rand 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "response 0.1.0",
- "skiplist 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "skiplist 0.2.6 (git+https://github.com/seppo0010/rust-skiplist)",
  "time 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "util 0.1.0",
 ]
@@ -41,7 +41,7 @@ dependencies = [
  "config 0.1.0",
  "rand 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "response 0.1.0",
- "skiplist 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "skiplist 0.2.6 (git+https://github.com/seppo0010/rust-skiplist)",
  "util 0.1.0",
 ]
 
@@ -86,8 +86,8 @@ version = "0.1.0"
 
 [[package]]
 name = "skiplist"
-version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
+version = "0.2.6"
+source = "git+https://github.com/seppo0010/rust-skiplist#9f386ac1eaedd74eec7e618b0942e41937284716"
 dependencies = [
  "rand 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
