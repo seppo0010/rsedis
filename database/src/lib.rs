@@ -6,18 +6,17 @@ extern crate response;
 extern crate skiplist;
 extern crate util;
 
+pub mod error;
+pub mod string;
+pub mod dbutil;
+
 use std::usize;
-use std::fmt;
-use std::error::Error;
 use std::cmp::Ord;
 use std::cmp::Ordering;
 use std::collections::Bound;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::collections::LinkedList;
-use std::str::from_utf8;
-use std::str::Utf8Error;
-use std::num::ParseIntError;
 use std::sync::mpsc::{Sender, channel};
 
 use rand::random;
@@ -28,6 +27,9 @@ use response::Response;
 use util::glob_match;
 use util::mstime;
 
+use error::OperationError;
+use string::ValueString;
+use dbutil::normalize_position;
 
 /**
  * SortedSetMember is a wrapper around f64 to implement ordering and equality.
@@ -107,12 +109,6 @@ pub enum Value {
 }
 
 #[derive(PartialEq, Debug, Clone)]
-pub enum ValueString {
-    Integer(i64),
-    Data(Vec<u8>),
-}
-
-#[derive(PartialEq, Debug, Clone)]
 pub enum ValueList {
     Data(LinkedList<Vec<u8>>),
 }
@@ -125,34 +121,6 @@ pub enum ValueSet {
 #[derive(PartialEq, Debug)]
 pub enum ValueSortedSet {
     Data(OrderedSkipList<SortedSetMember>, HashMap<Vec<u8>, f64>),
-}
-
-#[derive(Debug)]
-pub enum OperationError {
-    OverflowError,
-    ValueError,
-    WrongTypeError,
-    OutOfBoundsError,
-}
-
-impl fmt::Display for OperationError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.description().fmt(f)
-    }
-}
-
-impl Error for OperationError {
-    fn description(&self) -> &str {
-        return "oops";
-    }
-}
-
-impl From<Utf8Error> for OperationError {
-    fn from(_: Utf8Error) -> OperationError { OperationError::ValueError }
-}
-
-impl From<ParseIntError> for OperationError {
-    fn from(_: ParseIntError) -> OperationError { OperationError::ValueError }
 }
 
 #[derive(PartialEq, Debug)]
@@ -204,21 +172,6 @@ impl PubsubEvent {
     }
 }
 
-fn normalize_position(position: i64, _len: usize) -> Result<usize, usize> {
-    let len = _len as i64;
-    let mut pos = position;
-    if pos < 0 {
-        pos += len;
-    }
-    if pos < 0 {
-        return Err(0);
-    }
-    if pos > len {
-        return Err(len as usize);
-    }
-    return Ok(pos as usize);
-}
-
 fn is_range_valid<T: Ord>(min: Bound<T>, max: Bound<T>) -> bool {
     let mut both_in = true;
     let v1 = match min {
@@ -266,34 +219,20 @@ impl Value {
     }
 
     pub fn set(&mut self, newvalue: Vec<u8>) -> Result<(), OperationError> {
-        if newvalue.len() < 32 { // ought to be enough!
-            if let Ok(utf8) = from_utf8(&*newvalue) {
-                if let Ok(i) = utf8.parse::<i64>() {
-                    *self = Value::String(ValueString::Integer(i));
-                    return Ok(());
-                }
-            }
-        }
-        *self = Value::String(ValueString::Data(newvalue));
+        *self = Value::String(ValueString::new(newvalue));
         return Ok(());
     }
 
     pub fn get(&self) -> Result<Vec<u8>, OperationError> {
         match self {
-            &Value::String(ref value) => match value {
-                &ValueString::Data(ref data) => Ok(data.clone()),
-                &ValueString::Integer(ref int) => Ok(format!("{}", int).into_bytes()),
-            },
+            &Value::String(ref value) => Ok(value.to_vec()),
             _ => Err(OperationError::WrongTypeError),
         }
     }
 
     pub fn strlen(&self) -> Result<usize, OperationError> {
         match self {
-            &Value::String(ref val) => match val {
-                &ValueString::Data(ref data) => Ok(data.len()),
-                &ValueString::Integer(ref int) => Ok(format!("{}", int).len()),
-            },
+            &Value::String(ref val) => Ok(val.strlen()),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -302,18 +241,10 @@ impl Value {
         match self {
             &mut Value::Nil => {
                 let len = newvalue.len();
-                *self = Value::String(ValueString::Data(newvalue));
+                *self = Value::String(ValueString::new(newvalue));
                 Ok(len)
             },
-            &mut Value::String(ref mut value) => match value {
-                &mut ValueString::Data(ref mut data) => { data.extend(newvalue); Ok(data.len()) },
-                &mut ValueString::Integer(i) => {
-                    let oldstr = format!("{}", i);
-                    let len = oldstr.len() + newvalue.len();
-                    *value = ValueString::Data([oldstr.into_bytes(), newvalue].concat());
-                    Ok(len)
-                },
-            },
+            &mut Value::String(ref mut val) => { val.append(newvalue); Ok(val.strlen()) },
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -323,149 +254,54 @@ impl Value {
         match self {
             &mut Value::Nil => {
                 newval = incr;
+                *self = Value::String(ValueString::Integer(newval.clone()));
+                return Ok(newval);
             },
-            &mut Value::String(ref mut value) => {
-                match value {
-                    &mut ValueString::Integer(i) => {
-                        let tmp_newval = i.checked_add(incr);
-                        match tmp_newval {
-                            Some(v) => newval = v,
-                            None => return Err(OperationError::OverflowError),
-                        }
-                    },
-                    &mut ValueString::Data(ref data) => {
-                        if data.len() > 32 {
-                            return Err(OperationError::OverflowError);
-                        }
-                        let res = try!(from_utf8(&data));
-                        let ival = try!(res.parse::<i64>());
-                        let tmp_newval = ival.checked_add(incr);
-                        match tmp_newval {
-                            Some(v) => newval = v,
-                            None => return Err(OperationError::OverflowError),
-                        }
-                    },
-                }
-            },
+            &mut Value::String(ref mut value) => value.incr(incr),
             _ => return Err(OperationError::WrongTypeError),
         }
-        *self = Value::String(ValueString::Integer(newval));
-        return Ok(newval);
     }
 
-    pub fn getrange(&self, _start: i64, _stop: i64) -> Result<Vec<u8>, OperationError> {
-        let s = match self {
-            &Value::Nil => return Ok(Vec::new()),
-            &Value::String(ref value) => match value {
-                &ValueString::Integer(ref i) => format!("{}", i).into_bytes(),
-                &ValueString::Data(ref s) => s.clone(),
-            },
+    pub fn getrange(&self, start: i64, stop: i64) -> Result<Vec<u8>, OperationError> {
+        match self {
+            &Value::Nil => Ok(Vec::new()),
+            &Value::String(ref value) => Ok(value.getrange(start, stop)),
+            _ => Err(OperationError::WrongTypeError),
+        }
+    }
+
+    pub fn setrange(&mut self, index: i64, data: Vec<u8>) -> Result<usize, OperationError> {
+        match self {
+            &mut Value::Nil => *self = Value::String(ValueString::Data(Vec::new())),
+            &mut Value::String(_) => (),
             _ => return Err(OperationError::WrongTypeError),
         };
 
-        let len = s.len();
-        let start = match normalize_position(_start, len) {
-            Ok(i) => i,
-            Err(i) => if i == 0 { 0 } else { return Ok(Vec::new()); }
-        } as usize;
-        let stop = match normalize_position(_stop, len) {
-            Ok(i) => i,
-            Err(i) => if i == 0 { return Ok(Vec::new()); } else { len }
-        } as usize;
-        let mut v = Vec::with_capacity(stop - start + 1);
-        v.extend(s[start..stop + 1].iter());
-        Ok(v)
+        match self {
+            &mut Value::String(ref mut value) => Ok(value.setrange(index, data)),
+            _ => panic!("Expected value to be a string"),
+        }
     }
 
     pub fn setbit(&mut self, bitoffset: usize, on: bool) -> Result<bool, OperationError> {
         match self {
             &mut Value::Nil => *self = Value::String(ValueString::Data(Vec::new())),
-            &mut Value::String(ref mut value) => {
-                match value {
-                    &mut ValueString::Integer(i) => *value = ValueString::Data(format!("{}", i).into_bytes()),
-                    &mut ValueString::Data(_) => (),
-                }
-            }
+            &mut Value::String(_) => (),
             _ => return Err(OperationError::WrongTypeError),
-        };
-        let mut d = match self {
-            &mut Value::String(ref mut value) => match value {
-                &mut ValueString::Data(ref mut d) => d,
-                _ => panic!("Value should be data"),
-            },
-            _ => panic!("Value should be string"),
-        };
-
-        let byte = bitoffset >> 3;
-
-        while byte + 1 > d.len() {
-            d.push(0);
         }
 
-        let mut byteval = d[byte];
-        let bit = 7 - (bitoffset & 0x7);
-        let bitval = byteval & (1 << bit);
-
-        byteval &= !(1 << bit);
-        byteval |= (if on { 1 } else { 0 } & 0x1) << bit;
-        d[byte] = byteval;
-
-        Ok(bitval != 0)
+        match self {
+            &mut Value::String(ref mut value) => Ok(value.setbit(bitoffset, on)),
+            _ => panic!("Value must be a string")
+        }
     }
 
     pub fn getbit(&self, bitoffset: usize) -> Result<bool, OperationError> {
-        let tmp;
-        let d = match self {
-            &Value::Nil => return Ok(false),
-            &Value::String(ref value) => match value {
-                &ValueString::Integer(i) => { tmp = format!("{}", i).into_bytes(); &tmp },
-                &ValueString::Data(ref d) => d,
-            },
-            _ => return Err(OperationError::WrongTypeError),
-        };
-
-        let byte = bitoffset >> 3;
-        if byte >= d.len() {
-            return Ok(false);
-        }
-
-        let bit = 7 - (bitoffset & 0x7);;
-        let bitval = d[byte] & (1 << bit);
-
-        Ok(bitval != 0)
-    }
-
-    pub fn setrange(&mut self, _index: i64, data: Vec<u8>) -> Result<usize, OperationError> {
         match self {
-            &mut Value::Nil => *self = Value::String(ValueString::Data(Vec::new())),
-            &mut Value::String(ref mut value) => match value {
-                &mut ValueString::Integer(i) => *value = ValueString::Data(format!("{}", i).into_bytes()),
-                &mut ValueString::Data(_) => (),
-            },
+            &Value::Nil => return Ok(false),
+            &Value::String(ref value) => Ok(value.getbit(bitoffset)),
             _ => return Err(OperationError::WrongTypeError),
-        };
-        let mut d = match self {
-            &mut Value::String(ref mut value) => match value {
-                &mut ValueString::Data(ref mut s) => s,
-                _ => panic!("Value should be data"),
-            },
-            _ => panic!("Value should be string"),
-        };
-        let mut index = match normalize_position(_index, d.len()) {
-            Ok(i) => i,
-            Err(p) => if p == 0 { p } else { _index as usize },
-        };
-        for _ in d.len()..index {
-            d.push(0);
         }
-        for c in data {
-            d.push(c);
-            if index < d.len() - 1 {
-                d.swap_remove(index);
-            }
-            index += 1;
-        }
-        Ok(d.len())
     }
 
     pub fn push(&mut self, el: Vec<u8>, right: bool) -> Result<usize, OperationError> {

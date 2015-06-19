@@ -16,7 +16,7 @@ use std::usize;
 
 use database::PubsubEvent;
 use database::Database;
-use database::{Value, ValueString, ValueSet};
+use database::{Value, ValueSet};
 use response::{Response, ResponseError};
 use parser::{Parser, Argument};
 use util::mstime;
@@ -1380,10 +1380,7 @@ macro_rules! parser {
 
 fn getstr(database: &Database, key: &[u8]) -> String {
     match database.get(0, &key.to_vec()).unwrap() {
-        &Value::String(ref value) => match value {
-            &ValueString::Data(ref bytes) => from_utf8(bytes).unwrap().to_owned(),
-            &ValueString::Integer(i) => format!("{}", i),
-        },
+        &Value::String(ref value) => from_utf8(&*value.to_vec()).unwrap().to_owned(),
         _ => panic!("Got non-string"),
     }
 }
@@ -1683,7 +1680,7 @@ fn append_command() {
     let mut db = Database::mock();
     assert_eq!(command(&parser!(b"append key value"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(5));
     assert_eq!(command(&parser!(b"append key value"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(10));
-    assert_eq!(db.get(0, &b"key".to_vec()).unwrap(), &Value::String(ValueString::Data(b"valuevalue".to_vec())));
+    assert_eq!(db.get(0, &b"key".to_vec()).unwrap().get().unwrap(), b"valuevalue".to_vec());
 }
 
 #[test]
