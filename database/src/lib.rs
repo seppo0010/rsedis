@@ -18,7 +18,7 @@ use std::collections::LinkedList;
 use std::str::from_utf8;
 use std::str::Utf8Error;
 use std::num::ParseIntError;
-use std::sync::mpsc::Sender;
+use std::sync::mpsc::{Sender, channel};
 
 use rand::random;
 use skiplist::OrderedSkipList;
@@ -2254,4 +2254,38 @@ fn zincrby() {
     assert_eq!(value.zincrby(s1.clone(), v1.clone()).unwrap(), s1);
     assert_eq!(value.zincrby(s2.clone(), v1.clone()).unwrap(), s1 + s2);
     assert_eq!(value.zincrby(- s1.clone(), v1.clone()).unwrap(), s2);
+}
+
+#[test]
+fn pubsub_basic() {
+    let mut database = Database::mock();
+    let channel_name = vec![1u8, 2, 3];
+    let message = vec![2u8, 3, 4, 5, 6];
+    let (tx, rx) = channel();
+    database.subscribe(channel_name.clone(), tx);
+    database.publish(&channel_name, &message);
+    assert_eq!(rx.recv().unwrap(), PubsubEvent::Message(channel_name, None, message));
+}
+
+#[test]
+fn unsubscribe() {
+    let mut database = Database::mock();
+    let channel_name = vec![1u8, 2, 3];
+    let message = vec![2u8, 3, 4, 5, 6];
+    let (tx, rx) = channel();
+    let subscriber_id = database.subscribe(channel_name.clone(), tx);
+    database.unsubscribe(channel_name.clone(), subscriber_id);
+    database.publish(&channel_name, &message);
+    assert!(rx.try_recv().is_err());
+}
+
+#[test]
+fn pubsub_pattern() {
+    let mut database = Database::mock();
+    let channel_name = vec![1u8, 2, 3];
+    let message = vec![2u8, 3, 4, 5, 6];
+    let (tx, rx) = channel();
+    database.psubscribe(channel_name.clone(), tx);
+    database.publish(&channel_name, &message);
+    assert_eq!(rx.recv().unwrap(), PubsubEvent::Message(channel_name.clone(), Some(channel_name.clone()), message));
 }
