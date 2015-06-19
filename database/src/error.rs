@@ -7,6 +7,7 @@ use std::str::Utf8Error;
 pub enum OperationError {
     OverflowError,
     ValueError,
+    UnknownKeyError,
     WrongTypeError,
     OutOfBoundsError,
 }

@@ -6,9 +6,10 @@ extern crate response;
 extern crate skiplist;
 extern crate util;
 
-pub mod error;
-pub mod string;
 pub mod dbutil;
+pub mod error;
+pub mod list;
+pub mod string;
 
 use std::usize;
 use std::cmp::Ord;
@@ -16,7 +17,6 @@ use std::cmp::Ordering;
 use std::collections::Bound;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::collections::LinkedList;
 use std::sync::mpsc::{Sender, channel};
 
 use rand::random;
@@ -27,9 +27,10 @@ use response::Response;
 use util::glob_match;
 use util::mstime;
 
-use error::OperationError;
-use string::ValueString;
 use dbutil::normalize_position;
+use error::OperationError;
+use list::ValueList;
+use string::ValueString;
 
 /**
  * SortedSetMember is a wrapper around f64 to implement ordering and equality.
@@ -106,11 +107,6 @@ pub enum Value {
     List(ValueList),
     Set(ValueSet),
     SortedSet(ValueSortedSet),
-}
-
-#[derive(PartialEq, Debug, Clone)]
-pub enum ValueList {
-    Data(LinkedList<Vec<u8>>),
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -305,223 +301,77 @@ impl Value {
     }
 
     pub fn push(&mut self, el: Vec<u8>, right: bool) -> Result<usize, OperationError> {
-        let listsize;
-        match self {
+        Ok(match self {
             &mut Value::Nil => {
-                let mut list = LinkedList::new();
-                list.push_back(el);
-                *self = Value::List(ValueList::Data(list));
-                listsize = 1;
+                let mut list = ValueList::new();
+                list.push(el, right);
+                *self = Value::List(list);
+                1
             },
-            &mut Value::List(ref mut value) => match value {
-                &mut ValueList::Data(ref mut list) => {
-                    if right {
-                        list.push_back(el);
-                    } else {
-                        list.push_front(el);
-                    }
-                    listsize = list.len();
-                },
-            },
+            &mut Value::List(ref mut list) => { list.push(el, right); list.llen() },
             _ => return Err(OperationError::WrongTypeError),
-        }
-        return Ok(listsize);
+        })
     }
 
     pub fn pop(&mut self, right: bool) -> Result<Option<Vec<u8>>, OperationError> {
-        let el;
-        let mut clear;
-        match self {
-            &mut Value::Nil => {
-                return Ok(None);
-            },
-            &mut Value::List(ref mut value) => match value {
-                &mut ValueList::Data(ref mut list) => {
-                    if right {
-                        el = list.pop_back();
-                    } else {
-                        el = list.pop_front();
-                    }
-                    clear = list.len() == 0;
-                },
-            },
+        Ok(match self {
+            &mut Value::Nil => None,
+            &mut Value::List(ref mut list) => list.pop(right),
             _ => return Err(OperationError::WrongTypeError),
-        }
-        if clear {
-            *self = Value::Nil;
-        }
-        return Ok(el);
+        })
     }
 
-    pub fn lindex(&self, _index: i64) -> Result<Option<&Vec<u8>>, OperationError> {
-        match self {
-            &Value::List(ref value) => match value {
-                &ValueList::Data(ref list) => {
-                    let index = match normalize_position(_index, list.len()) {
-                        Ok(i) => i,
-                        Err(_) => return Ok(None),
-                    };
-                    Ok(list.iter().nth(index as usize))
-                },
-            },
+    pub fn lindex(&self, index: i64) -> Result<Option<&Vec<u8>>, OperationError> {
+        match *self {
+            Value::List(ref value) => Ok(value.lindex(index)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
 
     pub fn linsert(&mut self, before: bool, pivot: Vec<u8>, newvalue: Vec<u8>) -> Result<Option<usize>, OperationError> {
         match self {
-            &mut Value::List(ref mut value) => match value {
-                &mut ValueList::Data(ref mut list) => {
-                    let pos;
-                    match list.iter().position(|x| x == &pivot) {
-                        Some(_pos) => {
-                            if before {
-                                pos = _pos;
-                            } else {
-                                pos = _pos + 1;
-                            }
-                        },
-                        None => return Ok(None),
-                    }
-                    let mut right = list.split_off(pos);
-                    list.push_back(newvalue);
-                    list.append(&mut right);
-                    return Ok(Some(list.len()));
-                },
-            },
-            _ => return Err(OperationError::WrongTypeError),
-        };
+            &mut Value::Nil => Ok(None),
+            &mut Value::List(ref mut value) => Ok(value.linsert(before, pivot, newvalue)),
+            _ => Err(OperationError::WrongTypeError),
+        }
     }
 
     pub fn llen(&self) -> Result<usize, OperationError> {
         return match self {
             &Value::Nil => Ok(0),
-            &Value::List(ref value) => match value {
-                &ValueList::Data(ref list) => Ok(list.len()),
-            },
+            &Value::List(ref value) => Ok(value.llen()),
             _ => Err(OperationError::WrongTypeError),
         };
     }
 
-    pub fn lrange(&self, _start: i64, _stop: i64) -> Result<Vec<&Vec<u8>>, OperationError> {
+    pub fn lrange(&self, start: i64, stop: i64) -> Result<Vec<&Vec<u8>>, OperationError> {
         match self {
-            &Value::List(ref value) => match value {
-                &ValueList::Data(ref list) => {
-                    let len = list.len();
-                    let start = match normalize_position(_start, len) {
-                        Ok(i) => i,
-                        Err(i) => if i == 0 { 0 } else { return Ok(Vec::new()); },
-                    };
-                    let stop = match normalize_position(_stop, len) {
-                        Ok(i) => i,
-                        Err(i) => if i == 0 { return Ok(Vec::new()); } else { i },
-                    };
-                    Ok(list.iter().skip(start as usize).take(stop as usize - start as usize + 1).collect::<Vec<_>>())
-                },
-            },
+            &Value::Nil => Ok(Vec::new()),
+            &Value::List(ref value) => Ok(value.lrange(start, stop)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
 
     pub fn lrem(&mut self, left: bool, limit: usize, newvalue: Vec<u8>) -> Result<usize, OperationError> {
-        let mut count = 0;
-        let mut newlist = LinkedList::new();
         match self {
-            &mut Value::List(ref mut value) => match value {
-                &mut ValueList::Data(ref mut list) => {
-                    if left {
-                        while limit == 0 || count < limit {
-                            match list.pop_front() {
-                                None => break,
-                                Some(el) => {
-                                    if el != newvalue {
-                                        newlist.push_back(el);
-                                    } else {
-                                        count += 1;
-                                    }
-                                }
-                            }
-                        }
-                        newlist.append(list);
-                    } else {
-                        while limit == 0 || count < limit {
-                            match list.pop_back() {
-                                None => break,
-                                Some(el) => {
-                                    if el != newvalue {
-                                        newlist.push_front(el);
-                                    } else {
-                                        count += 1;
-                                    }
-                                }
-                            }
-                        }
-                        // omg, ugly code, let me explain
-                        // append will merge right two lists and clear the parameter
-                        // newlist is the one that will survive after lrem
-                        // but list needs to be at the beginning, so we are merging
-                        // first to list and then to newlist
-                        list.append(&mut newlist);
-                        newlist.append(list);
-                    }
-                },
-            },
-            _ => return Err(OperationError::WrongTypeError),
-        };
-        if newlist.len() == 0 {
-            *self = Value::Nil;
-        } else {
-            *self = Value::List(ValueList::Data(newlist));
+            &mut Value::List(ref mut value) => Ok(value.lrem(left, limit, newvalue)),
+            _ => Err(OperationError::WrongTypeError),
         }
-        return Ok(count);
     }
 
     pub fn lset(&mut self, index: i64, newvalue: Vec<u8>) -> Result<(), OperationError> {
-        return match self {
-            &mut Value::List(ref mut value) => match value {
-                &mut ValueList::Data(ref mut list) => {
-                    let i = match normalize_position(index, list.len()) {
-                        Ok(i) => i,
-                        Err(_) => return Err(OperationError::OutOfBoundsError),
-                    };
-                    // this unwrap is safe because `i` is already validated to be inside the list
-                    let el = list.iter_mut().skip(i).next().unwrap();
-                    *el = newvalue;
-                    Ok(())
-                }
-            },
-            _ => return Err(OperationError::WrongTypeError),
+        match self {
+            &mut Value::Nil => Err(OperationError::UnknownKeyError),
+            &mut Value::List(ref mut value) => value.lset(index, newvalue),
+            _ => Err(OperationError::WrongTypeError),
         }
     }
 
-    pub fn ltrim(&mut self, _start: i64, _stop: i64) -> Result<(), OperationError> {
-        let mut newlist;
+    pub fn ltrim(&mut self, start: i64, stop: i64) -> Result<(), OperationError> {
         match self {
-            &mut Value::List(ref mut value) => match value {
-                &mut ValueList::Data(ref mut list) => {
-                    let len = list.len();
-                    let start = match normalize_position(_start, len) {
-                        Ok(i) => i,
-                        Err(i) => if i == 0 { 0 } else {
-                            list.split_off(len);
-                            len
-                        },
-                    };
-                    let stop = match normalize_position(_stop, len) {
-                        Ok(i) => i,
-                        Err(i) => if i == 0 {
-                            list.split_off(len);
-                            0
-                        } else { i },
-                    };
-                    list.split_off(stop + 1);
-                    newlist = list.split_off(start);
-                }
-            },
+            &mut Value::List(ref mut value) => value.ltrim(start, stop),
             _ => return Err(OperationError::WrongTypeError),
         }
-        *self = Value::List(ValueList::Data(newlist));
-        return Ok(());
     }
 
     pub fn sadd(&mut self, el: Vec<u8>) -> Result<bool, OperationError> {
@@ -1184,7 +1034,7 @@ impl Database {
 fn lpush() {
     let v1 = vec![1u8, 2, 3, 4];
     let v2 = vec![1u8, 5, 6, 7];
-    let mut value = Value::List(ValueList::Data(LinkedList::new()));
+    let mut value = Value::List(ValueList::new());
 
     value.push(v1.clone(), false).unwrap();
     {
@@ -1204,7 +1054,7 @@ fn lpush() {
 
 #[test]
 fn lpop() {
-    let mut value = Value::List(ValueList::Data(LinkedList::new()));
+    let mut value = Value::List(ValueList::new());
     let v1 = vec![1, 2, 3, 4];
     let v2 = vec![5, 6, 7, 8];
     value.push(v1.clone(), false).unwrap();
@@ -1216,7 +1066,7 @@ fn lpop() {
 
 #[test]
 fn lindex() {
-    let mut value = Value::List(ValueList::Data(LinkedList::new()));
+    let mut value = Value::List(ValueList::new());
     let v1 = vec![1, 2, 3, 4];
     let v2 = vec![5, 6, 7, 8];
     value.push(v1.clone(), false).unwrap();
@@ -1233,7 +1083,7 @@ fn lindex() {
 
 #[test]
 fn linsert() {
-    let mut value = Value::List(ValueList::Data(LinkedList::new()));
+    let mut value = Value::List(ValueList::new());
     let v1 = vec![1, 2, 3, 4];
     let v2 = vec![5, 6, 7, 8];
     let v3 = vec![9, 0, 1, 2];
@@ -1250,7 +1100,7 @@ fn linsert() {
 
 #[test]
 fn llen() {
-    let mut value = Value::List(ValueList::Data(LinkedList::new()));
+    let mut value = Value::List(ValueList::new());
     let v1 = vec![1, 2, 3, 4];
     let v2 = vec![5, 6, 7, 8];
     let v3 = vec![9, 0, 1, 2];
@@ -1264,7 +1114,7 @@ fn llen() {
 
 #[test]
 fn lrange() {
-    let mut value = Value::List(ValueList::Data(LinkedList::new()));
+    let mut value = Value::List(ValueList::new());
     let v1 = vec![1, 2, 3, 4];
     let v2 = vec![5, 6, 7, 8];
     let v3 = vec![9, 0, 1, 2];
@@ -1280,7 +1130,7 @@ fn lrange() {
 
 #[test]
 fn lrem_left_unlimited() {
-    let mut value = Value::List(ValueList::Data(LinkedList::new()));
+    let mut value = Value::List(ValueList::new());
     let v1 = vec![1, 2, 3, 4];
     let v2 = vec![5, 6, 7, 8];
     let v3 = vec![9, 0, 1, 2];
@@ -1293,12 +1143,12 @@ fn lrem_left_unlimited() {
     assert_eq!(value.lrem(true, 0, v1.clone()).unwrap(), 1);
     assert_eq!(value.llen().unwrap(), 1);
     assert_eq!(value.lrem(true, 0, v2.clone()).unwrap(), 1);
-    assert_eq!(value, Value::Nil);
+    assert_eq!(value.llen().unwrap(), 0);
 }
 
 #[test]
 fn lrem_left_limited() {
-    let mut value = Value::List(ValueList::Data(LinkedList::new()));
+    let mut value = Value::List(ValueList::new());
     let v1 = vec![1, 2, 3, 4];
     let v2 = vec![5, 6, 7, 8];
     value.push(v1.clone(), true).unwrap();
@@ -1319,7 +1169,7 @@ fn lrem_left_limited() {
 
 #[test]
 fn lrem_right_unlimited() {
-    let mut value = Value::List(ValueList::Data(LinkedList::new()));
+    let mut value = Value::List(ValueList::new());
     let v1 = vec![1, 2, 3, 4];
     let v2 = vec![5, 6, 7, 8];
     let v3 = vec![9, 0, 1, 2];
@@ -1332,12 +1182,12 @@ fn lrem_right_unlimited() {
     assert_eq!(value.lrem(false, 0, v1.clone()).unwrap(), 1);
     assert_eq!(value.llen().unwrap(), 1);
     assert_eq!(value.lrem(false, 0, v2.clone()).unwrap(), 1);
-    assert_eq!(value, Value::Nil);
+    assert_eq!(value.llen().unwrap(), 0);
 }
 
 #[test]
 fn lrem_right_limited() {
-    let mut value = Value::List(ValueList::Data(LinkedList::new()));
+    let mut value = Value::List(ValueList::new());
     let v1 = vec![1, 2, 3, 4];
     let v2 = vec![5, 6, 7, 8];
     value.push(v1.clone(), true).unwrap();
@@ -1358,7 +1208,7 @@ fn lrem_right_limited() {
 
 #[test]
 fn lset() {
-    let mut value = Value::List(ValueList::Data(LinkedList::new()));
+    let mut value = Value::List(ValueList::new());
     let v1 = vec![1, 2, 3, 4];
     let v2 = vec![5, 6, 7, 8];
     let v3 = vec![9, 0, 1, 2];
@@ -1375,7 +1225,7 @@ fn lset() {
 
 #[test]
 fn ltrim() {
-    let mut value = Value::List(ValueList::Data(LinkedList::new()));
+    let mut value = Value::List(ValueList::new());
     let v1 = vec![1, 2, 3, 4];
     let v2 = vec![5, 6, 7, 8];
     let v3 = vec![9, 0, 1, 2];
