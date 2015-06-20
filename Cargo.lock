@@ -5,13 +5,9 @@ dependencies = [
  "command 0.1.0",
  "config 0.1.0",
  "database 0.1.0",
- "libc 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "networking 0.1.0",
  "parser 0.1.0",
- "rand 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "response 0.1.0",
- "skiplist 0.2.6 (git+https://github.com/seppo0010/rust-skiplist)",
- "time 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "util 0.1.0",
 ]
 

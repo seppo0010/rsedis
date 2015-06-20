@@ -3,7 +3,6 @@ sudo: false
 rust: nightly
 
 script:
-  - cargo test --verbose
   - cargo test --verbose --package command
   - cargo test --verbose --package config
   - cargo test --verbose --package database

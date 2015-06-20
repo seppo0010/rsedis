@@ -6,17 +6,11 @@ authors = [ "Sebastian Waisbrot <seppo0010@gmail.com>" ]
 exclude = [
     ".gitignore",
     ".travis.yml",
-    "tests/*",
 ]
 
 [[bin]]
 
 name = "rsedis"
-
-[[test]]
-
-name = "tests"
-path = "tests/tests.rs"
 
 [dependencies.config]
 path = "config"
@@ -38,16 +32,3 @@ path = "command"
 
 [dependencies.networking]
 path = "networking"
-
-[dependencies.skiplist]
-git = "https://github.com/seppo0010/rust-skiplist"
-
-[dependencies]
-time = "0.1"
-rand = "0.3.8"
-
-[target.x86_64-unknown-linux-gnu.dependencies]
-libc ="0.1.8"
-
-[target.x86_64-apple-darwin.dependencies]
-libc ="0.1.8"
