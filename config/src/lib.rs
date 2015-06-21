@@ -21,6 +21,7 @@ pub struct Config {
     pub bind: Vec<String>,
     pub port: u16,
     pub tcp_keepalive: u32,
+    pub active_rehashing: bool,
 }
 
 #[derive(Debug)]
@@ -58,6 +59,7 @@ fn read_bool(args: Vec<Vec<u8>>) -> Result<bool, ConfigError> {
 impl Config {
     pub fn mock(port: u16) -> Config {
         Config {
+            active_rehashing: true,
             daemonize: false,
             databases: 16,
             pidfile: "/var/run/sredis.pid".to_owned(),
@@ -69,6 +71,7 @@ impl Config {
 
     pub fn new() -> Config {
         Config {
+            active_rehashing: true,
             daemonize: false,
             databases: 16,
             pidfile: "/var/run/sredis.pid".to_owned(),
@@ -98,6 +101,7 @@ impl Config {
                             Err(_) => "".to_owned(), // TODO: return ConfigError
                             })),
                 b"port" => self.port = try!(read_parse(args)),
+                b"activerehashing" => self.active_rehashing = try!(read_bool(args)),
                 b"daemonize" => self.daemonize = try!(read_bool(args)),
                 b"databases" => self.databases = try!(read_parse(args)),
                 b"tcp-keepalive" => self.tcp_keepalive = try!(read_parse(args)),
@@ -189,6 +193,18 @@ mod tests {
     fn parse_daemonize_no() {
         let config = config!(b"daemonize no");
         assert!(!config.daemonize);
+    }
+
+    #[test]
+    fn parse_active_rehashing_yes() {
+        let config = config!(b"activerehashing yes");
+        assert!(config.active_rehashing);
+    }
+
+    #[test]
+    fn parse_active_rehashing_no() {
+        let config = config!(b"activerehashing no");
+        assert!(!config.active_rehashing);
     }
 
     #[test]

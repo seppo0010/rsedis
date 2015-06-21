@@ -23,6 +23,7 @@ version = "0.1.0"
 dependencies = [
  "config 0.1.0",
  "rand 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rehashinghashmap 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "response 0.1.0",
  "skiplist 0.2.6 (git+https://github.com/seppo0010/rust-skiplist)",
  "util 0.1.0",
@@ -49,6 +50,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "libc 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
+
+[[package]]
+name = "rehashinghashmap"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "response"

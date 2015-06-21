@@ -3,6 +3,7 @@
 
 extern crate config;
 extern crate rand;
+extern crate rehashinghashmap;
 extern crate response;
 extern crate skiplist;
 extern crate util;
@@ -21,6 +22,7 @@ use std::collections::HashSet;
 use std::sync::mpsc::{Sender, channel};
 
 use config::Config;
+use rehashinghashmap::RehashingHashMap;
 use response::Response;
 use util::glob_match;
 use util::mstime;
@@ -469,21 +471,24 @@ impl Value {
 }
 
 pub struct Database {
-    data: Vec<HashMap<Vec<u8>, Value>>,
-    data_expiration_ns: Vec<HashMap<Vec<u8>, i64>>,
+    data: Vec<RehashingHashMap<Vec<u8>, Value>>,
+    data_expiration_ns: Vec<RehashingHashMap<Vec<u8>, i64>>,
     pub size: usize,
     subscribers: HashMap<Vec<u8>, HashMap<usize, Sender<PubsubEvent>>>,
     pattern_subscribers: HashMap<Vec<u8>, HashMap<usize, Sender<PubsubEvent>>>,
-    key_subscribers: HashMap<Vec<u8>, HashMap<usize, Sender<bool>>>,
+    key_subscribers: Vec<RehashingHashMap<Vec<u8>, HashMap<usize, Sender<bool>>>>,
     subscriber_id: usize,
+    active_rehashing: bool,
 }
 
-fn create_database(size: usize) -> Database {
+fn create_database(size: usize, active_rehashing: bool) -> Database {
     let mut data = Vec::with_capacity(size);
     let mut data_expiration_ns = Vec::with_capacity(size);
+    let mut key_subscribers = Vec::with_capacity(size);
     for _ in 0..size {
-        data.push(HashMap::new());
-        data_expiration_ns.push(HashMap::new());
+        data.push(RehashingHashMap::new());
+        data_expiration_ns.push(RehashingHashMap::new());
+        key_subscribers.push(RehashingHashMap::new());
     }
     return Database {
         data: data,
@@ -491,18 +496,19 @@ fn create_database(size: usize) -> Database {
         size: size,
         subscribers: HashMap::new(),
         pattern_subscribers: HashMap::new(),
-        key_subscribers: HashMap::new(),
+        key_subscribers: key_subscribers,
         subscriber_id: 0,
+        active_rehashing: active_rehashing,
     };
 }
 
 impl Database {
     pub fn mock() -> Database {
-        create_database(16)
+        create_database(16, true)
     }
 
     pub fn new(config: &Config) -> Database {
-        create_database(config.databases as usize)
+        create_database(config.databases as usize, config.active_rehashing)
     }
 
     fn is_expired(&self, index: usize, key: &Vec<u8>) -> bool {
@@ -535,6 +541,17 @@ impl Database {
             r = None;
         }
         self.data_expiration_ns[index].remove(key);
+        if self.active_rehashing {
+            if self.data[index].len() * 10 / 12 < self.data[index].capacity() {
+                self.data[index].shrink_to_fit();
+            }
+            if self.data_expiration_ns[index].len() * 10 / 12 < self.data_expiration_ns[index].capacity() {
+                self.data_expiration_ns[index].shrink_to_fit();
+            }
+            if self.key_subscribers[index].len() * 10 / 12 < self.key_subscribers[index].capacity() {
+                self.key_subscribers[index].shrink_to_fit();
+            }
+        }
         r
     }
 
@@ -563,24 +580,30 @@ impl Database {
         return self.data[index].get_mut(key).unwrap();
     }
 
-    fn ensure_key_subscribers(&mut self, key: &Vec<u8>) {
-        if !self.key_subscribers.contains_key(key) {
-            self.key_subscribers.insert(key.clone(), HashMap::new());
+    fn ensure_key_subscribers(&mut self, index: usize, key: &Vec<u8>) {
+        if !self.key_subscribers[index].contains_key(key) {
+            self.key_subscribers[index].insert(key.clone(), HashMap::new());
         }
     }
 
-    pub fn key_subscribe(&mut self, key: &Vec<u8>, sender: Sender<bool>) -> usize {
-        self.ensure_key_subscribers(key);
-        let mut key_subscribers = self.key_subscribers.get_mut(key).unwrap();
+    pub fn key_subscribe(&mut self, index: usize, key: &Vec<u8>, sender: Sender<bool>) -> usize {
+        self.ensure_key_subscribers(index, key);
+        let mut key_subscribers = self.key_subscribers[index].get_mut(key).unwrap();
         let subscriber_id = self.subscriber_id;
         key_subscribers.insert(subscriber_id, sender);
         self.subscriber_id += 1;
         subscriber_id
     }
 
-    pub fn key_publish(&mut self, key: &Vec<u8>) {
+    pub fn key_publish(&mut self, index: usize, key: &Vec<u8>) {
+        if self.active_rehashing {
+            self.data[index].rehash();
+            self.data_expiration_ns[index].rehash();
+            self.key_subscribers[index].rehash();
+        }
+
         let mut torem = Vec::new();
-        match self.key_subscribers.get_mut(key) {
+        match self.key_subscribers[index].get_mut(key) {
             Some(mut channels) => {
                 for (subscriber_id, channel) in channels.iter() {
                     match channel.send(true) {
@@ -1619,4 +1642,38 @@ fn pubsub_pattern() {
     database.psubscribe(channel_name.clone(), tx);
     database.publish(&channel_name, &message);
     assert_eq!(rx.recv().unwrap(), PubsubEvent::Message(channel_name.clone(), Some(channel_name.clone()), message));
+}
+
+#[test]
+fn rehashing() {
+    let mut database = Database::mock();
+    for i in 0u32..1000 {
+        let key = vec![(i % 256) as u8, (i / 256) as u8];
+        database.get_or_create(0, &key).set(key.clone()).unwrap();
+    }
+    assert_eq!(database.data[0].len(), 1000);
+    assert!(database.data[0].capacity() >= 1000);
+    for i in 0u32..1000 {
+        let key = vec![(i % 256) as u8, (i / 256) as u8];
+        database.remove(0, &key).unwrap();
+    }
+    // freeing memory
+    assert!(database.data[0].capacity() < 1000);
+}
+
+#[test]
+fn no_rehashing() {
+    let mut database = create_database(1, false);
+    for i in 0u32..1000 {
+        let key = vec![(i % 256) as u8, (i / 256) as u8];
+        database.get_or_create(0, &key).set(key.clone()).unwrap();
+    }
+    assert_eq!(database.data[0].len(), 1000);
+    assert!(database.data[0].capacity() >= 1000);
+    for i in 0u32..1000 {
+        let key = vec![(i % 256) as u8, (i / 256) as u8];
+        database.remove(0, &key).unwrap();
+    }
+    // no freeing memory
+    assert!(database.data[0].capacity() > 1000);
 }
