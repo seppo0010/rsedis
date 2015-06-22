@@ -75,23 +75,6 @@ impl PartialOrd for SortedSetMember {
     fn ge(&self, other: &Self) -> bool { self.f > other.f || (self.f == other.f && self.s >= other.s) }
 }
 
-fn is_range_valid<T: Ord>(min: Bound<T>, max: Bound<T>) -> bool {
-    let mut both_in = true;
-    let v1 = match min {
-        Bound::Included(ref v) => v,
-        Bound::Excluded(ref v) => { both_in = false; v },
-        Bound::Unbounded => return true,
-    };
-
-    let v2 = match max {
-        Bound::Included(ref v) => v,
-        Bound::Excluded(ref v) => { both_in = false; v },
-        Bound::Unbounded => return true,
-    };
-
-    return v1 < v2 || (v1 == v2 && both_in);
-}
-
 #[derive(PartialEq, Debug)]
 pub enum ValueSortedSet {
     Data(OrderedSkipList<SortedSetMember>, HashMap<Vec<u8>, f64>),
@@ -255,10 +238,6 @@ impl ValueSortedSet {
             Bound::Excluded(f) => { f2.set_f64(f); Bound::Excluded(&f2) },
             Bound::Unbounded => Bound::Unbounded,
         };
-
-        if !is_range_valid(m1, m2) {
-            return vec![];
-        }
 
         let mut r = vec![];
         if rev {
