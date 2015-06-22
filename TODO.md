@@ -246,7 +246,7 @@
     - [ ] zset-max-ziplist-entries
     - [ ] zset-max-ziplist-value
     - [ ] hll-sparse-max-bytes
-    - [ ] activerehashing
+    - [x] activerehashing
     - [ ] client-output-buffer-limit
     - [ ] hz
     - [ ] aof-rewrite-incremental-fsync
