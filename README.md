@@ -2,7 +2,7 @@
 
 [![Build Status](https://travis-ci.org/seppo0010/rsedis.svg?branch=master)](https://travis-ci.org/seppo0010/rsedis)
 
-Redis reimplementation in Rust.
+Redis re-implemented in Rust.
 
 ## Why?
 
@@ -18,7 +18,7 @@ cores.
 
 ## Prerequisites
 
-Rust nigthly.
+Rust nightly.
 
 ## Current Status
 
