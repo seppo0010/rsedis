@@ -260,7 +260,6 @@ impl ValueSortedSet {
             return vec![];
         }
 
-        // FIXME: skiplist crashes when using .range().rev()
         let mut r = vec![];
         if rev {
             let len = skiplist.len();
@@ -268,13 +267,13 @@ impl ValueSortedSet {
             if c + offset > len {
                 c = len - offset;
             }
-            for member in skiplist.range(m1, m2).skip(skiplist.len() - offset - c).take(c) {
+            for member in skiplist.range(m1, m2).rev().skip(offset).take(c) {
+                r.push(member.get_vec().clone());
                 if withscores {
                     r.push(format!("{}", member.get_f64()).into_bytes());
                 }
-                r.push(member.get_vec().clone());
             }
-            r.iter().cloned().rev().collect::<Vec<_>>()
+            r.iter().cloned().collect::<Vec<_>>()
         } else {
             for member in skiplist.range(m1, m2).skip(offset).take(count) {
                 r.push(member.get_vec().clone());
