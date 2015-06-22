@@ -10,8 +10,15 @@ To learn Rust.
 
 ## Use Cases
 
-Unlike Redis, rsedis does not rely on UNIX-specific features. Windows users
-can run it as a replacement of Redis.
+rsedis does not rely on UNIX-specific features. Windows users can run it as a
+replacement of Redis.
+
+rsedis uses multiple threads which may be more useful in machines with multiple
+cores.
+
+## Prerequisites
+
+Rust nigthly.
 
 ## Current Status
 
