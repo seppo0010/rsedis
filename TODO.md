@@ -242,7 +242,7 @@
     - [ ] hash-max-ziplist-value
     - [ ] list-max-ziplist-entries
     - [ ] list-max-ziplist-value
-    - [ ] set-max-intset-entries
+    - [x] set-max-intset-entries
     - [ ] zset-max-ziplist-entries
     - [ ] zset-max-ziplist-value
     - [ ] hll-sparse-max-bytes

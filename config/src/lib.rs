@@ -22,6 +22,7 @@ pub struct Config {
     pub port: u16,
     pub tcp_keepalive: u32,
     pub active_rehashing: bool,
+    pub set_max_intset_entries: usize,
 }
 
 #[derive(Debug)]
@@ -66,6 +67,7 @@ impl Config {
             bind: vec!["127.0.0.1".to_owned()],
             port: port,
             tcp_keepalive: 0,
+            set_max_intset_entries: 512,
         }
     }
 
@@ -78,6 +80,7 @@ impl Config {
             bind: vec![],
             port: 6379,
             tcp_keepalive: 0,
+            set_max_intset_entries: 512,
         }
     }
 
@@ -105,6 +108,7 @@ impl Config {
                 b"daemonize" => self.daemonize = try!(read_bool(args)),
                 b"databases" => self.databases = try!(read_parse(args)),
                 b"tcp-keepalive" => self.tcp_keepalive = try!(read_parse(args)),
+                b"set-max-intset-entries" => self.set_max_intset_entries = try!(read_parse(args)),
                 b"pidfile" => self.pidfile = try!(read_string(args)).to_owned(),
                 b"include" => if args.len() != 2 {
                     return Err(ConfigError::InvalidFormat)
@@ -223,5 +227,11 @@ mod tests {
     fn parse_keepalive_quotes() {
         let config = config!(b"tcp-keepalive \"123\"");
         assert_eq!(config.tcp_keepalive, 123);
+    }
+
+    #[test]
+    fn parse_set_max_intset_entries() {
+        let config = config!(b"set-max-intset-entries 123456");
+        assert_eq!(config.set_max_intset_entries, 123456);
     }
 }

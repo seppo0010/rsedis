@@ -281,15 +281,15 @@ impl Value {
         }
     }
 
-    pub fn sadd(&mut self, el: Vec<u8>) -> Result<bool, OperationError> {
+    pub fn sadd(&mut self, el: Vec<u8>, set_max_intset_entries: usize) -> Result<bool, OperationError> {
         match self {
             &mut Value::Nil => {
                 let mut value = ValueSet::new();
-                value.sadd(el);
+                value.sadd(el, set_max_intset_entries);
                 *self = Value::Set(value);
                 Ok(true)
             },
-            &mut Value::Set(ref mut value) => Ok(value.sadd(el)),
+            &mut Value::Set(ref mut value) => Ok(value.sadd(el, set_max_intset_entries)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -479,36 +479,35 @@ pub struct Database {
     key_subscribers: Vec<RehashingHashMap<Vec<u8>, HashMap<usize, Sender<bool>>>>,
     subscriber_id: usize,
     active_rehashing: bool,
-}
-
-fn create_database(size: usize, active_rehashing: bool) -> Database {
-    let mut data = Vec::with_capacity(size);
-    let mut data_expiration_ns = Vec::with_capacity(size);
-    let mut key_subscribers = Vec::with_capacity(size);
-    for _ in 0..size {
-        data.push(RehashingHashMap::new());
-        data_expiration_ns.push(RehashingHashMap::new());
-        key_subscribers.push(RehashingHashMap::new());
-    }
-    return Database {
-        data: data,
-        data_expiration_ns: data_expiration_ns,
-        size: size,
-        subscribers: HashMap::new(),
-        pattern_subscribers: HashMap::new(),
-        key_subscribers: key_subscribers,
-        subscriber_id: 0,
-        active_rehashing: active_rehashing,
-    };
+    pub set_max_intset_entries: usize,
 }
 
 impl Database {
     pub fn mock() -> Database {
-        create_database(16, true)
+        Database::new(&Config::new())
     }
 
     pub fn new(config: &Config) -> Database {
-        create_database(config.databases as usize, config.active_rehashing)
+        let size = config.databases as usize;
+        let mut data = Vec::with_capacity(size);
+        let mut data_expiration_ns = Vec::with_capacity(size);
+        let mut key_subscribers = Vec::with_capacity(size);
+        for _ in 0..size {
+            data.push(RehashingHashMap::new());
+            data_expiration_ns.push(RehashingHashMap::new());
+            key_subscribers.push(RehashingHashMap::new());
+        }
+        return Database {
+            data: data,
+            data_expiration_ns: data_expiration_ns,
+            size: size,
+            subscribers: HashMap::new(),
+            pattern_subscribers: HashMap::new(),
+            key_subscribers: key_subscribers,
+            subscriber_id: 0,
+            active_rehashing: config.active_rehashing,
+            set_max_intset_entries: config.set_max_intset_entries,
+        }
     }
 
     fn is_expired(&self, index: usize, key: &Vec<u8>) -> bool {
@@ -706,13 +705,15 @@ mod test_command {
     use std::sync::mpsc::channel;
     use std::usize;
 
+    use config::Config;
     use util::mstime;
 
     use list::ValueList;
     use string::ValueString;
+    use set::ValueSet;
     use zset::ValueSortedSet;
 
-    use super::{Database, Value, PubsubEvent, create_database};
+    use super::{Database, Value, PubsubEvent};
 
     #[test]
     fn lpush() {
@@ -929,8 +930,8 @@ mod test_command {
         let mut value = Value::Nil;
         let v1 = vec![1, 2, 3, 4];
 
-        assert_eq!(value.sadd(v1.clone()).unwrap(), true);
-        assert_eq!(value.sadd(v1.clone()).unwrap(), false);
+        assert_eq!(value.sadd(v1.clone(), 100).unwrap(), true);
+        assert_eq!(value.sadd(v1.clone(), 100).unwrap(), false);
     }
 
     #[test]
@@ -939,7 +940,7 @@ mod test_command {
         let v1 = vec![1, 2, 3, 4];
 
         assert_eq!(value.srem(&v1).unwrap(), false);
-        assert_eq!(value.sadd(v1.clone()).unwrap(), true);
+        assert_eq!(value.sadd(v1.clone(), 100).unwrap(), true);
         assert_eq!(value.srem(&v1).unwrap(), true);
         assert_eq!(value.srem(&v1).unwrap(), false);
     }
@@ -950,7 +951,7 @@ mod test_command {
         let v1 = vec![1, 2, 3, 4];
 
         assert_eq!(value.sismember(&v1).unwrap(), false);
-        assert_eq!(value.sadd(v1.clone()).unwrap(), true);
+        assert_eq!(value.sadd(v1.clone(), 100).unwrap(), true);
         assert_eq!(value.sismember(&v1).unwrap(), true);
     }
 
@@ -960,7 +961,7 @@ mod test_command {
         let v1 = vec![1, 2, 3, 4];
 
         assert_eq!(value.scard().unwrap(), 0);
-        assert_eq!(value.sadd(v1.clone()).unwrap(), true);
+        assert_eq!(value.sadd(v1.clone(), 100).unwrap(), true);
         assert_eq!(value.scard().unwrap(), 1);
     }
 
@@ -971,9 +972,9 @@ mod test_command {
         let v2 = vec![2];
         let v3 = vec![3];
 
-        value.sadd(v1.clone()).unwrap();
-        value.sadd(v2.clone()).unwrap();
-        value.sadd(v3.clone()).unwrap();
+        value.sadd(v1.clone(), 100).unwrap();
+        value.sadd(v2.clone(), 100).unwrap();
+        value.sadd(v3.clone(), 100).unwrap();
 
         let mut v = value.srandmember(10, false).unwrap();
         v.sort_by(|a, b| a.cmp(b));
@@ -987,9 +988,9 @@ mod test_command {
         let v2 = vec![2];
         let v3 = vec![3];
 
-        value.sadd(v1.clone()).unwrap();
-        value.sadd(v2.clone()).unwrap();
-        value.sadd(v3.clone()).unwrap();
+        value.sadd(v1.clone(), 100).unwrap();
+        value.sadd(v2.clone(), 100).unwrap();
+        value.sadd(v3.clone(), 100).unwrap();
 
         let v = value.srandmember(100, true).unwrap();
         assert_eq!(v.len(), 100);
@@ -1004,8 +1005,8 @@ mod test_command {
         let mut value = Value::Nil;
         let v1 = vec![1];
         let v2 = vec![2];
-        value.sadd(v1.clone()).unwrap();
-        value.sadd(v2.clone()).unwrap();
+        value.sadd(v1.clone(), 100).unwrap();
+        value.sadd(v2.clone(), 100).unwrap();
 
         let mut v = value.srandmember(2, false).unwrap();
         v.sort_by(|a, b| a.cmp(b));
@@ -1019,8 +1020,8 @@ mod test_command {
         let mut value = Value::Nil;
         let v1 = vec![1];
         let v2 = vec![2];
-        value.sadd(v1.clone()).unwrap();
-        value.sadd(v2.clone()).unwrap();
+        value.sadd(v1.clone(), 100).unwrap();
+        value.sadd(v2.clone(), 100).unwrap();
 
         let mut v = value.srandmember(1, false).unwrap();
         v.sort_by(|a, b| a.cmp(b));
@@ -1032,7 +1033,7 @@ mod test_command {
     fn srandmember_dup() {
         let mut value = Value::Nil;
         let v1 = vec![1];
-        value.sadd(v1.clone()).unwrap();
+        value.sadd(v1.clone(), 100).unwrap();
 
         let v = value.srandmember(5, true).unwrap();
         assert_eq!(v, vec![v1.clone(), v1.clone(), v1.clone(), v1.clone(), v1.clone()]);
@@ -1045,9 +1046,9 @@ mod test_command {
         let v2 = vec![2];
         let v3 = vec![3];
 
-        value.sadd(v1.clone()).unwrap();
-        value.sadd(v2.clone()).unwrap();
-        value.sadd(v3.clone()).unwrap();
+        value.sadd(v1.clone(), 100).unwrap();
+        value.sadd(v2.clone(), 100).unwrap();
+        value.sadd(v3.clone(), 100).unwrap();
 
         let mut v = value.spop(10).unwrap();
         v.sort_by(|a, b| a.cmp(b));
@@ -1061,9 +1062,9 @@ mod test_command {
         let v2 = vec![2];
         let v3 = vec![3];
 
-        value.sadd(v1.clone()).unwrap();
-        value.sadd(v2.clone()).unwrap();
-        value.sadd(v3.clone()).unwrap();
+        value.sadd(v1.clone(), 100).unwrap();
+        value.sadd(v2.clone(), 100).unwrap();
+        value.sadd(v3.clone(), 100).unwrap();
 
         let v = value.spop(1).unwrap();
         assert!(v == [v1] || v == [v2] || v == [v3]);
@@ -1076,9 +1077,9 @@ mod test_command {
         let v2 = vec![5, 6, 7, 8];
         let v3 = vec![9, 10, 11, 12];
 
-        assert_eq!(value.sadd(v1.clone()).unwrap(), true);
-        assert_eq!(value.sadd(v2.clone()).unwrap(), true);
-        assert_eq!(value.sadd(v3.clone()).unwrap(), true);
+        assert_eq!(value.sadd(v1.clone(), 100).unwrap(), true);
+        assert_eq!(value.sadd(v2.clone(), 100).unwrap(), true);
+        assert_eq!(value.sadd(v3.clone(), 100).unwrap(), true);
 
         let mut v = value.smembers().unwrap();
         v.sort_by(|a, b| a.cmp(b));
@@ -1093,11 +1094,11 @@ mod test_command {
         let v2 = vec![5, 6, 7, 8];
         let v3 = vec![0, 9, 1, 2];
 
-        assert_eq!(value1.sadd(v1.clone()).unwrap(), true);
-        assert_eq!(value1.sadd(v2.clone()).unwrap(), true);
+        assert_eq!(value1.sadd(v1.clone(), 100).unwrap(), true);
+        assert_eq!(value1.sadd(v2.clone(), 100).unwrap(), true);
 
-        assert_eq!(value2.sadd(v1.clone()).unwrap(), true);
-        assert_eq!(value2.sadd(v3.clone()).unwrap(), true);
+        assert_eq!(value2.sadd(v1.clone(), 100).unwrap(), true);
+        assert_eq!(value2.sadd(v3.clone(), 100).unwrap(), true);
 
         assert_eq!(value1.sdiff(&vec![&value2]).unwrap(),
                 vec![v2].iter().cloned().collect::<HashSet<_>>());
@@ -1111,11 +1112,11 @@ mod test_command {
         let v2 = vec![5, 6, 7, 8];
         let v3 = vec![0, 9, 1, 2];
 
-        assert_eq!(value1.sadd(v1.clone()).unwrap(), true);
-        assert_eq!(value1.sadd(v2.clone()).unwrap(), true);
+        assert_eq!(value1.sadd(v1.clone(), 100).unwrap(), true);
+        assert_eq!(value1.sadd(v2.clone(), 100).unwrap(), true);
 
-        assert_eq!(value2.sadd(v1.clone()).unwrap(), true);
-        assert_eq!(value2.sadd(v3.clone()).unwrap(), true);
+        assert_eq!(value2.sadd(v1.clone(), 100).unwrap(), true);
+        assert_eq!(value2.sadd(v3.clone(), 100).unwrap(), true);
 
         assert_eq!(value1.sinter(&vec![&value2]).unwrap().iter().collect::<Vec<_>>(),
                 vec![&v1]);
@@ -1135,11 +1136,11 @@ mod test_command {
         let v2 = vec![5, 6, 7, 8];
         let v3 = vec![0, 9, 1, 2];
 
-        assert_eq!(value1.sadd(v1.clone()).unwrap(), true);
-        assert_eq!(value1.sadd(v2.clone()).unwrap(), true);
+        assert_eq!(value1.sadd(v1.clone(), 100).unwrap(), true);
+        assert_eq!(value1.sadd(v2.clone(), 100).unwrap(), true);
 
-        assert_eq!(value2.sadd(v1.clone()).unwrap(), true);
-        assert_eq!(value2.sadd(v3.clone()).unwrap(), true);
+        assert_eq!(value2.sadd(v1.clone(), 100).unwrap(), true);
+        assert_eq!(value2.sadd(v3.clone(), 100).unwrap(), true);
 
         assert_eq!(value1.sunion(&vec![&value2]).unwrap(),
                 vec![&v1, &v2, &v3].iter().cloned().cloned().collect::<HashSet<_>>());
@@ -1679,7 +1680,10 @@ mod test_command {
 
     #[test]
     fn no_rehashing() {
-        let mut database = create_database(1, false);
+        let mut config = Config::new();
+        config.databases = 1;
+        config.active_rehashing = false;
+        let mut database = Database::new(&config);
         for i in 0u32..1000 {
             let key = vec![(i % 256) as u8, (i / 256) as u8];
             database.get_or_create(0, &key).set(key.clone()).unwrap();
@@ -1692,5 +1696,31 @@ mod test_command {
         }
         // no freeing memory
         assert!(database.data[0].capacity() > 1000);
+    }
+
+    #[test]
+    fn intset() {
+        let mut value = Value::Nil;
+        let v1 = b"1".to_vec();
+        let v2 = b"2".to_vec();
+        let v3 = b"3".to_vec();
+
+        assert_eq!(value.sadd(v1.clone(), 2).unwrap(), true);
+        assert_eq!(value.sadd(v2.clone(), 2).unwrap(), true);
+        match value {
+            Value::Set(ref set) => match set {
+                &ValueSet::Integer(_) => (),
+                _ => panic!("Must be int set"),
+            },
+            _ => panic!("Must be set"),
+        }
+        assert_eq!(value.sadd(v3.clone(), 2).unwrap(), true);
+        match value {
+            Value::Set(ref set) => match set {
+                &ValueSet::Data(_) => (),
+                _ => panic!("Must be data set"),
+            },
+            _ => panic!("Must be set"),
+        }
     }
 }

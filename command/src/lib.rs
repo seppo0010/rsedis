@@ -740,11 +740,12 @@ fn sadd(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() > 2, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let mut count = 0;
+    let set_max_intset_entries = db.set_max_intset_entries;
     {
         let el = db.get_or_create(dbindex, &key);
         for i in 2..parser.argv.len() {
             let val = try_validate!(parser.get_vec(i), "Invalid value");
-            match el.sadd(val) {
+            match el.sadd(val, set_max_intset_entries) {
                 Ok(added) => if added { count += 1 },
                 Err(err) => return Response::Error(err.to_string()),
             }
@@ -866,9 +867,10 @@ fn smove(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
         }
     }
 
+    let set_max_intset_entries = db.set_max_intset_entries;
     {
         let destination = db.get_or_create(dbindex, &destination_key);
-        match destination.sadd(member) {
+        match destination.sadd(member, set_max_intset_entries) {
             Ok(_) => (),
             Err(err) => panic!("Unexpected failure {}", err.to_string()),
         }
@@ -1633,6 +1635,7 @@ mod test_command {
     #[test]
     fn type_command() {
         let mut db = Database::mock();
+        let set_max_intset_entries = db.set_max_intset_entries;
         assert_eq!(command(&parser!(b"type key"), &mut db, &mut 0, None, None, None).unwrap(), Response::Data(b"none".to_vec()));
 
         assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
@@ -1645,7 +1648,7 @@ mod test_command {
         assert_eq!(command(&parser!(b"type key"), &mut db, &mut 0, None, None, None).unwrap(), Response::Data(b"list".to_vec()));
 
         assert!(db.remove(0, &b"key".to_vec()).is_some());
-        assert!(db.get_or_create(0, &b"key".to_vec()).sadd(b"1".to_vec()).is_ok());
+        assert!(db.get_or_create(0, &b"key".to_vec()).sadd(b"1".to_vec(), set_max_intset_entries).is_ok());
         assert_eq!(command(&parser!(b"type key"), &mut db, &mut 0, None, None, None).unwrap(), Response::Data(b"set".to_vec()));
 
         assert!(db.remove(0, &b"key".to_vec()).is_some());
