@@ -16,7 +16,6 @@ pub mod set;
 pub mod string;
 pub mod zset;
 
-use std::usize;
 use std::collections::Bound;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -699,982 +698,999 @@ impl Database {
     }
 }
 
-#[test]
-fn lpush() {
-    let v1 = vec![1u8, 2, 3, 4];
-    let v2 = vec![1u8, 5, 6, 7];
-    let mut value = Value::List(ValueList::new());
+#[cfg(test)]
+mod test_command {
+    use std::collections::Bound;
+    use std::collections::HashSet;
+    use std::i64;
+    use std::sync::mpsc::channel;
+    use std::usize;
 
-    value.push(v1.clone(), false).unwrap();
-    {
-        let list = match value { Value::List(ref value) => match value { &ValueList::Data(ref l) => l }, _ => panic!("Expected list") };
-        assert_eq!(list.len(), 1);
-        assert_eq!(list.front(), Some(&v1));
+    use util::mstime;
+
+    use list::ValueList;
+    use string::ValueString;
+    use zset::ValueSortedSet;
+
+    use super::{Database, Value, PubsubEvent, create_database};
+
+    #[test]
+    fn lpush() {
+        let v1 = vec![1u8, 2, 3, 4];
+        let v2 = vec![1u8, 5, 6, 7];
+        let mut value = Value::List(ValueList::new());
+
+        value.push(v1.clone(), false).unwrap();
+        {
+            let list = match value { Value::List(ref value) => match value { &ValueList::Data(ref l) => l }, _ => panic!("Expected list") };
+            assert_eq!(list.len(), 1);
+            assert_eq!(list.front(), Some(&v1));
+        }
+
+        value.push(v2.clone(), false).unwrap();
+        {
+            let list = match value { Value::List(ref value) => match value { &ValueList::Data(ref l) => l }, _ => panic!("Expected list") };
+            assert_eq!(list.len(), 2);
+            assert_eq!(list.back(), Some(&v1));
+            assert_eq!(list.front(), Some(&v2));
+        }
     }
 
-    value.push(v2.clone(), false).unwrap();
-    {
-        let list = match value { Value::List(ref value) => match value { &ValueList::Data(ref l) => l }, _ => panic!("Expected list") };
-        assert_eq!(list.len(), 2);
-        assert_eq!(list.back(), Some(&v1));
-        assert_eq!(list.front(), Some(&v2));
+    #[test]
+    fn lpop() {
+        let mut value = Value::List(ValueList::new());
+        let v1 = vec![1, 2, 3, 4];
+        let v2 = vec![5, 6, 7, 8];
+        value.push(v1.clone(), false).unwrap();
+        value.push(v2.clone(), false).unwrap();
+        assert_eq!(value.pop(false).unwrap(), Some(v2));
+        assert_eq!(value.pop(false).unwrap(), Some(v1));
+        assert_eq!(value.pop(false).unwrap(), None);
     }
-}
 
-#[test]
-fn lpop() {
-    let mut value = Value::List(ValueList::new());
-    let v1 = vec![1, 2, 3, 4];
-    let v2 = vec![5, 6, 7, 8];
-    value.push(v1.clone(), false).unwrap();
-    value.push(v2.clone(), false).unwrap();
-    assert_eq!(value.pop(false).unwrap(), Some(v2));
-    assert_eq!(value.pop(false).unwrap(), Some(v1));
-    assert_eq!(value.pop(false).unwrap(), None);
-}
+    #[test]
+    fn lindex() {
+        let mut value = Value::List(ValueList::new());
+        let v1 = vec![1, 2, 3, 4];
+        let v2 = vec![5, 6, 7, 8];
+        value.push(v1.clone(), false).unwrap();
+        value.push(v2.clone(), false).unwrap();
 
-#[test]
-fn lindex() {
-    let mut value = Value::List(ValueList::new());
-    let v1 = vec![1, 2, 3, 4];
-    let v2 = vec![5, 6, 7, 8];
-    value.push(v1.clone(), false).unwrap();
-    value.push(v2.clone(), false).unwrap();
+        assert_eq!(value.lindex(0).unwrap(), Some(&v2));
+        assert_eq!(value.lindex(1).unwrap(), Some(&v1));
+        assert_eq!(value.lindex(2).unwrap(), None);
 
-    assert_eq!(value.lindex(0).unwrap(), Some(&v2));
-    assert_eq!(value.lindex(1).unwrap(), Some(&v1));
-    assert_eq!(value.lindex(2).unwrap(), None);
-
-    assert_eq!(value.lindex(-2).unwrap(), Some(&v2));
-    assert_eq!(value.lindex(-1).unwrap(), Some(&v1));
-    assert_eq!(value.lindex(-3).unwrap(), None);
-}
-
-#[test]
-fn linsert() {
-    let mut value = Value::List(ValueList::new());
-    let v1 = vec![1, 2, 3, 4];
-    let v2 = vec![5, 6, 7, 8];
-    let v3 = vec![9, 0, 1, 2];
-    value.push(v1.clone(), true).unwrap();
-    value.push(v2.clone(), true).unwrap();
-
-    assert_eq!(value.linsert(true, v2.clone(), v3.clone()).unwrap().unwrap(), 3);
-    assert_eq!(value.lindex(0).unwrap(), Some(&v1));
-    assert_eq!(value.lindex(1).unwrap(), Some(&v3));
-    assert_eq!(value.lindex(2).unwrap(), Some(&v2));
-
-    assert_eq!(value.linsert(true, vec![], v3.clone()).unwrap(), None);
-}
-
-#[test]
-fn llen() {
-    let mut value = Value::List(ValueList::new());
-    let v1 = vec![1, 2, 3, 4];
-    let v2 = vec![5, 6, 7, 8];
-    let v3 = vec![9, 0, 1, 2];
-    value.push(v1.clone(), true).unwrap();
-    value.push(v2.clone(), true).unwrap();
-    assert_eq!(value.llen().unwrap(), 2);
-
-    value.push(v3.clone(), true).unwrap();
-    assert_eq!(value.llen().unwrap(), 3);
-}
-
-#[test]
-fn lrange() {
-    let mut value = Value::List(ValueList::new());
-    let v1 = vec![1, 2, 3, 4];
-    let v2 = vec![5, 6, 7, 8];
-    let v3 = vec![9, 0, 1, 2];
-    value.push(v1.clone(), true).unwrap();
-    value.push(v2.clone(), true).unwrap();
-    value.push(v3.clone(), true).unwrap();
-
-    assert_eq!(value.lrange(-100, 100).unwrap(), vec![&v1, &v2, &v3]);
-    assert_eq!(value.lrange(0, 1).unwrap(), vec![&v1, &v2]);
-    assert_eq!(value.lrange(0, 0).unwrap(), vec![&v1]);
-    assert_eq!(value.lrange(1, -1).unwrap(), vec![&v2, &v3]);
-}
-
-#[test]
-fn lrem_left_unlimited() {
-    let mut value = Value::List(ValueList::new());
-    let v1 = vec![1, 2, 3, 4];
-    let v2 = vec![5, 6, 7, 8];
-    let v3 = vec![9, 0, 1, 2];
-    value.push(v1.clone(), true).unwrap();
-    value.push(v2.clone(), true).unwrap();
-    value.push(v3.clone(), true).unwrap();
-
-    assert_eq!(value.lrem(true, 0, v3.clone()).unwrap(), 1);
-    assert_eq!(value.llen().unwrap(), 2);
-    assert_eq!(value.lrem(true, 0, v1.clone()).unwrap(), 1);
-    assert_eq!(value.llen().unwrap(), 1);
-    assert_eq!(value.lrem(true, 0, v2.clone()).unwrap(), 1);
-    assert_eq!(value.llen().unwrap(), 0);
-}
-
-#[test]
-fn lrem_left_limited() {
-    let mut value = Value::List(ValueList::new());
-    let v1 = vec![1, 2, 3, 4];
-    let v2 = vec![5, 6, 7, 8];
-    value.push(v1.clone(), true).unwrap();
-    value.push(v1.clone(), true).unwrap();
-    value.push(v1.clone(), true).unwrap();
-    value.push(v2.clone(), true).unwrap();
-    value.push(v1.clone(), true).unwrap();
-
-    assert_eq!(value.lrem(true, 3, v1.clone()).unwrap(), 3);
-    assert_eq!(value.llen().unwrap(), 2);
-    {
-        let list = match value { Value::List(ref value) => match value { &ValueList::Data(ref l) => l }, _ => panic!("Expected list") };
-        assert_eq!(list.front().unwrap(), &v2);
+        assert_eq!(value.lindex(-2).unwrap(), Some(&v2));
+        assert_eq!(value.lindex(-1).unwrap(), Some(&v1));
+        assert_eq!(value.lindex(-3).unwrap(), None);
     }
-    assert_eq!(value.lrem(true, 3, v1.clone()).unwrap(), 1);
-    assert_eq!(value.llen().unwrap(), 1);
-}
 
-#[test]
-fn lrem_right_unlimited() {
-    let mut value = Value::List(ValueList::new());
-    let v1 = vec![1, 2, 3, 4];
-    let v2 = vec![5, 6, 7, 8];
-    let v3 = vec![9, 0, 1, 2];
-    value.push(v1.clone(), true).unwrap();
-    value.push(v2.clone(), true).unwrap();
-    value.push(v3.clone(), true).unwrap();
+    #[test]
+    fn linsert() {
+        let mut value = Value::List(ValueList::new());
+        let v1 = vec![1, 2, 3, 4];
+        let v2 = vec![5, 6, 7, 8];
+        let v3 = vec![9, 0, 1, 2];
+        value.push(v1.clone(), true).unwrap();
+        value.push(v2.clone(), true).unwrap();
 
-    assert_eq!(value.lrem(false, 0, v3.clone()).unwrap(), 1);
-    assert_eq!(value.llen().unwrap(), 2);
-    assert_eq!(value.lrem(false, 0, v1.clone()).unwrap(), 1);
-    assert_eq!(value.llen().unwrap(), 1);
-    assert_eq!(value.lrem(false, 0, v2.clone()).unwrap(), 1);
-    assert_eq!(value.llen().unwrap(), 0);
-}
+        assert_eq!(value.linsert(true, v2.clone(), v3.clone()).unwrap().unwrap(), 3);
+        assert_eq!(value.lindex(0).unwrap(), Some(&v1));
+        assert_eq!(value.lindex(1).unwrap(), Some(&v3));
+        assert_eq!(value.lindex(2).unwrap(), Some(&v2));
 
-#[test]
-fn lrem_right_limited() {
-    let mut value = Value::List(ValueList::new());
-    let v1 = vec![1, 2, 3, 4];
-    let v2 = vec![5, 6, 7, 8];
-    value.push(v1.clone(), true).unwrap();
-    value.push(v1.clone(), true).unwrap();
-    value.push(v1.clone(), true).unwrap();
-    value.push(v2.clone(), true).unwrap();
-    value.push(v1.clone(), true).unwrap();
-
-    assert_eq!(value.lrem(false, 3, v1.clone()).unwrap(), 3);
-    assert_eq!(value.llen().unwrap(), 2);
-    {
-        let list = match value { Value::List(ref value) => match value { &ValueList::Data(ref l) => l }, _ => panic!("Expected list") };
-        assert_eq!(list.front().unwrap(), &v1);
+        assert_eq!(value.linsert(true, vec![], v3.clone()).unwrap(), None);
     }
-    assert_eq!(value.lrem(false, 3, v1.clone()).unwrap(), 1);
-    assert_eq!(value.llen().unwrap(), 1);
-}
 
-#[test]
-fn lset() {
-    let mut value = Value::List(ValueList::new());
-    let v1 = vec![1, 2, 3, 4];
-    let v2 = vec![5, 6, 7, 8];
-    let v3 = vec![9, 0, 1, 2];
-    let v4 = vec![3, 4, 5, 6];
-    value.push(v1.clone(), true).unwrap();
-    value.push(v2.clone(), true).unwrap();
-    value.push(v3.clone(), true).unwrap();
-
-    assert_eq!(value.lset(1, v4.clone()).unwrap(), ());
-    assert_eq!(value.lrange(0, -1).unwrap(), vec![&v1, &v4, &v3]);
-    assert_eq!(value.lset(-1, v2.clone()).unwrap(), ());
-    assert_eq!(value.lrange(0, -1).unwrap(), vec![&v1, &v4, &v2]);
-}
-
-#[test]
-fn ltrim() {
-    let mut value = Value::List(ValueList::new());
-    let v1 = vec![1, 2, 3, 4];
-    let v2 = vec![5, 6, 7, 8];
-    let v3 = vec![9, 0, 1, 2];
-    let v4 = vec![3, 4, 5, 6];
-    value.push(v1.clone(), true).unwrap();
-    value.push(v2.clone(), true).unwrap();
-    value.push(v3.clone(), true).unwrap();
-    value.push(v4.clone(), true).unwrap();
-
-    assert_eq!(value.ltrim(1, 2).unwrap(), ());
-    assert_eq!(value.llen().unwrap(), 2);
-    assert_eq!(value.lrange(0, -1).unwrap(), vec![&v2, &v3]);
-}
-
-#[test]
-fn sadd() {
-    let mut value = Value::Nil;
-    let v1 = vec![1, 2, 3, 4];
-
-    assert_eq!(value.sadd(v1.clone()).unwrap(), true);
-    assert_eq!(value.sadd(v1.clone()).unwrap(), false);
-}
-
-#[test]
-fn srem() {
-    let mut value = Value::Nil;
-    let v1 = vec![1, 2, 3, 4];
-
-    assert_eq!(value.srem(&v1).unwrap(), false);
-    assert_eq!(value.sadd(v1.clone()).unwrap(), true);
-    assert_eq!(value.srem(&v1).unwrap(), true);
-    assert_eq!(value.srem(&v1).unwrap(), false);
-}
-
-#[test]
-fn sismember() {
-    let mut value = Value::Nil;
-    let v1 = vec![1, 2, 3, 4];
-
-    assert_eq!(value.sismember(&v1).unwrap(), false);
-    assert_eq!(value.sadd(v1.clone()).unwrap(), true);
-    assert_eq!(value.sismember(&v1).unwrap(), true);
-}
-
-#[test]
-fn scard() {
-    let mut value = Value::Nil;
-    let v1 = vec![1, 2, 3, 4];
-
-    assert_eq!(value.scard().unwrap(), 0);
-    assert_eq!(value.sadd(v1.clone()).unwrap(), true);
-    assert_eq!(value.scard().unwrap(), 1);
-}
-
-#[test]
-fn srandmember_toomany_nodup() {
-    let mut value = Value::Nil;
-    let v1 = vec![1];
-    let v2 = vec![2];
-    let v3 = vec![3];
-
-    value.sadd(v1.clone()).unwrap();
-    value.sadd(v2.clone()).unwrap();
-    value.sadd(v3.clone()).unwrap();
-
-    let mut v = value.srandmember(10, false).unwrap();
-    v.sort_by(|a, b| a.cmp(b));
-    assert_eq!(v, [v1, v2, v3]);
-}
-
-#[test]
-fn srandmember_alot_dup() {
-    let mut value = Value::Nil;
-    let v1 = vec![1];
-    let v2 = vec![2];
-    let v3 = vec![3];
-
-    value.sadd(v1.clone()).unwrap();
-    value.sadd(v2.clone()).unwrap();
-    value.sadd(v3.clone()).unwrap();
-
-    let v = value.srandmember(100, true).unwrap();
-    assert_eq!(v.len(), 100);
-    // this test _probably_ passes
-    assert!(v.contains(&v1));
-    assert!(v.contains(&v2));
-    assert!(v.contains(&v3));
-}
-
-#[test]
-fn srandmember_nodup_all() {
-    let mut value = Value::Nil;
-    let v1 = vec![1];
-    let v2 = vec![2];
-    value.sadd(v1.clone()).unwrap();
-    value.sadd(v2.clone()).unwrap();
-
-    let mut v = value.srandmember(2, false).unwrap();
-    v.sort_by(|a, b| a.cmp(b));
-    assert!(v == vec![v1.clone(), v1.clone()] ||
-            v == vec![v1.clone(), v2.clone()] ||
-            v == vec![v2.clone(), v2.clone()]);
-}
-
-#[test]
-fn srandmember_nodup_some() {
-    let mut value = Value::Nil;
-    let v1 = vec![1];
-    let v2 = vec![2];
-    value.sadd(v1.clone()).unwrap();
-    value.sadd(v2.clone()).unwrap();
-
-    let mut v = value.srandmember(1, false).unwrap();
-    v.sort_by(|a, b| a.cmp(b));
-    assert!(v == vec![v1.clone()] ||
-            v == vec![v2.clone()]);
-}
-
-#[test]
-fn srandmember_dup() {
-    let mut value = Value::Nil;
-    let v1 = vec![1];
-    value.sadd(v1.clone()).unwrap();
-
-    let v = value.srandmember(5, true).unwrap();
-    assert_eq!(v, vec![v1.clone(), v1.clone(), v1.clone(), v1.clone(), v1.clone()]);
-}
-
-#[test]
-fn spop_toomany() {
-    let mut value = Value::Nil;
-    let v1 = vec![1];
-    let v2 = vec![2];
-    let v3 = vec![3];
-
-    value.sadd(v1.clone()).unwrap();
-    value.sadd(v2.clone()).unwrap();
-    value.sadd(v3.clone()).unwrap();
-
-    let mut v = value.spop(10).unwrap();
-    v.sort_by(|a, b| a.cmp(b));
-    assert_eq!(v, [v1, v2, v3]);
-}
-
-#[test]
-fn spop_some() {
-    let mut value = Value::Nil;
-    let v1 = vec![1];
-    let v2 = vec![2];
-    let v3 = vec![3];
-
-    value.sadd(v1.clone()).unwrap();
-    value.sadd(v2.clone()).unwrap();
-    value.sadd(v3.clone()).unwrap();
-
-    let v = value.spop(1).unwrap();
-    assert!(v == [v1] || v == [v2] || v == [v3]);
-}
-
-#[test]
-fn smembers() {
-    let mut value = Value::Nil;
-    let v1 = vec![1, 2, 3, 4];
-    let v2 = vec![5, 6, 7, 8];
-    let v3 = vec![9, 10, 11, 12];
-
-    assert_eq!(value.sadd(v1.clone()).unwrap(), true);
-    assert_eq!(value.sadd(v2.clone()).unwrap(), true);
-    assert_eq!(value.sadd(v3.clone()).unwrap(), true);
-
-    let mut v = value.smembers().unwrap();
-    v.sort_by(|a, b| a.cmp(b));
-    assert_eq!(v, [v1, v2, v3]);
-}
-
-#[test]
-fn sdiff() {
-    let mut value1 = Value::Nil;
-    let mut value2 = Value::Nil;
-    let v1 = vec![1, 2, 3, 4];
-    let v2 = vec![5, 6, 7, 8];
-    let v3 = vec![0, 9, 1, 2];
-
-    assert_eq!(value1.sadd(v1.clone()).unwrap(), true);
-    assert_eq!(value1.sadd(v2.clone()).unwrap(), true);
-
-    assert_eq!(value2.sadd(v1.clone()).unwrap(), true);
-    assert_eq!(value2.sadd(v3.clone()).unwrap(), true);
-
-    assert_eq!(value1.sdiff(&vec![&value2]).unwrap(),
-            vec![v2].iter().cloned().collect::<HashSet<_>>());
-}
-
-#[test]
-fn sinter() {
-    let mut value1 = Value::Nil;
-    let mut value2 = Value::Nil;
-    let v1 = vec![1, 2, 3, 4];
-    let v2 = vec![5, 6, 7, 8];
-    let v3 = vec![0, 9, 1, 2];
-
-    assert_eq!(value1.sadd(v1.clone()).unwrap(), true);
-    assert_eq!(value1.sadd(v2.clone()).unwrap(), true);
-
-    assert_eq!(value2.sadd(v1.clone()).unwrap(), true);
-    assert_eq!(value2.sadd(v3.clone()).unwrap(), true);
-
-    assert_eq!(value1.sinter(&vec![&value2]).unwrap().iter().collect::<Vec<_>>(),
-            vec![&v1]);
-
-    let empty:Vec<&Value> = Vec::new();
-    assert_eq!(value1.sinter(&empty).unwrap(),
-            vec![v1, v2].iter().cloned().collect::<HashSet<_>>());
-
-    assert_eq!(value1.sinter(&vec![&value2, &Value::Nil]).unwrap().len(), 0);
-}
-
-#[test]
-fn sunion() {
-    let mut value1 = Value::Nil;
-    let mut value2 = Value::Nil;
-    let v1 = vec![1, 2, 3, 4];
-    let v2 = vec![5, 6, 7, 8];
-    let v3 = vec![0, 9, 1, 2];
-
-    assert_eq!(value1.sadd(v1.clone()).unwrap(), true);
-    assert_eq!(value1.sadd(v2.clone()).unwrap(), true);
-
-    assert_eq!(value2.sadd(v1.clone()).unwrap(), true);
-    assert_eq!(value2.sadd(v3.clone()).unwrap(), true);
-
-    assert_eq!(value1.sunion(&vec![&value2]).unwrap(),
-            vec![&v1, &v2, &v3].iter().cloned().cloned().collect::<HashSet<_>>());
-
-    let empty:Vec<&Value> = Vec::new();
-    assert_eq!(value1.sunion(&empty).unwrap(),
-            vec![&v1, &v2].iter().cloned().cloned().collect::<HashSet<_>>());
-
-    assert_eq!(value1.sunion(&vec![&value2, &Value::Nil]).unwrap(),
-            vec![&v1, &v2, &v3].iter().cloned().cloned().collect::<HashSet<_>>());
-}
-
-#[test]
-fn set_get() {
-    let s = vec![1u8, 2, 3, 4];
-    let mut value = Value::Nil;
-    value.set(s.clone()).unwrap();
-    assert_eq!(value, Value::String(ValueString::Data(s)));
-}
-
-#[test]
-fn get_empty() {
-    let database = Database::mock();
-    let key = vec![1u8];
-    assert!(database.get(0, &key).is_none());
-}
-
-#[test]
-fn set_set_get() {
-    let s = vec![1, 2, 3, 4];
-    let mut value = Value::String(ValueString::Data(vec![0, 0, 0]));
-    value.set(s.clone()).unwrap();
-    assert_eq!(value, Value::String(ValueString::Data(s)));
-}
-
-#[test]
-fn append_append_get() {
-    let mut value = Value::Nil;
-    assert_eq!(value.append(vec![0, 0, 0]).unwrap(), 3);
-    assert_eq!(value.append(vec![1, 2, 3, 4]).unwrap(), 7);
-    assert_eq!(value, Value::String(ValueString::Data(vec![0u8, 0, 0, 1, 2, 3, 4])));
-}
-
-#[test]
-fn set_number() {
-    let mut value = Value::Nil;
-    value.set(b"123".to_vec()).unwrap();
-    assert_eq!(value, Value::String(ValueString::Integer(123)));
-}
-
-#[test]
-fn append_number() {
-    let mut value = Value::String(ValueString::Integer(123));
-    assert_eq!(value.append(b"asd".to_vec()).unwrap(), 6);
-    assert_eq!(value, Value::String(ValueString::Data(b"123asd".to_vec())));
-}
-
-#[test]
-fn remove_value() {
-    let mut database = Database::mock();
-    let key = vec![1u8];
-    let value = vec![1u8, 2, 3, 4];
-    assert!(database.get_or_create(0, &key).set(value).is_ok());
-    database.remove(0, &key).unwrap();
-    assert!(database.remove(0, &key).is_none());
-}
-
-#[test]
-fn incr_str() {
-    let mut value = Value::String(ValueString::Integer(123));
-    assert_eq!(value.incr(1).unwrap(), 124);
-    assert_eq!(value, Value::String(ValueString::Integer(124)));
-}
-
-#[test]
-fn incr2_str() {
-    let mut value = Value::String(ValueString::Data(b"123".to_vec()));
-    assert_eq!(value.incr(1).unwrap(), 124);
-    assert_eq!(value, Value::String(ValueString::Integer(124)));
-}
-
-#[test]
-fn incr_create_update() {
-    let mut value = Value::Nil;
-    assert_eq!(value.incr(124).unwrap(), 124);
-    assert_eq!(value, Value::String(ValueString::Integer(124)));
-    assert_eq!(value.incr(1).unwrap(), 125);
-    assert_eq!(value, Value::String(ValueString::Integer(125)));
-}
-
-#[test]
-fn incr_overflow() {
-    let mut value = Value::String(ValueString::Integer(std::i64::MAX));
-    assert!(value.incr(1).is_err());
-}
-
-#[test]
-fn set_expire_get() {
-    let mut database = Database::mock();
-    let key = vec![1u8];
-    let value = vec![1u8, 2, 3, 4];
-    assert!(database.get_or_create(0, &key).set(value).is_ok());
-    database.set_msexpiration(0, key.clone(), mstime());
-    assert_eq!(database.get(0, &key), None);
-}
-
-#[test]
-fn set_will_expire_get() {
-    let mut database = Database::mock();
-    let key = vec![1u8];
-    let value = vec![1u8, 2, 3, 4];
-    let expected = Vec::clone(&value);
-    assert!(database.get_or_create(0, &key).set(value).is_ok());
-    database.set_msexpiration(0, key.clone(), mstime() + 10000);
-    assert_eq!(database.get(0, &key), Some(&Value::String(ValueString::Data(expected))));
-}
-
-#[test]
-fn getrange_integer() {
-    let value = Value::String(ValueString::Integer(123));
-    assert_eq!(value.getrange(0, -1).unwrap(), "123".to_owned().into_bytes());
-    assert_eq!(value.getrange(-100, -2).unwrap(), "12".to_owned().into_bytes());
-    assert_eq!(value.getrange(1, 1).unwrap(), "2".to_owned().into_bytes());
-}
-
-#[test]
-fn getrange_data() {
-    let value = Value::String(ValueString::Data(vec![1,2,3]));
-    assert_eq!(value.getrange(0, -1).unwrap(), vec![1,2,3]);
-    assert_eq!(value.getrange(-100, -2).unwrap(), vec![1,2]);
-    assert_eq!(value.getrange(1, 1).unwrap(), vec![2]);
-}
-
-#[test]
-fn setrange_append() {
-    let mut value = Value::String(ValueString::Data(vec![1,2,3]));
-    assert_eq!(value.setrange(3, vec![4, 5, 6]).unwrap(), 6);
-    assert_eq!(value, Value::String(ValueString::Data(vec![1,2,3,4,5,6])));
-}
-
-#[test]
-fn setrange_create() {
-    let mut value = Value::Nil;
-    assert_eq!(value.setrange(0, vec![4, 5, 6]).unwrap(), 3);
-    assert_eq!(value, Value::String(ValueString::Data(vec![4,5,6])));
-}
-
-#[test]
-fn setrange_padding() {
-    let mut value = Value::String(ValueString::Data(vec![1,2,3]));
-    assert_eq!(value.setrange(5, vec![6]).unwrap(), 6);
-    assert_eq!(value, Value::String(ValueString::Data(vec![1,2,3,0,0,6])));
-}
-
-#[test]
-fn setrange_intermediate() {
-    let mut value = Value::String(ValueString::Data(vec![1,2,3,4,5]));
-    assert_eq!(value.setrange(2, vec![13, 14]).unwrap(), 5);
-    assert_eq!(value, Value::String(ValueString::Data(vec![1,2,13,14,5])));
-}
-
-#[test]
-fn setbit() {
-    let mut value = Value::Nil;
-    assert_eq!(value.setbit(23, false).unwrap(), false);
-    assert_eq!(value.getrange(0, -1).unwrap(), [0u8, 0, 0]);
-    assert_eq!(value.setbit(23, true).unwrap(), false);
-    assert_eq!(value.getrange(0, -1).unwrap(), [0u8, 0, 1]);
-}
-
-#[test]
-fn getbit() {
-    let value = Value::String(ValueString::Data(vec![1,2,3,4,5]));
-    assert_eq!(value.getbit(0).unwrap(), false);
-    assert_eq!(value.getbit(23).unwrap(), true);
-    assert_eq!(value.getbit(500).unwrap(), false);
-}
-
-macro_rules! zadd {
-    ($value: expr, $score: expr, $member: expr) => (
-        $value.zadd($score, $member.clone(), false, false, false, false).unwrap()
-    )
-}
-
-#[test]
-fn zadd_basic() {
-    let mut value = Value::Nil;
-    let s1 = 1.0;
-    let v1 = vec![1, 2, 3, 4];
-    let s2 = 1.0;
-    let v2 = vec![5, 6, 7, 8];
-
-    assert_eq!(zadd!(value, s1, v1), true);
-    assert_eq!(zadd!(value, s1, v1), false);
-    assert_eq!(zadd!(value, s2, v2), true);
-    assert_eq!(zadd!(value, s1, v2), false);
-    match value {
-        Value::SortedSet(value) => match value {
-            ValueSortedSet::Data(_, hs) => {
-                assert_eq!(hs.get(&v1).unwrap(), &s1);
-                assert_eq!(hs.get(&v2).unwrap(), &s1);
-            },
-        },
-        _ => panic!("Expected zset"),
+    #[test]
+    fn llen() {
+        let mut value = Value::List(ValueList::new());
+        let v1 = vec![1, 2, 3, 4];
+        let v2 = vec![5, 6, 7, 8];
+        let v3 = vec![9, 0, 1, 2];
+        value.push(v1.clone(), true).unwrap();
+        value.push(v2.clone(), true).unwrap();
+        assert_eq!(value.llen().unwrap(), 2);
+
+        value.push(v3.clone(), true).unwrap();
+        assert_eq!(value.llen().unwrap(), 3);
     }
-}
 
-#[test]
-fn zadd_nx() {
-    let mut value = Value::Nil;
-    let s1 = 1.0;
-    let v1 = vec![1, 2, 3, 4];
-    let s2 = 1.0;
-    let v2 = vec![5, 6, 7, 8];
+    #[test]
+    fn lrange() {
+        let mut value = Value::List(ValueList::new());
+        let v1 = vec![1, 2, 3, 4];
+        let v2 = vec![5, 6, 7, 8];
+        let v3 = vec![9, 0, 1, 2];
+        value.push(v1.clone(), true).unwrap();
+        value.push(v2.clone(), true).unwrap();
+        value.push(v3.clone(), true).unwrap();
 
-    assert_eq!(value.zadd(s1, v1.clone(), true, false, false, false).unwrap(), true);
-    assert_eq!(value.zadd(s1, v1.clone(), true, false, false, false).unwrap(), false);
-    assert_eq!(value.zadd(s2, v2.clone(), true, false, false, false).unwrap(), true);
-    assert_eq!(value.zadd(s1, v2.clone(), true, false, false, false).unwrap(), false);
-    match value {
-        Value::SortedSet(value) => match value {
-            ValueSortedSet::Data(_, hs) => {
-                assert_eq!(hs.get(&v1).unwrap(), &s1);
-                assert_eq!(hs.get(&v2).unwrap(), &s2);
-            },
-        },
-        _ => panic!("Expected zset"),
+        assert_eq!(value.lrange(-100, 100).unwrap(), vec![&v1, &v2, &v3]);
+        assert_eq!(value.lrange(0, 1).unwrap(), vec![&v1, &v2]);
+        assert_eq!(value.lrange(0, 0).unwrap(), vec![&v1]);
+        assert_eq!(value.lrange(1, -1).unwrap(), vec![&v2, &v3]);
     }
-}
 
-#[test]
-fn zadd_xx() {
-    let mut value = Value::Nil;
-    let s1 = 1.0;
-    let v1 = vec![1, 2, 3, 4];
-    let s2 = 2.0;
+    #[test]
+    fn lrem_left_unlimited() {
+        let mut value = Value::List(ValueList::new());
+        let v1 = vec![1, 2, 3, 4];
+        let v2 = vec![5, 6, 7, 8];
+        let v3 = vec![9, 0, 1, 2];
+        value.push(v1.clone(), true).unwrap();
+        value.push(v2.clone(), true).unwrap();
+        value.push(v3.clone(), true).unwrap();
 
-    assert_eq!(value.zadd(s1, v1.clone(), false, true, false, false).unwrap(), false);
-    assert_eq!(zadd!(value, s1, v1), true);
-    assert_eq!(value.zadd(s2, v1.clone(), false, true, false, false).unwrap(), false);
-    match value {
-        Value::SortedSet(value) => match value {
-            ValueSortedSet::Data(_, hs) => {
-                assert_eq!(hs.get(&v1).unwrap(), &s2);
-            },
-        },
-        _ => panic!("Expected zset"),
+        assert_eq!(value.lrem(true, 0, v3.clone()).unwrap(), 1);
+        assert_eq!(value.llen().unwrap(), 2);
+        assert_eq!(value.lrem(true, 0, v1.clone()).unwrap(), 1);
+        assert_eq!(value.llen().unwrap(), 1);
+        assert_eq!(value.lrem(true, 0, v2.clone()).unwrap(), 1);
+        assert_eq!(value.llen().unwrap(), 0);
     }
-}
 
-#[test]
-fn zadd_ch() {
-    let mut value = Value::Nil;
-    let s1 = 1.0;
-    let v1 = vec![1, 2, 3, 4];
-    let s2 = 2.0;
+    #[test]
+    fn lrem_left_limited() {
+        let mut value = Value::List(ValueList::new());
+        let v1 = vec![1, 2, 3, 4];
+        let v2 = vec![5, 6, 7, 8];
+        value.push(v1.clone(), true).unwrap();
+        value.push(v1.clone(), true).unwrap();
+        value.push(v1.clone(), true).unwrap();
+        value.push(v2.clone(), true).unwrap();
+        value.push(v1.clone(), true).unwrap();
 
-    assert_eq!(value.zadd(s1, v1.clone(), false, false, true, false).unwrap(), true);
-    assert_eq!(zadd!(value, s1, v1), false);
-    assert_eq!(value.zadd(s2, v1.clone(), false, false, true, false).unwrap(), true);
-    match value {
-        Value::SortedSet(value) => match value {
-            ValueSortedSet::Data(_, hs) => {
-                assert_eq!(hs.get(&v1).unwrap(), &s2);
-            },
-        },
-        _ => panic!("Expected zset"),
+        assert_eq!(value.lrem(true, 3, v1.clone()).unwrap(), 3);
+        assert_eq!(value.llen().unwrap(), 2);
+        {
+            let list = match value { Value::List(ref value) => match value { &ValueList::Data(ref l) => l }, _ => panic!("Expected list") };
+            assert_eq!(list.front().unwrap(), &v2);
+        }
+        assert_eq!(value.lrem(true, 3, v1.clone()).unwrap(), 1);
+        assert_eq!(value.llen().unwrap(), 1);
     }
-}
 
-#[test]
-fn zcount() {
-    let mut value = Value::Nil;
-    let s1 = 1.0;
-    let v1 = vec![1, 2, 3, 4];
-    let s2 = 2.0;
-    let v2 = vec![5, 6, 7, 8];
+    #[test]
+    fn lrem_right_unlimited() {
+        let mut value = Value::List(ValueList::new());
+        let v1 = vec![1, 2, 3, 4];
+        let v2 = vec![5, 6, 7, 8];
+        let v3 = vec![9, 0, 1, 2];
+        value.push(v1.clone(), true).unwrap();
+        value.push(v2.clone(), true).unwrap();
+        value.push(v3.clone(), true).unwrap();
 
-    assert_eq!(zadd!(value, s1, v1), true);
-    assert_eq!(zadd!(value, s2, v2), true);
-    assert_eq!(value.zcount(Bound::Included(0.0), Bound::Included(5.0)).unwrap(), 2);
-    assert_eq!(value.zcount(Bound::Included(1.0), Bound::Included(2.0)).unwrap(), 2);
-    assert_eq!(value.zcount(Bound::Excluded(1.0), Bound::Excluded(2.0)).unwrap(), 0);
-    assert_eq!(value.zcount(Bound::Included(1.5), Bound::Included(2.0)).unwrap(), 1);
-    assert_eq!(value.zcount(Bound::Included(5.0), Bound::Included(10.0)).unwrap(), 0);
-}
-
-#[test]
-fn zrange() {
-    let mut value = Value::Nil;
-    let s1 = 0.0;
-    let v1 = vec![1, 2, 3, 4];
-    let s2 = 0.0;
-    let v2 = vec![5, 6, 7, 8];
-    let s3 = 0.0;
-    let v3 = vec![9, 10, 11, 12];
-
-    assert_eq!(zadd!(value, s1, v1), true);
-    assert_eq!(zadd!(value, s3, v3), true);
-    assert_eq!(zadd!(value, s2, v2), true);
-    assert_eq!(value.zrange(0, -1, true, false).unwrap(), vec![
-            vec![1, 2, 3, 4], b"0".to_vec(),
-            vec![5, 6, 7, 8], b"0".to_vec(),
-            vec![9, 10, 11, 12], b"0".to_vec(),
-            ]);
-    assert_eq!(value.zrange(1, 1, true, false).unwrap(), vec![
-            vec![5, 6, 7, 8], b"0".to_vec(),
-            ]);
-    assert_eq!(value.zrange(2, 0, true, false).unwrap().len(), 0);
-}
-
-#[test]
-fn zrevrange() {
-    let mut value = Value::Nil;
-    let s1 = 0.0;
-    let v1 = vec![1, 2, 3, 4];
-    let s2 = 0.0;
-    let v2 = vec![5, 6, 7, 8];
-    let s3 = 0.0;
-    let v3 = vec![9, 10, 11, 12];
-
-    assert_eq!(zadd!(value, s1, v1), true);
-    assert_eq!(zadd!(value, s3, v3), true);
-    assert_eq!(zadd!(value, s2, v2), true);
-    assert_eq!(value.zrange(0, -1, true, true).unwrap(), vec![
-            v3.clone(), b"0".to_vec(),
-            v2.clone(), b"0".to_vec(),
-            v1.clone(), b"0".to_vec(),
-            ]);
-    assert_eq!(value.zrange(1, 1, true, true).unwrap(), vec![
-            v2.clone(), b"0".to_vec(),
-            ]);
-    assert_eq!(value.zrange(2, 0, true, true).unwrap().len(), 0);
-    assert_eq!(value.zrange(2, 2, true, true).unwrap(), vec![
-            v1.clone(), b"0".to_vec(),
-            ]);
-}
-
-#[test]
-fn zrangebyscore() {
-    let mut value = Value::Nil;
-    let s1 = 10.0;
-    let v1 = vec![1, 2, 3, 4];
-    let s2 = 20.0;
-    let v2 = vec![5, 6, 7, 8];
-    let s3 = 30.0;
-    let v3 = vec![9, 10, 11, 12];
-
-    assert_eq!(zadd!(value, s1, v1), true);
-    assert_eq!(zadd!(value, s3, v3), true);
-    assert_eq!(zadd!(value, s2, v2), true);
-    assert_eq!(value.zrangebyscore(Bound::Unbounded, Bound::Unbounded, true, 0, usize::MAX, false).unwrap(), vec![
-            vec![1, 2, 3, 4], b"10".to_vec(),
-            vec![5, 6, 7, 8], b"20".to_vec(),
-            vec![9, 10, 11, 12], b"30".to_vec(),
-            ]);
-    assert_eq!(value.zrangebyscore(Bound::Excluded(10.0), Bound::Included(20.0), true, 0, usize::MAX, false).unwrap(), vec![
-            vec![5, 6, 7, 8], b"20".to_vec(),
-            ]);
-    assert_eq!(value.zrangebyscore(Bound::Included(20.0), Bound::Excluded(30.0), true, 0, usize::MAX, false).unwrap(), vec![
-            vec![5, 6, 7, 8], b"20".to_vec(),
-            ]);
-    assert_eq!(value.zrangebyscore(Bound::Unbounded, Bound::Unbounded, true, 1, 1, false).unwrap(), vec![
-            vec![5, 6, 7, 8], b"20".to_vec(),
-            ]);
-    assert_eq!(value.zrangebyscore(Bound::Excluded(30.0), Bound::Included(20.0), false, 0, usize::MAX, false).unwrap().len(), 0);
-    assert_eq!(value.zrangebyscore(Bound::Excluded(30.0), Bound::Excluded(30.0), false, 0, usize::MAX, false).unwrap().len(), 0);
-    assert_eq!(value.zrangebyscore(Bound::Included(30.0), Bound::Included(30.0), false, 0, usize::MAX, false).unwrap().len(), 1);
-    assert_eq!(value.zrangebyscore(Bound::Included(30.0), Bound::Excluded(30.0), false, 0, usize::MAX, false).unwrap().len(), 0);
-    assert_eq!(value.zrangebyscore(Bound::Included(21.0), Bound::Included(22.0), false, 0, usize::MAX, false).unwrap().len(), 0);
-}
-
-#[test]
-fn zrevrangebyscore() {
-    let mut value = Value::Nil;
-    let s1 = 10.0;
-    let v1 = vec![1, 2, 3, 4];
-    let s2 = 20.0;
-    let v2 = vec![5, 6, 7, 8];
-    let s3 = 30.0;
-    let v3 = vec![9, 10, 11, 12];
-
-    assert_eq!(zadd!(value, s1, v1), true);
-    assert_eq!(zadd!(value, s3, v3), true);
-    assert_eq!(zadd!(value, s2, v2), true);
-    assert_eq!(value.zrangebyscore(Bound::Unbounded, Bound::Unbounded, true, 0, usize::MAX, true).unwrap(), vec![
-            vec![9, 10, 11, 12], b"30".to_vec(),
-            vec![5, 6, 7, 8], b"20".to_vec(),
-            vec![1, 2, 3, 4], b"10".to_vec(),
-            ]);
-    assert_eq!(value.zrangebyscore(Bound::Included(20.0), Bound::Excluded(10.0), true, 0, usize::MAX, true).unwrap(), vec![
-            vec![5, 6, 7, 8], b"20".to_vec(),
-            ]);
-    assert_eq!(value.zrangebyscore(Bound::Excluded(30.0), Bound::Included(20.0), true, 0, usize::MAX, true).unwrap(), vec![
-            vec![5, 6, 7, 8], b"20".to_vec(),
-            ]);
-    assert_eq!(value.zrangebyscore(Bound::Unbounded, Bound::Unbounded, true, 1, 1, true).unwrap(), vec![
-            vec![5, 6, 7, 8], b"20".to_vec(),
-            ]);
-    assert_eq!(value.zrangebyscore(Bound::Included(20.0), Bound::Excluded(30.0), false, 0, usize::MAX, true).unwrap().len(), 0);
-    assert_eq!(value.zrangebyscore(Bound::Excluded(30.0), Bound::Excluded(30.0), false, 0, usize::MAX, true).unwrap().len(), 0);
-    assert_eq!(value.zrangebyscore(Bound::Included(30.0), Bound::Included(30.0), false, 0, usize::MAX, true).unwrap().len(), 1);
-    assert_eq!(value.zrangebyscore(Bound::Excluded(30.0), Bound::Included(30.0), false, 0, usize::MAX, true).unwrap().len(), 0);
-    assert_eq!(value.zrangebyscore(Bound::Included(22.0), Bound::Included(21.0), false, 0, usize::MAX, true).unwrap().len(), 0);
-}
-
-#[test]
-fn zrank() {
-    let mut value = Value::Nil;
-    let s1 = 0.0;
-    let v1 = vec![1, 2, 3, 4];
-    let s2 = 0.0;
-    let v2 = vec![5, 6, 7, 8];
-    let v3 = vec![9, 10, 11, 12];
-
-    assert_eq!(zadd!(value, s1, v1), true);
-    assert_eq!(zadd!(value, s2, v2), true);
-    assert_eq!(value.zrank(v1.clone()).unwrap(), Some(0));
-    assert_eq!(value.zrank(v2.clone()).unwrap(), Some(1));
-    assert_eq!(value.zrank(v3.clone()).unwrap(), None);
-}
-
-#[test]
-fn zadd_update() {
-    let mut value = Value::Nil;
-    let s1 = 0.0;
-    let s2 = 1.0;
-    let v1 = vec![1, 2, 3, 4];
-
-    assert_eq!(zadd!(value, s1, v1), true);
-    assert_eq!(zadd!(value, s2, v1), false);
-    assert_eq!(value.zrange(0, -1, true, false).unwrap(), vec![
-            vec![1, 2, 3, 4], b"1".to_vec(),
-            ]);
-}
-
-#[test]
-fn zadd_incr() {
-    let mut value = Value::Nil;
-    let s1 = 1.0;
-    let incr = 2.0;
-    let v1 = vec![1, 2, 3, 4];
-
-    assert_eq!(value.zadd(s1, v1.clone(), false, false, false, true).unwrap(), true);
-    assert_eq!(value.zrange(0, -1, true, false).unwrap(), vec![v1.clone(), b"1".to_vec()]);
-    assert_eq!(value.zadd(incr, v1.clone(), false, false, false, true).unwrap(), false);
-    assert_eq!(value.zrange(0, -1, true, false).unwrap(), vec![v1.clone(), b"3".to_vec()]);
-}
-
-#[test]
-fn zadd_incr_ch() {
-    let mut value = Value::Nil;
-    let s1 = 1.0;
-    let incr = 2.0;
-    let v1 = vec![1, 2, 3, 4];
-
-    assert_eq!(value.zadd(s1, v1.clone(), false, false, true, true).unwrap(), true);
-    assert_eq!(value.zrange(0, -1, true, false).unwrap(), vec![v1.clone(), b"1".to_vec()]);
-    assert_eq!(value.zadd(incr, v1.clone(), false, false, true, true).unwrap(), true);
-    assert_eq!(value.zrange(0, -1, true, false).unwrap(), vec![v1.clone(), b"3".to_vec()]);
-}
-
-#[test]
-fn zrem() {
-    let mut value = Value::Nil;
-    let s1 = 0.0;
-    let v1 = vec![1, 2, 3, 4];
-
-    assert_eq!(zadd!(value, s1, v1), true);
-    assert_eq!(value.zrem(vec![8u8]).unwrap(), false);
-    assert_eq!(value.zrem(v1.clone()).unwrap(), true);
-    assert_eq!(value.zrem(v1.clone()).unwrap(), false);
-}
-
-#[test]
-fn zincrby() {
-    let mut value = Value::Nil;
-    let s1 = 1.0;
-    let s2 = 2.0;
-    let v1 = vec![1, 2, 3, 4];
-
-    assert_eq!(value.zincrby(s1.clone(), v1.clone()).unwrap(), s1);
-    assert_eq!(value.zincrby(s2.clone(), v1.clone()).unwrap(), s1 + s2);
-    assert_eq!(value.zincrby(- s1.clone(), v1.clone()).unwrap(), s2);
-}
-
-#[test]
-fn pubsub_basic() {
-    let mut database = Database::mock();
-    let channel_name = vec![1u8, 2, 3];
-    let message = vec![2u8, 3, 4, 5, 6];
-    let (tx, rx) = channel();
-    database.subscribe(channel_name.clone(), tx);
-    database.publish(&channel_name, &message);
-    assert_eq!(rx.recv().unwrap(), PubsubEvent::Message(channel_name, None, message));
-}
-
-#[test]
-fn unsubscribe() {
-    let mut database = Database::mock();
-    let channel_name = vec![1u8, 2, 3];
-    let message = vec![2u8, 3, 4, 5, 6];
-    let (tx, rx) = channel();
-    let subscriber_id = database.subscribe(channel_name.clone(), tx);
-    database.unsubscribe(channel_name.clone(), subscriber_id);
-    database.publish(&channel_name, &message);
-    assert!(rx.try_recv().is_err());
-}
-
-#[test]
-fn pubsub_pattern() {
-    let mut database = Database::mock();
-    let channel_name = vec![1u8, 2, 3];
-    let message = vec![2u8, 3, 4, 5, 6];
-    let (tx, rx) = channel();
-    database.psubscribe(channel_name.clone(), tx);
-    database.publish(&channel_name, &message);
-    assert_eq!(rx.recv().unwrap(), PubsubEvent::Message(channel_name.clone(), Some(channel_name.clone()), message));
-}
-
-#[test]
-fn rehashing() {
-    let mut database = Database::mock();
-    for i in 0u32..1000 {
-        let key = vec![(i % 256) as u8, (i / 256) as u8];
-        database.get_or_create(0, &key).set(key.clone()).unwrap();
+        assert_eq!(value.lrem(false, 0, v3.clone()).unwrap(), 1);
+        assert_eq!(value.llen().unwrap(), 2);
+        assert_eq!(value.lrem(false, 0, v1.clone()).unwrap(), 1);
+        assert_eq!(value.llen().unwrap(), 1);
+        assert_eq!(value.lrem(false, 0, v2.clone()).unwrap(), 1);
+        assert_eq!(value.llen().unwrap(), 0);
     }
-    assert_eq!(database.data[0].len(), 1000);
-    assert!(database.data[0].capacity() >= 1000);
-    for i in 0u32..1000 {
-        let key = vec![(i % 256) as u8, (i / 256) as u8];
+
+    #[test]
+    fn lrem_right_limited() {
+        let mut value = Value::List(ValueList::new());
+        let v1 = vec![1, 2, 3, 4];
+        let v2 = vec![5, 6, 7, 8];
+        value.push(v1.clone(), true).unwrap();
+        value.push(v1.clone(), true).unwrap();
+        value.push(v1.clone(), true).unwrap();
+        value.push(v2.clone(), true).unwrap();
+        value.push(v1.clone(), true).unwrap();
+
+        assert_eq!(value.lrem(false, 3, v1.clone()).unwrap(), 3);
+        assert_eq!(value.llen().unwrap(), 2);
+        {
+            let list = match value { Value::List(ref value) => match value { &ValueList::Data(ref l) => l }, _ => panic!("Expected list") };
+            assert_eq!(list.front().unwrap(), &v1);
+        }
+        assert_eq!(value.lrem(false, 3, v1.clone()).unwrap(), 1);
+        assert_eq!(value.llen().unwrap(), 1);
+    }
+
+    #[test]
+    fn lset() {
+        let mut value = Value::List(ValueList::new());
+        let v1 = vec![1, 2, 3, 4];
+        let v2 = vec![5, 6, 7, 8];
+        let v3 = vec![9, 0, 1, 2];
+        let v4 = vec![3, 4, 5, 6];
+        value.push(v1.clone(), true).unwrap();
+        value.push(v2.clone(), true).unwrap();
+        value.push(v3.clone(), true).unwrap();
+
+        assert_eq!(value.lset(1, v4.clone()).unwrap(), ());
+        assert_eq!(value.lrange(0, -1).unwrap(), vec![&v1, &v4, &v3]);
+        assert_eq!(value.lset(-1, v2.clone()).unwrap(), ());
+        assert_eq!(value.lrange(0, -1).unwrap(), vec![&v1, &v4, &v2]);
+    }
+
+    #[test]
+    fn ltrim() {
+        let mut value = Value::List(ValueList::new());
+        let v1 = vec![1, 2, 3, 4];
+        let v2 = vec![5, 6, 7, 8];
+        let v3 = vec![9, 0, 1, 2];
+        let v4 = vec![3, 4, 5, 6];
+        value.push(v1.clone(), true).unwrap();
+        value.push(v2.clone(), true).unwrap();
+        value.push(v3.clone(), true).unwrap();
+        value.push(v4.clone(), true).unwrap();
+
+        assert_eq!(value.ltrim(1, 2).unwrap(), ());
+        assert_eq!(value.llen().unwrap(), 2);
+        assert_eq!(value.lrange(0, -1).unwrap(), vec![&v2, &v3]);
+    }
+
+    #[test]
+    fn sadd() {
+        let mut value = Value::Nil;
+        let v1 = vec![1, 2, 3, 4];
+
+        assert_eq!(value.sadd(v1.clone()).unwrap(), true);
+        assert_eq!(value.sadd(v1.clone()).unwrap(), false);
+    }
+
+    #[test]
+    fn srem() {
+        let mut value = Value::Nil;
+        let v1 = vec![1, 2, 3, 4];
+
+        assert_eq!(value.srem(&v1).unwrap(), false);
+        assert_eq!(value.sadd(v1.clone()).unwrap(), true);
+        assert_eq!(value.srem(&v1).unwrap(), true);
+        assert_eq!(value.srem(&v1).unwrap(), false);
+    }
+
+    #[test]
+    fn sismember() {
+        let mut value = Value::Nil;
+        let v1 = vec![1, 2, 3, 4];
+
+        assert_eq!(value.sismember(&v1).unwrap(), false);
+        assert_eq!(value.sadd(v1.clone()).unwrap(), true);
+        assert_eq!(value.sismember(&v1).unwrap(), true);
+    }
+
+    #[test]
+    fn scard() {
+        let mut value = Value::Nil;
+        let v1 = vec![1, 2, 3, 4];
+
+        assert_eq!(value.scard().unwrap(), 0);
+        assert_eq!(value.sadd(v1.clone()).unwrap(), true);
+        assert_eq!(value.scard().unwrap(), 1);
+    }
+
+    #[test]
+    fn srandmember_toomany_nodup() {
+        let mut value = Value::Nil;
+        let v1 = vec![1];
+        let v2 = vec![2];
+        let v3 = vec![3];
+
+        value.sadd(v1.clone()).unwrap();
+        value.sadd(v2.clone()).unwrap();
+        value.sadd(v3.clone()).unwrap();
+
+        let mut v = value.srandmember(10, false).unwrap();
+        v.sort_by(|a, b| a.cmp(b));
+        assert_eq!(v, [v1, v2, v3]);
+    }
+
+    #[test]
+    fn srandmember_alot_dup() {
+        let mut value = Value::Nil;
+        let v1 = vec![1];
+        let v2 = vec![2];
+        let v3 = vec![3];
+
+        value.sadd(v1.clone()).unwrap();
+        value.sadd(v2.clone()).unwrap();
+        value.sadd(v3.clone()).unwrap();
+
+        let v = value.srandmember(100, true).unwrap();
+        assert_eq!(v.len(), 100);
+        // this test _probably_ passes
+        assert!(v.contains(&v1));
+        assert!(v.contains(&v2));
+        assert!(v.contains(&v3));
+    }
+
+    #[test]
+    fn srandmember_nodup_all() {
+        let mut value = Value::Nil;
+        let v1 = vec![1];
+        let v2 = vec![2];
+        value.sadd(v1.clone()).unwrap();
+        value.sadd(v2.clone()).unwrap();
+
+        let mut v = value.srandmember(2, false).unwrap();
+        v.sort_by(|a, b| a.cmp(b));
+        assert!(v == vec![v1.clone(), v1.clone()] ||
+                v == vec![v1.clone(), v2.clone()] ||
+                v == vec![v2.clone(), v2.clone()]);
+    }
+
+    #[test]
+    fn srandmember_nodup_some() {
+        let mut value = Value::Nil;
+        let v1 = vec![1];
+        let v2 = vec![2];
+        value.sadd(v1.clone()).unwrap();
+        value.sadd(v2.clone()).unwrap();
+
+        let mut v = value.srandmember(1, false).unwrap();
+        v.sort_by(|a, b| a.cmp(b));
+        assert!(v == vec![v1.clone()] ||
+                v == vec![v2.clone()]);
+    }
+
+    #[test]
+    fn srandmember_dup() {
+        let mut value = Value::Nil;
+        let v1 = vec![1];
+        value.sadd(v1.clone()).unwrap();
+
+        let v = value.srandmember(5, true).unwrap();
+        assert_eq!(v, vec![v1.clone(), v1.clone(), v1.clone(), v1.clone(), v1.clone()]);
+    }
+
+    #[test]
+    fn spop_toomany() {
+        let mut value = Value::Nil;
+        let v1 = vec![1];
+        let v2 = vec![2];
+        let v3 = vec![3];
+
+        value.sadd(v1.clone()).unwrap();
+        value.sadd(v2.clone()).unwrap();
+        value.sadd(v3.clone()).unwrap();
+
+        let mut v = value.spop(10).unwrap();
+        v.sort_by(|a, b| a.cmp(b));
+        assert_eq!(v, [v1, v2, v3]);
+    }
+
+    #[test]
+    fn spop_some() {
+        let mut value = Value::Nil;
+        let v1 = vec![1];
+        let v2 = vec![2];
+        let v3 = vec![3];
+
+        value.sadd(v1.clone()).unwrap();
+        value.sadd(v2.clone()).unwrap();
+        value.sadd(v3.clone()).unwrap();
+
+        let v = value.spop(1).unwrap();
+        assert!(v == [v1] || v == [v2] || v == [v3]);
+    }
+
+    #[test]
+    fn smembers() {
+        let mut value = Value::Nil;
+        let v1 = vec![1, 2, 3, 4];
+        let v2 = vec![5, 6, 7, 8];
+        let v3 = vec![9, 10, 11, 12];
+
+        assert_eq!(value.sadd(v1.clone()).unwrap(), true);
+        assert_eq!(value.sadd(v2.clone()).unwrap(), true);
+        assert_eq!(value.sadd(v3.clone()).unwrap(), true);
+
+        let mut v = value.smembers().unwrap();
+        v.sort_by(|a, b| a.cmp(b));
+        assert_eq!(v, [v1, v2, v3]);
+    }
+
+    #[test]
+    fn sdiff() {
+        let mut value1 = Value::Nil;
+        let mut value2 = Value::Nil;
+        let v1 = vec![1, 2, 3, 4];
+        let v2 = vec![5, 6, 7, 8];
+        let v3 = vec![0, 9, 1, 2];
+
+        assert_eq!(value1.sadd(v1.clone()).unwrap(), true);
+        assert_eq!(value1.sadd(v2.clone()).unwrap(), true);
+
+        assert_eq!(value2.sadd(v1.clone()).unwrap(), true);
+        assert_eq!(value2.sadd(v3.clone()).unwrap(), true);
+
+        assert_eq!(value1.sdiff(&vec![&value2]).unwrap(),
+                vec![v2].iter().cloned().collect::<HashSet<_>>());
+    }
+
+    #[test]
+    fn sinter() {
+        let mut value1 = Value::Nil;
+        let mut value2 = Value::Nil;
+        let v1 = vec![1, 2, 3, 4];
+        let v2 = vec![5, 6, 7, 8];
+        let v3 = vec![0, 9, 1, 2];
+
+        assert_eq!(value1.sadd(v1.clone()).unwrap(), true);
+        assert_eq!(value1.sadd(v2.clone()).unwrap(), true);
+
+        assert_eq!(value2.sadd(v1.clone()).unwrap(), true);
+        assert_eq!(value2.sadd(v3.clone()).unwrap(), true);
+
+        assert_eq!(value1.sinter(&vec![&value2]).unwrap().iter().collect::<Vec<_>>(),
+                vec![&v1]);
+
+        let empty:Vec<&Value> = Vec::new();
+        assert_eq!(value1.sinter(&empty).unwrap(),
+                vec![v1, v2].iter().cloned().collect::<HashSet<_>>());
+
+        assert_eq!(value1.sinter(&vec![&value2, &Value::Nil]).unwrap().len(), 0);
+    }
+
+    #[test]
+    fn sunion() {
+        let mut value1 = Value::Nil;
+        let mut value2 = Value::Nil;
+        let v1 = vec![1, 2, 3, 4];
+        let v2 = vec![5, 6, 7, 8];
+        let v3 = vec![0, 9, 1, 2];
+
+        assert_eq!(value1.sadd(v1.clone()).unwrap(), true);
+        assert_eq!(value1.sadd(v2.clone()).unwrap(), true);
+
+        assert_eq!(value2.sadd(v1.clone()).unwrap(), true);
+        assert_eq!(value2.sadd(v3.clone()).unwrap(), true);
+
+        assert_eq!(value1.sunion(&vec![&value2]).unwrap(),
+                vec![&v1, &v2, &v3].iter().cloned().cloned().collect::<HashSet<_>>());
+
+        let empty:Vec<&Value> = Vec::new();
+        assert_eq!(value1.sunion(&empty).unwrap(),
+                vec![&v1, &v2].iter().cloned().cloned().collect::<HashSet<_>>());
+
+        assert_eq!(value1.sunion(&vec![&value2, &Value::Nil]).unwrap(),
+                vec![&v1, &v2, &v3].iter().cloned().cloned().collect::<HashSet<_>>());
+    }
+
+    #[test]
+    fn set_get() {
+        let s = vec![1u8, 2, 3, 4];
+        let mut value = Value::Nil;
+        value.set(s.clone()).unwrap();
+        assert_eq!(value, Value::String(ValueString::Data(s)));
+    }
+
+    #[test]
+    fn get_empty() {
+        let database = Database::mock();
+        let key = vec![1u8];
+        assert!(database.get(0, &key).is_none());
+    }
+
+    #[test]
+    fn set_set_get() {
+        let s = vec![1, 2, 3, 4];
+        let mut value = Value::String(ValueString::Data(vec![0, 0, 0]));
+        value.set(s.clone()).unwrap();
+        assert_eq!(value, Value::String(ValueString::Data(s)));
+    }
+
+    #[test]
+    fn append_append_get() {
+        let mut value = Value::Nil;
+        assert_eq!(value.append(vec![0, 0, 0]).unwrap(), 3);
+        assert_eq!(value.append(vec![1, 2, 3, 4]).unwrap(), 7);
+        assert_eq!(value, Value::String(ValueString::Data(vec![0u8, 0, 0, 1, 2, 3, 4])));
+    }
+
+    #[test]
+    fn set_number() {
+        let mut value = Value::Nil;
+        value.set(b"123".to_vec()).unwrap();
+        assert_eq!(value, Value::String(ValueString::Integer(123)));
+    }
+
+    #[test]
+    fn append_number() {
+        let mut value = Value::String(ValueString::Integer(123));
+        assert_eq!(value.append(b"asd".to_vec()).unwrap(), 6);
+        assert_eq!(value, Value::String(ValueString::Data(b"123asd".to_vec())));
+    }
+
+    #[test]
+    fn remove_value() {
+        let mut database = Database::mock();
+        let key = vec![1u8];
+        let value = vec![1u8, 2, 3, 4];
+        assert!(database.get_or_create(0, &key).set(value).is_ok());
         database.remove(0, &key).unwrap();
+        assert!(database.remove(0, &key).is_none());
     }
-    // freeing memory
-    assert!(database.data[0].capacity() < 1000);
-}
 
-#[test]
-fn no_rehashing() {
-    let mut database = create_database(1, false);
-    for i in 0u32..1000 {
-        let key = vec![(i % 256) as u8, (i / 256) as u8];
-        database.get_or_create(0, &key).set(key.clone()).unwrap();
+    #[test]
+    fn incr_str() {
+        let mut value = Value::String(ValueString::Integer(123));
+        assert_eq!(value.incr(1).unwrap(), 124);
+        assert_eq!(value, Value::String(ValueString::Integer(124)));
     }
-    assert_eq!(database.data[0].len(), 1000);
-    assert!(database.data[0].capacity() >= 1000);
-    for i in 0u32..1000 {
-        let key = vec![(i % 256) as u8, (i / 256) as u8];
-        database.remove(0, &key).unwrap();
+
+    #[test]
+    fn incr2_str() {
+        let mut value = Value::String(ValueString::Data(b"123".to_vec()));
+        assert_eq!(value.incr(1).unwrap(), 124);
+        assert_eq!(value, Value::String(ValueString::Integer(124)));
     }
-    // no freeing memory
-    assert!(database.data[0].capacity() > 1000);
+
+    #[test]
+    fn incr_create_update() {
+        let mut value = Value::Nil;
+        assert_eq!(value.incr(124).unwrap(), 124);
+        assert_eq!(value, Value::String(ValueString::Integer(124)));
+        assert_eq!(value.incr(1).unwrap(), 125);
+        assert_eq!(value, Value::String(ValueString::Integer(125)));
+    }
+
+    #[test]
+    fn incr_overflow() {
+        let mut value = Value::String(ValueString::Integer(i64::MAX));
+        assert!(value.incr(1).is_err());
+    }
+
+    #[test]
+    fn set_expire_get() {
+        let mut database = Database::mock();
+        let key = vec![1u8];
+        let value = vec![1u8, 2, 3, 4];
+        assert!(database.get_or_create(0, &key).set(value).is_ok());
+        database.set_msexpiration(0, key.clone(), mstime());
+        assert_eq!(database.get(0, &key), None);
+    }
+
+    #[test]
+    fn set_will_expire_get() {
+        let mut database = Database::mock();
+        let key = vec![1u8];
+        let value = vec![1u8, 2, 3, 4];
+        let expected = Vec::clone(&value);
+        assert!(database.get_or_create(0, &key).set(value).is_ok());
+        database.set_msexpiration(0, key.clone(), mstime() + 10000);
+        assert_eq!(database.get(0, &key), Some(&Value::String(ValueString::Data(expected))));
+    }
+
+    #[test]
+    fn getrange_integer() {
+        let value = Value::String(ValueString::Integer(123));
+        assert_eq!(value.getrange(0, -1).unwrap(), "123".to_owned().into_bytes());
+        assert_eq!(value.getrange(-100, -2).unwrap(), "12".to_owned().into_bytes());
+        assert_eq!(value.getrange(1, 1).unwrap(), "2".to_owned().into_bytes());
+    }
+
+    #[test]
+    fn getrange_data() {
+        let value = Value::String(ValueString::Data(vec![1,2,3]));
+        assert_eq!(value.getrange(0, -1).unwrap(), vec![1,2,3]);
+        assert_eq!(value.getrange(-100, -2).unwrap(), vec![1,2]);
+        assert_eq!(value.getrange(1, 1).unwrap(), vec![2]);
+    }
+
+    #[test]
+    fn setrange_append() {
+        let mut value = Value::String(ValueString::Data(vec![1,2,3]));
+        assert_eq!(value.setrange(3, vec![4, 5, 6]).unwrap(), 6);
+        assert_eq!(value, Value::String(ValueString::Data(vec![1,2,3,4,5,6])));
+    }
+
+    #[test]
+    fn setrange_create() {
+        let mut value = Value::Nil;
+        assert_eq!(value.setrange(0, vec![4, 5, 6]).unwrap(), 3);
+        assert_eq!(value, Value::String(ValueString::Data(vec![4,5,6])));
+    }
+
+    #[test]
+    fn setrange_padding() {
+        let mut value = Value::String(ValueString::Data(vec![1,2,3]));
+        assert_eq!(value.setrange(5, vec![6]).unwrap(), 6);
+        assert_eq!(value, Value::String(ValueString::Data(vec![1,2,3,0,0,6])));
+    }
+
+    #[test]
+    fn setrange_intermediate() {
+        let mut value = Value::String(ValueString::Data(vec![1,2,3,4,5]));
+        assert_eq!(value.setrange(2, vec![13, 14]).unwrap(), 5);
+        assert_eq!(value, Value::String(ValueString::Data(vec![1,2,13,14,5])));
+    }
+
+    #[test]
+    fn setbit() {
+        let mut value = Value::Nil;
+        assert_eq!(value.setbit(23, false).unwrap(), false);
+        assert_eq!(value.getrange(0, -1).unwrap(), [0u8, 0, 0]);
+        assert_eq!(value.setbit(23, true).unwrap(), false);
+        assert_eq!(value.getrange(0, -1).unwrap(), [0u8, 0, 1]);
+    }
+
+    #[test]
+    fn getbit() {
+        let value = Value::String(ValueString::Data(vec![1,2,3,4,5]));
+        assert_eq!(value.getbit(0).unwrap(), false);
+        assert_eq!(value.getbit(23).unwrap(), true);
+        assert_eq!(value.getbit(500).unwrap(), false);
+    }
+
+    macro_rules! zadd {
+        ($value: expr, $score: expr, $member: expr) => (
+            $value.zadd($score, $member.clone(), false, false, false, false).unwrap()
+        )
+    }
+
+    #[test]
+    fn zadd_basic() {
+        let mut value = Value::Nil;
+        let s1 = 1.0;
+        let v1 = vec![1, 2, 3, 4];
+        let s2 = 1.0;
+        let v2 = vec![5, 6, 7, 8];
+
+        assert_eq!(zadd!(value, s1, v1), true);
+        assert_eq!(zadd!(value, s1, v1), false);
+        assert_eq!(zadd!(value, s2, v2), true);
+        assert_eq!(zadd!(value, s1, v2), false);
+        match value {
+            Value::SortedSet(value) => match value {
+                ValueSortedSet::Data(_, hs) => {
+                    assert_eq!(hs.get(&v1).unwrap(), &s1);
+                    assert_eq!(hs.get(&v2).unwrap(), &s1);
+                },
+            },
+            _ => panic!("Expected zset"),
+        }
+    }
+
+    #[test]
+    fn zadd_nx() {
+        let mut value = Value::Nil;
+        let s1 = 1.0;
+        let v1 = vec![1, 2, 3, 4];
+        let s2 = 1.0;
+        let v2 = vec![5, 6, 7, 8];
+
+        assert_eq!(value.zadd(s1, v1.clone(), true, false, false, false).unwrap(), true);
+        assert_eq!(value.zadd(s1, v1.clone(), true, false, false, false).unwrap(), false);
+        assert_eq!(value.zadd(s2, v2.clone(), true, false, false, false).unwrap(), true);
+        assert_eq!(value.zadd(s1, v2.clone(), true, false, false, false).unwrap(), false);
+        match value {
+            Value::SortedSet(value) => match value {
+                ValueSortedSet::Data(_, hs) => {
+                    assert_eq!(hs.get(&v1).unwrap(), &s1);
+                    assert_eq!(hs.get(&v2).unwrap(), &s2);
+                },
+            },
+            _ => panic!("Expected zset"),
+        }
+    }
+
+    #[test]
+    fn zadd_xx() {
+        let mut value = Value::Nil;
+        let s1 = 1.0;
+        let v1 = vec![1, 2, 3, 4];
+        let s2 = 2.0;
+
+        assert_eq!(value.zadd(s1, v1.clone(), false, true, false, false).unwrap(), false);
+        assert_eq!(zadd!(value, s1, v1), true);
+        assert_eq!(value.zadd(s2, v1.clone(), false, true, false, false).unwrap(), false);
+        match value {
+            Value::SortedSet(value) => match value {
+                ValueSortedSet::Data(_, hs) => {
+                    assert_eq!(hs.get(&v1).unwrap(), &s2);
+                },
+            },
+            _ => panic!("Expected zset"),
+        }
+    }
+
+    #[test]
+    fn zadd_ch() {
+        let mut value = Value::Nil;
+        let s1 = 1.0;
+        let v1 = vec![1, 2, 3, 4];
+        let s2 = 2.0;
+
+        assert_eq!(value.zadd(s1, v1.clone(), false, false, true, false).unwrap(), true);
+        assert_eq!(zadd!(value, s1, v1), false);
+        assert_eq!(value.zadd(s2, v1.clone(), false, false, true, false).unwrap(), true);
+        match value {
+            Value::SortedSet(value) => match value {
+                ValueSortedSet::Data(_, hs) => {
+                    assert_eq!(hs.get(&v1).unwrap(), &s2);
+                },
+            },
+            _ => panic!("Expected zset"),
+        }
+    }
+
+    #[test]
+    fn zcount() {
+        let mut value = Value::Nil;
+        let s1 = 1.0;
+        let v1 = vec![1, 2, 3, 4];
+        let s2 = 2.0;
+        let v2 = vec![5, 6, 7, 8];
+
+        assert_eq!(zadd!(value, s1, v1), true);
+        assert_eq!(zadd!(value, s2, v2), true);
+        assert_eq!(value.zcount(Bound::Included(0.0), Bound::Included(5.0)).unwrap(), 2);
+        assert_eq!(value.zcount(Bound::Included(1.0), Bound::Included(2.0)).unwrap(), 2);
+        assert_eq!(value.zcount(Bound::Excluded(1.0), Bound::Excluded(2.0)).unwrap(), 0);
+        assert_eq!(value.zcount(Bound::Included(1.5), Bound::Included(2.0)).unwrap(), 1);
+        assert_eq!(value.zcount(Bound::Included(5.0), Bound::Included(10.0)).unwrap(), 0);
+    }
+
+    #[test]
+    fn zrange() {
+        let mut value = Value::Nil;
+        let s1 = 0.0;
+        let v1 = vec![1, 2, 3, 4];
+        let s2 = 0.0;
+        let v2 = vec![5, 6, 7, 8];
+        let s3 = 0.0;
+        let v3 = vec![9, 10, 11, 12];
+
+        assert_eq!(zadd!(value, s1, v1), true);
+        assert_eq!(zadd!(value, s3, v3), true);
+        assert_eq!(zadd!(value, s2, v2), true);
+        assert_eq!(value.zrange(0, -1, true, false).unwrap(), vec![
+                vec![1, 2, 3, 4], b"0".to_vec(),
+                vec![5, 6, 7, 8], b"0".to_vec(),
+                vec![9, 10, 11, 12], b"0".to_vec(),
+                ]);
+        assert_eq!(value.zrange(1, 1, true, false).unwrap(), vec![
+                vec![5, 6, 7, 8], b"0".to_vec(),
+                ]);
+        assert_eq!(value.zrange(2, 0, true, false).unwrap().len(), 0);
+    }
+
+    #[test]
+    fn zrevrange() {
+        let mut value = Value::Nil;
+        let s1 = 0.0;
+        let v1 = vec![1, 2, 3, 4];
+        let s2 = 0.0;
+        let v2 = vec![5, 6, 7, 8];
+        let s3 = 0.0;
+        let v3 = vec![9, 10, 11, 12];
+
+        assert_eq!(zadd!(value, s1, v1), true);
+        assert_eq!(zadd!(value, s3, v3), true);
+        assert_eq!(zadd!(value, s2, v2), true);
+        assert_eq!(value.zrange(0, -1, true, true).unwrap(), vec![
+                v3.clone(), b"0".to_vec(),
+                v2.clone(), b"0".to_vec(),
+                v1.clone(), b"0".to_vec(),
+                ]);
+        assert_eq!(value.zrange(1, 1, true, true).unwrap(), vec![
+                v2.clone(), b"0".to_vec(),
+                ]);
+        assert_eq!(value.zrange(2, 0, true, true).unwrap().len(), 0);
+        assert_eq!(value.zrange(2, 2, true, true).unwrap(), vec![
+                v1.clone(), b"0".to_vec(),
+                ]);
+    }
+
+    #[test]
+    fn zrangebyscore() {
+        let mut value = Value::Nil;
+        let s1 = 10.0;
+        let v1 = vec![1, 2, 3, 4];
+        let s2 = 20.0;
+        let v2 = vec![5, 6, 7, 8];
+        let s3 = 30.0;
+        let v3 = vec![9, 10, 11, 12];
+
+        assert_eq!(zadd!(value, s1, v1), true);
+        assert_eq!(zadd!(value, s3, v3), true);
+        assert_eq!(zadd!(value, s2, v2), true);
+        assert_eq!(value.zrangebyscore(Bound::Unbounded, Bound::Unbounded, true, 0, usize::MAX, false).unwrap(), vec![
+                vec![1, 2, 3, 4], b"10".to_vec(),
+                vec![5, 6, 7, 8], b"20".to_vec(),
+                vec![9, 10, 11, 12], b"30".to_vec(),
+                ]);
+        assert_eq!(value.zrangebyscore(Bound::Excluded(10.0), Bound::Included(20.0), true, 0, usize::MAX, false).unwrap(), vec![
+                vec![5, 6, 7, 8], b"20".to_vec(),
+                ]);
+        assert_eq!(value.zrangebyscore(Bound::Included(20.0), Bound::Excluded(30.0), true, 0, usize::MAX, false).unwrap(), vec![
+                vec![5, 6, 7, 8], b"20".to_vec(),
+                ]);
+        assert_eq!(value.zrangebyscore(Bound::Unbounded, Bound::Unbounded, true, 1, 1, false).unwrap(), vec![
+                vec![5, 6, 7, 8], b"20".to_vec(),
+                ]);
+        assert_eq!(value.zrangebyscore(Bound::Excluded(30.0), Bound::Included(20.0), false, 0, usize::MAX, false).unwrap().len(), 0);
+        assert_eq!(value.zrangebyscore(Bound::Excluded(30.0), Bound::Excluded(30.0), false, 0, usize::MAX, false).unwrap().len(), 0);
+        assert_eq!(value.zrangebyscore(Bound::Included(30.0), Bound::Included(30.0), false, 0, usize::MAX, false).unwrap().len(), 1);
+        assert_eq!(value.zrangebyscore(Bound::Included(30.0), Bound::Excluded(30.0), false, 0, usize::MAX, false).unwrap().len(), 0);
+        assert_eq!(value.zrangebyscore(Bound::Included(21.0), Bound::Included(22.0), false, 0, usize::MAX, false).unwrap().len(), 0);
+    }
+
+    #[test]
+    fn zrevrangebyscore() {
+        let mut value = Value::Nil;
+        let s1 = 10.0;
+        let v1 = vec![1, 2, 3, 4];
+        let s2 = 20.0;
+        let v2 = vec![5, 6, 7, 8];
+        let s3 = 30.0;
+        let v3 = vec![9, 10, 11, 12];
+
+        assert_eq!(zadd!(value, s1, v1), true);
+        assert_eq!(zadd!(value, s3, v3), true);
+        assert_eq!(zadd!(value, s2, v2), true);
+        assert_eq!(value.zrangebyscore(Bound::Unbounded, Bound::Unbounded, true, 0, usize::MAX, true).unwrap(), vec![
+                vec![9, 10, 11, 12], b"30".to_vec(),
+                vec![5, 6, 7, 8], b"20".to_vec(),
+                vec![1, 2, 3, 4], b"10".to_vec(),
+                ]);
+        assert_eq!(value.zrangebyscore(Bound::Included(20.0), Bound::Excluded(10.0), true, 0, usize::MAX, true).unwrap(), vec![
+                vec![5, 6, 7, 8], b"20".to_vec(),
+                ]);
+        assert_eq!(value.zrangebyscore(Bound::Excluded(30.0), Bound::Included(20.0), true, 0, usize::MAX, true).unwrap(), vec![
+                vec![5, 6, 7, 8], b"20".to_vec(),
+                ]);
+        assert_eq!(value.zrangebyscore(Bound::Unbounded, Bound::Unbounded, true, 1, 1, true).unwrap(), vec![
+                vec![5, 6, 7, 8], b"20".to_vec(),
+                ]);
+        assert_eq!(value.zrangebyscore(Bound::Included(20.0), Bound::Excluded(30.0), false, 0, usize::MAX, true).unwrap().len(), 0);
+        assert_eq!(value.zrangebyscore(Bound::Excluded(30.0), Bound::Excluded(30.0), false, 0, usize::MAX, true).unwrap().len(), 0);
+        assert_eq!(value.zrangebyscore(Bound::Included(30.0), Bound::Included(30.0), false, 0, usize::MAX, true).unwrap().len(), 1);
+        assert_eq!(value.zrangebyscore(Bound::Excluded(30.0), Bound::Included(30.0), false, 0, usize::MAX, true).unwrap().len(), 0);
+        assert_eq!(value.zrangebyscore(Bound::Included(22.0), Bound::Included(21.0), false, 0, usize::MAX, true).unwrap().len(), 0);
+    }
+
+    #[test]
+    fn zrank() {
+        let mut value = Value::Nil;
+        let s1 = 0.0;
+        let v1 = vec![1, 2, 3, 4];
+        let s2 = 0.0;
+        let v2 = vec![5, 6, 7, 8];
+        let v3 = vec![9, 10, 11, 12];
+
+        assert_eq!(zadd!(value, s1, v1), true);
+        assert_eq!(zadd!(value, s2, v2), true);
+        assert_eq!(value.zrank(v1.clone()).unwrap(), Some(0));
+        assert_eq!(value.zrank(v2.clone()).unwrap(), Some(1));
+        assert_eq!(value.zrank(v3.clone()).unwrap(), None);
+    }
+
+    #[test]
+    fn zadd_update() {
+        let mut value = Value::Nil;
+        let s1 = 0.0;
+        let s2 = 1.0;
+        let v1 = vec![1, 2, 3, 4];
+
+        assert_eq!(zadd!(value, s1, v1), true);
+        assert_eq!(zadd!(value, s2, v1), false);
+        assert_eq!(value.zrange(0, -1, true, false).unwrap(), vec![
+                vec![1, 2, 3, 4], b"1".to_vec(),
+                ]);
+    }
+
+    #[test]
+    fn zadd_incr() {
+        let mut value = Value::Nil;
+        let s1 = 1.0;
+        let incr = 2.0;
+        let v1 = vec![1, 2, 3, 4];
+
+        assert_eq!(value.zadd(s1, v1.clone(), false, false, false, true).unwrap(), true);
+        assert_eq!(value.zrange(0, -1, true, false).unwrap(), vec![v1.clone(), b"1".to_vec()]);
+        assert_eq!(value.zadd(incr, v1.clone(), false, false, false, true).unwrap(), false);
+        assert_eq!(value.zrange(0, -1, true, false).unwrap(), vec![v1.clone(), b"3".to_vec()]);
+    }
+
+    #[test]
+    fn zadd_incr_ch() {
+        let mut value = Value::Nil;
+        let s1 = 1.0;
+        let incr = 2.0;
+        let v1 = vec![1, 2, 3, 4];
+
+        assert_eq!(value.zadd(s1, v1.clone(), false, false, true, true).unwrap(), true);
+        assert_eq!(value.zrange(0, -1, true, false).unwrap(), vec![v1.clone(), b"1".to_vec()]);
+        assert_eq!(value.zadd(incr, v1.clone(), false, false, true, true).unwrap(), true);
+        assert_eq!(value.zrange(0, -1, true, false).unwrap(), vec![v1.clone(), b"3".to_vec()]);
+    }
+
+    #[test]
+    fn zrem() {
+        let mut value = Value::Nil;
+        let s1 = 0.0;
+        let v1 = vec![1, 2, 3, 4];
+
+        assert_eq!(zadd!(value, s1, v1), true);
+        assert_eq!(value.zrem(vec![8u8]).unwrap(), false);
+        assert_eq!(value.zrem(v1.clone()).unwrap(), true);
+        assert_eq!(value.zrem(v1.clone()).unwrap(), false);
+    }
+
+    #[test]
+    fn zincrby() {
+        let mut value = Value::Nil;
+        let s1 = 1.0;
+        let s2 = 2.0;
+        let v1 = vec![1, 2, 3, 4];
+
+        assert_eq!(value.zincrby(s1.clone(), v1.clone()).unwrap(), s1);
+        assert_eq!(value.zincrby(s2.clone(), v1.clone()).unwrap(), s1 + s2);
+        assert_eq!(value.zincrby(- s1.clone(), v1.clone()).unwrap(), s2);
+    }
+
+    #[test]
+    fn pubsub_basic() {
+        let mut database = Database::mock();
+        let channel_name = vec![1u8, 2, 3];
+        let message = vec![2u8, 3, 4, 5, 6];
+        let (tx, rx) = channel();
+        database.subscribe(channel_name.clone(), tx);
+        database.publish(&channel_name, &message);
+        assert_eq!(rx.recv().unwrap(), PubsubEvent::Message(channel_name, None, message));
+    }
+
+    #[test]
+    fn unsubscribe() {
+        let mut database = Database::mock();
+        let channel_name = vec![1u8, 2, 3];
+        let message = vec![2u8, 3, 4, 5, 6];
+        let (tx, rx) = channel();
+        let subscriber_id = database.subscribe(channel_name.clone(), tx);
+        database.unsubscribe(channel_name.clone(), subscriber_id);
+        database.publish(&channel_name, &message);
+        assert!(rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn pubsub_pattern() {
+        let mut database = Database::mock();
+        let channel_name = vec![1u8, 2, 3];
+        let message = vec![2u8, 3, 4, 5, 6];
+        let (tx, rx) = channel();
+        database.psubscribe(channel_name.clone(), tx);
+        database.publish(&channel_name, &message);
+        assert_eq!(rx.recv().unwrap(), PubsubEvent::Message(channel_name.clone(), Some(channel_name.clone()), message));
+    }
+
+    #[test]
+    fn rehashing() {
+        let mut database = Database::mock();
+        for i in 0u32..1000 {
+            let key = vec![(i % 256) as u8, (i / 256) as u8];
+            database.get_or_create(0, &key).set(key.clone()).unwrap();
+        }
+        assert_eq!(database.data[0].len(), 1000);
+        assert!(database.data[0].capacity() >= 1000);
+        for i in 0u32..1000 {
+            let key = vec![(i % 256) as u8, (i / 256) as u8];
+            database.remove(0, &key).unwrap();
+        }
+        // freeing memory
+        assert!(database.data[0].capacity() < 1000);
+    }
+
+    #[test]
+    fn no_rehashing() {
+        let mut database = create_database(1, false);
+        for i in 0u32..1000 {
+            let key = vec![(i % 256) as u8, (i / 256) as u8];
+            database.get_or_create(0, &key).set(key.clone()).unwrap();
+        }
+        assert_eq!(database.data[0].len(), 1000);
+        assert!(database.data[0].capacity() >= 1000);
+        for i in 0u32..1000 {
+            let key = vec![(i % 256) as u8, (i / 256) as u8];
+            database.remove(0, &key).unwrap();
+        }
+        // no freeing memory
+        assert!(database.data[0].capacity() > 1000);
+    }
 }

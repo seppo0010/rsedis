@@ -1,6 +1,3 @@
-#![feature(tcp)]
-#![feature(collections)]
-
 extern crate command;
 extern crate config;
 extern crate database;

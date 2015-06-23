@@ -1,4 +1,3 @@
-use std::iter::FromIterator;
 use std::collections::VecMap;
 use std::collections::HashSet;
 
@@ -271,173 +270,181 @@ impl ValueSet {
     }
 }
 
-#[test]
-fn intset() {
-    let mut set = ValueSet::new();
-    assert!(set.is_intset());
-    assert!(set.sadd(b"123".to_vec()));
-    assert!(set.is_intset());
-    assert!(set.sadd(b"456".to_vec()));
-    assert!(set.is_intset());
-    assert!(!set.sadd(b"123".to_vec()));
-    assert!(set.is_intset());
-    assert!(set.sadd(b"foo".to_vec()));
-    assert!(!set.is_intset());
-}
+#[cfg(test)]
+mod test_set {
+    use std::iter::FromIterator;
+    use std::collections::HashSet;
 
-#[test]
-fn intset_srem() {
-    let mut set = ValueSet::new();
-    assert!(set.is_intset());
-    assert!(set.sadd(b"123".to_vec()));
-    assert!(set.is_intset());
-    assert!(!set.srem(&b"456".to_vec()));
-    assert!(set.is_intset());
-    assert!(set.srem(&b"123".to_vec()));
-    assert!(set.is_intset());
-    assert!(!set.srem(&b"foo".to_vec()));
-    assert!(set.is_intset());
-}
+    use super::ValueSet;
 
-#[test]
-fn intset_sismember() {
-    let mut set = ValueSet::new();
-    assert!(set.sadd(b"123".to_vec()));
-    assert!(set.sadd(b"456".to_vec()));
-    assert!(set.sismember(&b"123".to_vec()));
-    assert!(set.sismember(&b"456".to_vec()));
-    assert!(!set.sismember(&b"foo".to_vec()));
-    assert!(!set.sismember(&b"124".to_vec()));
-}
+    #[test]
+    fn intset() {
+        let mut set = ValueSet::new();
+        assert!(set.is_intset());
+        assert!(set.sadd(b"123".to_vec()));
+        assert!(set.is_intset());
+        assert!(set.sadd(b"456".to_vec()));
+        assert!(set.is_intset());
+        assert!(!set.sadd(b"123".to_vec()));
+        assert!(set.is_intset());
+        assert!(set.sadd(b"foo".to_vec()));
+        assert!(!set.is_intset());
+    }
 
-#[test]
-fn intset_scard() {
-    let mut set = ValueSet::new();
-    assert_eq!(set.scard(), 0);
-    assert!(set.sadd(b"123".to_vec()));
-    assert_eq!(set.scard(), 1);
-    assert!(set.sadd(b"456".to_vec()));
-    assert_eq!(set.scard(), 2);
-}
+    #[test]
+    fn intset_srem() {
+        let mut set = ValueSet::new();
+        assert!(set.is_intset());
+        assert!(set.sadd(b"123".to_vec()));
+        assert!(set.is_intset());
+        assert!(!set.srem(&b"456".to_vec()));
+        assert!(set.is_intset());
+        assert!(set.srem(&b"123".to_vec()));
+        assert!(set.is_intset());
+        assert!(!set.srem(&b"foo".to_vec()));
+        assert!(set.is_intset());
+    }
 
-#[test]
-fn intset_smembers() {
-    let mut set = ValueSet::new();
-    assert!(set.sadd(b"123".to_vec()));
-    assert!(set.sadd(b"456".to_vec()));
-    assert!(set.smembers() == vec![b"123".to_vec(), b"456".to_vec()] ||
-            set.smembers() == vec![b"456".to_vec(), b"123".to_vec()]);
-}
+    #[test]
+    fn intset_sismember() {
+        let mut set = ValueSet::new();
+        assert!(set.sadd(b"123".to_vec()));
+        assert!(set.sadd(b"456".to_vec()));
+        assert!(set.sismember(&b"123".to_vec()));
+        assert!(set.sismember(&b"456".to_vec()));
+        assert!(!set.sismember(&b"foo".to_vec()));
+        assert!(!set.sismember(&b"124".to_vec()));
+    }
 
-#[test]
-fn intset_spop() {
-    let mut set = ValueSet::new();
-    assert!(set.sadd(b"123".to_vec()));
-    assert!(set.sadd(b"456".to_vec()));
-    let mut h = HashSet::new();
-    h.insert(set.spop(1).pop().unwrap());
-    h.insert(set.spop(1).pop().unwrap());
-    assert_eq!(set.spop(1).len(), 0);
-    assert_eq!(h, HashSet::from_iter(vec![b"123".to_vec(), b"456".to_vec()]));
-}
+    #[test]
+    fn intset_scard() {
+        let mut set = ValueSet::new();
+        assert_eq!(set.scard(), 0);
+        assert!(set.sadd(b"123".to_vec()));
+        assert_eq!(set.scard(), 1);
+        assert!(set.sadd(b"456".to_vec()));
+        assert_eq!(set.scard(), 2);
+    }
 
-#[test]
-fn intset_sdiff() {
-    let mut set = ValueSet::new();
-    assert!(set.sadd(b"123".to_vec()));
-    assert!(set.sadd(b"456".to_vec()));
-    assert!(set.sadd(b"789".to_vec()));
+    #[test]
+    fn intset_smembers() {
+        let mut set = ValueSet::new();
+        assert!(set.sadd(b"123".to_vec()));
+        assert!(set.sadd(b"456".to_vec()));
+        assert!(set.smembers() == vec![b"123".to_vec(), b"456".to_vec()] ||
+                set.smembers() == vec![b"456".to_vec(), b"123".to_vec()]);
+    }
 
-    let mut set2 = ValueSet::new();
-    assert!(set2.sadd(b"123".to_vec()));
+    #[test]
+    fn intset_spop() {
+        let mut set = ValueSet::new();
+        assert!(set.sadd(b"123".to_vec()));
+        assert!(set.sadd(b"456".to_vec()));
+        let mut h = HashSet::new();
+        h.insert(set.spop(1).pop().unwrap());
+        h.insert(set.spop(1).pop().unwrap());
+        assert_eq!(set.spop(1).len(), 0);
+        assert_eq!(h, HashSet::from_iter(vec![b"123".to_vec(), b"456".to_vec()]));
+    }
 
-    let mut set3 = ValueSet::new();
-    assert!(set3.sadd(b"456".to_vec()));
-    assert!(set3.sadd(b"foo".to_vec()));
+    #[test]
+    fn intset_sdiff() {
+        let mut set = ValueSet::new();
+        assert!(set.sadd(b"123".to_vec()));
+        assert!(set.sadd(b"456".to_vec()));
+        assert!(set.sadd(b"789".to_vec()));
 
-    assert_eq!(set.sdiff(vec![&set2, &set3]), HashSet::from_iter(vec![b"789".to_vec()]));
-}
+        let mut set2 = ValueSet::new();
+        assert!(set2.sadd(b"123".to_vec()));
 
-#[test]
-fn intset_sinter() {
-    let mut set = ValueSet::new();
-    assert!(set.sadd(b"bar".to_vec()));
-    assert!(set.sadd(b"123".to_vec()));
-    assert!(set.sadd(b"456".to_vec()));
-    assert!(set.sadd(b"789".to_vec()));
+        let mut set3 = ValueSet::new();
+        assert!(set3.sadd(b"456".to_vec()));
+        assert!(set3.sadd(b"foo".to_vec()));
 
-    let mut set2 = ValueSet::new();
-    assert!(set2.sadd(b"123".to_vec()));
-    assert!(set2.sadd(b"456".to_vec()));
+        assert_eq!(set.sdiff(vec![&set2, &set3]), HashSet::from_iter(vec![b"789".to_vec()]));
+    }
 
-    let mut set3 = ValueSet::new();
-    assert!(set3.sadd(b"123".to_vec()));
-    assert!(set3.sadd(b"456".to_vec()));
-    assert!(set3.sadd(b"foo".to_vec()));
+    #[test]
+    fn intset_sinter() {
+        let mut set = ValueSet::new();
+        assert!(set.sadd(b"bar".to_vec()));
+        assert!(set.sadd(b"123".to_vec()));
+        assert!(set.sadd(b"456".to_vec()));
+        assert!(set.sadd(b"789".to_vec()));
 
-    assert_eq!(set.sinter(vec![&set2, &set3]), HashSet::from_iter(vec![
-                b"123".to_vec(),
-                b"456".to_vec(),
-                ]));
-}
+        let mut set2 = ValueSet::new();
+        assert!(set2.sadd(b"123".to_vec()));
+        assert!(set2.sadd(b"456".to_vec()));
 
-#[test]
-fn intset_sinter2() {
-    let mut set = ValueSet::new();
-    assert!(set.sadd(b"123".to_vec()));
-    assert!(set.sadd(b"456".to_vec()));
-    assert!(set.sadd(b"789".to_vec()));
+        let mut set3 = ValueSet::new();
+        assert!(set3.sadd(b"123".to_vec()));
+        assert!(set3.sadd(b"456".to_vec()));
+        assert!(set3.sadd(b"foo".to_vec()));
 
-    let mut set2 = ValueSet::new();
-    assert!(set2.sadd(b"123".to_vec()));
-    assert!(set2.sadd(b"456".to_vec()));
+        assert_eq!(set.sinter(vec![&set2, &set3]), HashSet::from_iter(vec![
+                    b"123".to_vec(),
+                    b"456".to_vec(),
+                    ]));
+    }
 
-    let mut set3 = ValueSet::new();
-    assert!(set3.sadd(b"123".to_vec()));
-    assert!(set3.sadd(b"456".to_vec()));
-    assert!(set3.sadd(b"foo".to_vec()));
+    #[test]
+    fn intset_sinter2() {
+        let mut set = ValueSet::new();
+        assert!(set.sadd(b"123".to_vec()));
+        assert!(set.sadd(b"456".to_vec()));
+        assert!(set.sadd(b"789".to_vec()));
 
-    assert_eq!(set.sinter(vec![&set2, &set3]), HashSet::from_iter(vec![
-                b"123".to_vec(),
-                b"456".to_vec(),
-                ]));
-}
+        let mut set2 = ValueSet::new();
+        assert!(set2.sadd(b"123".to_vec()));
+        assert!(set2.sadd(b"456".to_vec()));
 
-#[test]
-fn intset_sunion() {
-    let mut set = ValueSet::new();
-    assert!(set.sadd(b"bar".to_vec()));
-    assert!(set.sadd(b"123".to_vec()));
+        let mut set3 = ValueSet::new();
+        assert!(set3.sadd(b"123".to_vec()));
+        assert!(set3.sadd(b"456".to_vec()));
+        assert!(set3.sadd(b"foo".to_vec()));
 
-    let mut set2 = ValueSet::new();
-    assert!(set2.sadd(b"123".to_vec()));
-    assert!(set2.sadd(b"456".to_vec()));
+        assert_eq!(set.sinter(vec![&set2, &set3]), HashSet::from_iter(vec![
+                    b"123".to_vec(),
+                    b"456".to_vec(),
+                    ]));
+    }
 
-    let mut set3 = ValueSet::new();
-    assert!(set3.sadd(b"456".to_vec()));
-    assert!(set3.sadd(b"foo".to_vec()));
+    #[test]
+    fn intset_sunion() {
+        let mut set = ValueSet::new();
+        assert!(set.sadd(b"bar".to_vec()));
+        assert!(set.sadd(b"123".to_vec()));
 
-    assert_eq!(set.sunion(vec![&set2, &set3]), HashSet::from_iter(vec![
-                b"123".to_vec(),
-                b"456".to_vec(),
-                b"foo".to_vec(),
-                b"bar".to_vec(),
-                ]));
-}
+        let mut set2 = ValueSet::new();
+        assert!(set2.sadd(b"123".to_vec()));
+        assert!(set2.sadd(b"456".to_vec()));
 
-#[test]
-fn intset_sunion2() {
-    let mut set = ValueSet::new();
-    assert!(set.sadd(b"123".to_vec()));
+        let mut set3 = ValueSet::new();
+        assert!(set3.sadd(b"456".to_vec()));
+        assert!(set3.sadd(b"foo".to_vec()));
 
-    let mut set2 = ValueSet::new();
-    assert!(set2.sadd(b"456".to_vec()));
+        assert_eq!(set.sunion(vec![&set2, &set3]), HashSet::from_iter(vec![
+                    b"123".to_vec(),
+                    b"456".to_vec(),
+                    b"foo".to_vec(),
+                    b"bar".to_vec(),
+                    ]));
+    }
 
-    let mut set3 = ValueSet::new();
-    assert!(set3.sadd(b"456".to_vec()));
+    #[test]
+    fn intset_sunion2() {
+        let mut set = ValueSet::new();
+        assert!(set.sadd(b"123".to_vec()));
 
-    assert_eq!(set.sunion(vec![&set2, &set3]), HashSet::from_iter(vec![
-                b"123".to_vec(),
-                b"456".to_vec(),
-                ]));
+        let mut set2 = ValueSet::new();
+        assert!(set2.sadd(b"456".to_vec()));
+
+        let mut set3 = ValueSet::new();
+        assert!(set3.sadd(b"456".to_vec()));
+
+        assert_eq!(set.sunion(vec![&set2, &set3]), HashSet::from_iter(vec![
+                    b"123".to_vec(),
+                    b"456".to_vec(),
+                    ]));
+    }
 }

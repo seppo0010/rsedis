@@ -25,7 +25,7 @@ dependencies = [
  "rand 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "rehashinghashmap 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "response 0.1.0",
- "skiplist 0.2.6 (git+https://github.com/seppo0010/rust-skiplist)",
+ "skiplist 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "util 0.1.0",
 ]
 
@@ -63,7 +63,7 @@ version = "0.1.0"
 [[package]]
 name = "skiplist"
 version = "0.2.6"
-source = "git+https://github.com/seppo0010/rust-skiplist#9f386ac1eaedd74eec7e618b0942e41937284716"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "rand 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
