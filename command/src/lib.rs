@@ -1359,7 +1359,7 @@ pub fn command(
         "psubscribe" => return psubscribe(parser, db, subscriptions.unwrap().len(), pattern_subscriptions.unwrap(), sender.unwrap()),
         "punsubscribe" => return punsubscribe(parser, db, subscriptions.unwrap().len(), pattern_subscriptions.unwrap(), sender.unwrap()),
         "publish" => publish(parser, db),
-        _ => Response::Error("Unknown command".to_owned()),
+        cmd => Response::Error(format!("Unknown command \"{}\"", cmd).to_owned()),
     });
 }
 
