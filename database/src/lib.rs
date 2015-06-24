@@ -474,8 +474,8 @@ pub struct Database {
     data: Vec<RehashingHashMap<Vec<u8>, Value>>,
     data_expiration_ns: Vec<RehashingHashMap<Vec<u8>, i64>>,
     pub size: usize,
-    subscribers: HashMap<Vec<u8>, HashMap<usize, Sender<PubsubEvent>>>,
-    pattern_subscribers: HashMap<Vec<u8>, HashMap<usize, Sender<PubsubEvent>>>,
+    subscribers: HashMap<Vec<u8>, HashMap<usize, Sender<Option<PubsubEvent>>>>,
+    pattern_subscribers: HashMap<Vec<u8>, HashMap<usize, Sender<Option<PubsubEvent>>>>,
     key_subscribers: Vec<RehashingHashMap<Vec<u8>, HashMap<usize, Sender<bool>>>>,
     subscriber_id: usize,
     active_rehashing: bool,
@@ -624,7 +624,7 @@ impl Database {
         }
     }
 
-    pub fn subscribe(&mut self, channel: Vec<u8>, sender: Sender<PubsubEvent>) -> usize {
+    pub fn subscribe(&mut self, channel: Vec<u8>, sender: Sender<Option<PubsubEvent>>) -> usize {
         self.ensure_channel(&channel);
         let mut channelsubscribers = self.subscribers.get_mut(&channel).unwrap();
         let subscriber_id = self.subscriber_id;
@@ -647,7 +647,7 @@ impl Database {
         }
     }
 
-    pub fn psubscribe(&mut self, pattern: Vec<u8>, sender: Sender<PubsubEvent>) -> usize {
+    pub fn psubscribe(&mut self, pattern: Vec<u8>, sender: Sender<Option<PubsubEvent>>) -> usize {
         self.pensure_channel(&pattern);
         let mut channelsubscribers = self.pattern_subscribers.get_mut(&pattern).unwrap();
         let subscriber_id = self.subscriber_id;
@@ -669,7 +669,7 @@ impl Database {
         match self.subscribers.get(channel_name) {
             Some(channels) => {
                 for (_, channel) in channels {
-                    match channel.send(PubsubEvent::Message(channel_name.clone(), None, message.clone())) {
+                    match channel.send(Some(PubsubEvent::Message(channel_name.clone(), None, message.clone()))) {
                         Ok(_) => c += 1,
                         Err(_) => (),
                     }
@@ -680,7 +680,7 @@ impl Database {
         for (pattern, channels) in self.pattern_subscribers.iter() {
             if glob_match(&pattern, &channel_name, false) {
                 for (_, channel) in channels {
-                    match channel.send(PubsubEvent::Message(channel_name.clone(), Some(pattern.clone()), message.clone())) {
+                    match channel.send(Some(PubsubEvent::Message(channel_name.clone(), Some(pattern.clone()), message.clone()))) {
                         Ok(_) => c += 1,
                         Err(_) => (),
                     }
@@ -1635,7 +1635,7 @@ mod test_command {
         let (tx, rx) = channel();
         database.subscribe(channel_name.clone(), tx);
         database.publish(&channel_name, &message);
-        assert_eq!(rx.recv().unwrap(), PubsubEvent::Message(channel_name, None, message));
+        assert_eq!(rx.recv().unwrap(), Some(PubsubEvent::Message(channel_name, None, message)));
     }
 
     #[test]
@@ -1658,7 +1658,7 @@ mod test_command {
         let (tx, rx) = channel();
         database.psubscribe(channel_name.clone(), tx);
         database.publish(&channel_name, &message);
-        assert_eq!(rx.recv().unwrap(), PubsubEvent::Message(channel_name.clone(), Some(channel_name.clone()), message));
+        assert_eq!(rx.recv().unwrap(), Some(PubsubEvent::Message(channel_name.clone(), Some(channel_name.clone()), message)));
     }
 
     #[test]

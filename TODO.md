@@ -172,7 +172,7 @@
     - [x] bind
     - [ ] unixsocket
     - [ ] unixsocketperm
-    - [ ] timeout
+    - [x] timeout
     - [x] tcp-keepalive
     - [ ] loglevel
     - [ ] logfile

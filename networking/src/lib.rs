@@ -1,3 +1,5 @@
+#![feature(duration)]
+#![feature(socket_timeout)]
 #![feature(tcp)]
 #[cfg(unix)]extern crate libc;
 
@@ -9,6 +11,7 @@ extern crate database;
 extern crate command;
 
 use std::collections::HashMap;
+use std::time::Duration;
 use std::io::{Read, Write};
 use std::net::{ToSocketAddrs, TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
@@ -51,28 +54,35 @@ impl Client {
 
     pub fn run(&mut self) {
         #![allow(unused_must_use)]
-        let (stream_tx, rx) = channel::<Response>();
+        let (stream_tx, rx) = channel::<Option<Response>>();
         {
             let mut stream = self.stream.try_clone().unwrap();
             thread::spawn(move || {
                 loop {
                     match rx.recv() {
-                        Ok(msg) => stream.write(&*msg.as_bytes()),
+                        Ok(m) => match m {
+                            Some(msg) => stream.write(&*msg.as_bytes()),
+                            None => break,
+                        },
                         Err(_) => break,
                     };
                 }
             });
         }
-        let (pubsub_tx, pubsub_rx) = channel::<PubsubEvent>();
+        let (pubsub_tx, pubsub_rx) = channel::<Option<PubsubEvent>>();
         {
             let tx = stream_tx.clone();
             thread::spawn(move || {
                 loop {
                     match pubsub_rx.recv() {
-                        Ok(msg) => tx.send(msg.as_response()),
+                        Ok(m) => match m {
+                            Some(msg) => tx.send(Some(msg.as_response())),
+                            None => break,
+                        },
                         Err(_) => break,
                     };
                 }
+                tx.send(None);
             });
         }
         let mut buffer = [0u8; 512];
@@ -103,9 +113,8 @@ impl Client {
                 };
                 match command(&parser, &mut *db, &mut dbindex, Some(&mut subscriptions), Some(&mut psubscriptions), Some(&pubsub_tx)) {
                     Ok(response) => {
-                        match stream_tx.send(response) {
+                        match stream_tx.send(Some(response)) {
                             Ok(_) => (),
-                            // TODO: send a kill signal to the writer thread?
                             Err(_) => error = true,
                         };
                         break;
@@ -116,9 +125,8 @@ impl Client {
                         ResponseError::Wait(ref receiver) => {
                             drop(db);
                             if !receiver.recv().unwrap() {
-                                match stream_tx.send(Response::Nil) {
+                                match stream_tx.send(Some(Response::Nil)) {
                                     Ok(_) => (),
-                                    // TODO: send a kill signal to the writer thread?
                                     Err(_) => error = true,
                                 };
                             }
@@ -127,6 +135,8 @@ impl Client {
                 }
             }
             if error {
+                stream_tx.send(None);
+                pubsub_tx.send(None);
                 break;
             }
         };
@@ -188,6 +198,7 @@ impl Server {
 
     pub fn start(&mut self) {
         let tcp_keepalive = self.config.tcp_keepalive;
+        let timeout = self.config.timeout;
         for addr in self.config.addresses() {
             let (tx, rx) = channel();
             self.listener_channels.push(tx);
@@ -204,6 +215,8 @@ impl Server {
                             let db1 = db.clone();
                             thread::spawn(move || {
                                 stream.set_keepalive(if tcp_keepalive > 0 { Some(tcp_keepalive) } else { None }).unwrap();
+                                stream.set_read_timeout(if timeout > 0 { Some(Duration::new(timeout, 0)) } else { None }).unwrap();
+                                stream.set_write_timeout(if timeout > 0 { Some(Duration::new(timeout, 0)) } else { None }).unwrap();
                                 let mut client = Client::new(stream, db1);
                                 client.run();
                             });

@@ -1178,14 +1178,14 @@ fn subscribe(
         db: &mut Database,
         subscriptions: &mut HashMap<Vec<u8>, usize>,
         pattern_subscriptions_len: usize,
-        sender: &Sender<PubsubEvent>
+        sender: &Sender<Option<PubsubEvent>>
         ) -> Result<Response, ResponseError> {
     opt_validate!(parser.argv.len() >= 2, "Wrong number of parameters");
     for i in 1..parser.argv.len() {
         let channel_name = try_opt_validate!(parser.get_vec(i), "Invalid channel");
         let subscriber_id = db.subscribe(channel_name.clone(), sender.clone());
         subscriptions.insert(channel_name.clone(), subscriber_id);
-        match sender.send(PubsubEvent::Subscription(channel_name.clone(), pattern_subscriptions_len + subscriptions.len())) {
+        match sender.send(Some(PubsubEvent::Subscription(channel_name.clone(), pattern_subscriptions_len + subscriptions.len()))) {
             Ok(_) => None,
             Err(_) => subscriptions.remove(&channel_name),
         };
@@ -1198,7 +1198,7 @@ fn unsubscribe(
         db: &mut Database,
         subscriptions: &mut HashMap<Vec<u8>, usize>,
         pattern_subscriptions_len: usize,
-        sender: &Sender<PubsubEvent>
+        sender: &Sender<Option<PubsubEvent>>
         ) -> Result<Response, ResponseError> {
     #![allow(unused_must_use)]
     opt_validate!(parser.argv.len() >= 2, "Wrong number of parameters");
@@ -1207,7 +1207,7 @@ fn unsubscribe(
         match subscriptions.remove(&channel_name) {
             Some(subscriber_id) => {
                 db.unsubscribe(channel_name.clone(), subscriber_id);
-                sender.send(PubsubEvent::Unsubscription(channel_name, pattern_subscriptions_len + subscriptions.len()));
+                sender.send(Some(PubsubEvent::Unsubscription(channel_name, pattern_subscriptions_len + subscriptions.len())));
             },
             None => (),
         }
@@ -1220,14 +1220,14 @@ fn psubscribe(
         db: &mut Database,
         subscriptions_len: usize,
         pattern_subscriptions: &mut HashMap<Vec<u8>, usize>,
-        sender: &Sender<PubsubEvent>
+        sender: &Sender<Option<PubsubEvent>>
         ) -> Result<Response, ResponseError> {
     opt_validate!(parser.argv.len() >= 2, "Wrong number of parameters");
     for i in 1..parser.argv.len() {
         let pattern = try_opt_validate!(parser.get_vec(i), "Invalid channel");
         let subscriber_id = db.psubscribe(pattern.clone(), sender.clone());
         pattern_subscriptions.insert(pattern.clone(), subscriber_id);
-        match sender.send(PubsubEvent::PatternSubscription(pattern.clone(), subscriptions_len + pattern_subscriptions.len())) {
+        match sender.send(Some(PubsubEvent::PatternSubscription(pattern.clone(), subscriptions_len + pattern_subscriptions.len()))) {
             Ok(_) => None,
             Err(_) => pattern_subscriptions.remove(&pattern),
         };
@@ -1240,7 +1240,7 @@ fn punsubscribe(
         db: &mut Database,
         subscriptions_len: usize,
         pattern_subscriptions: &mut HashMap<Vec<u8>, usize>,
-        sender: &Sender<PubsubEvent>
+        sender: &Sender<Option<PubsubEvent>>
         ) -> Result<Response, ResponseError> {
     #![allow(unused_must_use)]
     opt_validate!(parser.argv.len() >= 2, "Wrong number of parameters");
@@ -1249,7 +1249,7 @@ fn punsubscribe(
         match pattern_subscriptions.remove(&pattern) {
             Some(subscriber_id) => {
                 db.punsubscribe(pattern.clone(), subscriber_id);
-                sender.send(PubsubEvent::PatternUnsubscription(pattern, subscriptions_len + pattern_subscriptions.len()));
+                sender.send(Some(PubsubEvent::PatternUnsubscription(pattern, subscriptions_len + pattern_subscriptions.len())));
             },
             None => (),
         }
@@ -1269,7 +1269,7 @@ pub fn command(
         _dbindex: &mut usize,
         subscriptions: Option<&mut HashMap<Vec<u8>, usize>>,
         pattern_subscriptions: Option<&mut HashMap<Vec<u8>, usize>>,
-        sender: Option<&Sender<PubsubEvent>>
+        sender: Option<&Sender<Option<PubsubEvent>>>
         ) -> Result<Response, ResponseError> {
     opt_validate!(parser.argv.len() > 0, "Not enough arguments");
     let command = try_opt_validate!(parser.get_str(0), "Invalid command");
@@ -2377,21 +2377,21 @@ mod test_command {
         assert_eq!(command(&parser!(b"publish channel hello-world"), &mut db, &mut 0, None, None, None).unwrap(), Response::Integer(1));
         assert!(command(&parser!(b"unsubscribe channel"), &mut db, &mut 0, Some(&mut subscriptions), Some(&mut psubscriptions), Some(&tx)).is_err());
 
-        assert_eq!(rx.try_recv().unwrap().as_response(),
+        assert_eq!(rx.try_recv().unwrap().unwrap().as_response(),
                 Response::Array(vec![
                     Response::Data(b"subscribe".to_vec()),
                     Response::Data(b"channel".to_vec()),
                     Response::Integer(1),
                     ])
             );
-        assert_eq!(rx.try_recv().unwrap().as_response(),
+        assert_eq!(rx.try_recv().unwrap().unwrap().as_response(),
                 Response::Array(vec![
                     Response::Data(b"message".to_vec()),
                     Response::Data(b"channel".to_vec()),
                     Response::Data(b"hello-world".to_vec()),
                     ])
             );
-        assert_eq!(rx.try_recv().unwrap().as_response(),
+        assert_eq!(rx.try_recv().unwrap().unwrap().as_response(),
                 Response::Array(vec![
                     Response::Data(b"unsubscribe".to_vec()),
                     Response::Data(b"channel".to_vec()),

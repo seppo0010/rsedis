@@ -6,6 +6,7 @@ use std::fs::File;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::Error as IOError;
+use std::io::Write;
 use std::num::ParseIntError;
 use std::str::Utf8Error;
 use std::path::Path;
@@ -23,6 +24,7 @@ pub struct Config {
     pub tcp_keepalive: u32,
     pub active_rehashing: bool,
     pub set_max_intset_entries: usize,
+    pub timeout: u64,
 }
 
 #[derive(Debug)]
@@ -68,6 +70,7 @@ impl Config {
             port: port,
             tcp_keepalive: 0,
             set_max_intset_entries: 512,
+            timeout: 0,
         }
     }
 
@@ -81,6 +84,7 @@ impl Config {
             port: 6379,
             tcp_keepalive: 0,
             set_max_intset_entries: 512,
+            timeout: 0,
         }
     }
 
@@ -98,6 +102,11 @@ impl Config {
                 Ok(args) => args,
                 Err(_) => return Err(ConfigError::InvalidFormat),
             };
+
+            if args.len() == 0 {
+                continue;
+            }
+
             match &*args[0] {
                 b"bind" => self.bind.extend(args[1..].iter().filter(|x| x.len() > 0).map(|x| match from_utf8(x) {
                             Ok(s) => s.to_owned(),
@@ -109,13 +118,14 @@ impl Config {
                 b"databases" => self.databases = try!(read_parse(args)),
                 b"tcp-keepalive" => self.tcp_keepalive = try!(read_parse(args)),
                 b"set-max-intset-entries" => self.set_max_intset_entries = try!(read_parse(args)),
+                b"timeout" => self.timeout = try!(read_parse(args)),
                 b"pidfile" => self.pidfile = try!(read_string(args)).to_owned(),
                 b"include" => if args.len() != 2 {
                     return Err(ConfigError::InvalidFormat)
                 } else {
                     try!(self.parsefile(try!(from_utf8(&*args[1])).to_owned()));
                 },
-                _ => panic!("Unknown configuration {:?}", args[0]),
+                _ => writeln!(&mut std::io::stderr(), "Unknown configuration {:?}", line).unwrap(),
             };
         }
 
@@ -233,5 +243,11 @@ mod tests {
     fn parse_set_max_intset_entries() {
         let config = config!(b"set-max-intset-entries 123456");
         assert_eq!(config.set_max_intset_entries, 123456);
+    }
+
+    #[test]
+    fn parse_timeout() {
+        let config = config!(b"timeout 23456");
+        assert_eq!(config.timeout, 23456);
     }
 }
