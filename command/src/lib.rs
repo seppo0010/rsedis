@@ -1272,7 +1272,7 @@ pub fn command(
         sender: Option<&Sender<Option<PubsubEvent>>>
         ) -> Result<Response, ResponseError> {
     opt_validate!(parser.argv.len() > 0, "Not enough arguments");
-    let command = try_opt_validate!(parser.get_str(0), "Invalid command");
+    let command = &*try_opt_validate!(parser.get_str(0), "Invalid command").to_ascii_lowercase();
     if command == "select" {
         opt_validate!(parser.argv.len() == 2, "Wrong number of parameters");
         let dbindex = try_opt_validate!(parser.get_i64(1), "Invalid dbindex") as usize;
