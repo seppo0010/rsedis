@@ -8,6 +8,7 @@ dependencies = [
  "libc 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "parser 0.1.0",
  "response 0.1.0",
+ "unix_socket 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "util 0.1.0",
 ]
 
@@ -27,6 +28,7 @@ version = "0.1.0"
 dependencies = [
  "rand 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "time 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
+ "util 0.1.0",
 ]
 
 [[package]]
@@ -35,10 +37,16 @@ version = "0.1.0"
 dependencies = [
  "config 0.1.0",
  "rand 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rehashinghashmap 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "response 0.1.0",
- "skiplist 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "skiplist 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "util 0.1.0",
 ]
+
+[[package]]
+name = "debug-builders"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "gcc"
@@ -63,12 +71,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "rehashinghashmap"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "response"
 version = "0.1.0"
 
 [[package]]
 name = "skiplist"
-version = "0.2.4"
+version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "rand 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -80,6 +93,15 @@ version = "0.1.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "gcc 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "unix_socket"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "debug-builders 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 

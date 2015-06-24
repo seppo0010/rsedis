@@ -170,8 +170,8 @@
     - [x] port
     - [ ] tcp-backlog
     - [x] bind
-    - [ ] unixsocket
-    - [ ] unixsocketperm
+    - [x] unixsocket
+    - [x] unixsocketperm
     - [x] timeout
     - [x] tcp-keepalive
     - [ ] loglevel

@@ -25,6 +25,8 @@ pub struct Config {
     pub active_rehashing: bool,
     pub set_max_intset_entries: usize,
     pub timeout: u64,
+    pub unixsocket: Option<String>,
+    pub unixsocketperm: u32,
 }
 
 #[derive(Debug)]
@@ -71,6 +73,8 @@ impl Config {
             tcp_keepalive: 0,
             set_max_intset_entries: 512,
             timeout: 0,
+            unixsocket: None,
+            unixsocketperm: 0700,
         }
     }
 
@@ -85,6 +89,8 @@ impl Config {
             tcp_keepalive: 0,
             set_max_intset_entries: 512,
             timeout: 0,
+            unixsocket: None,
+            unixsocketperm: 0700,
         }
     }
 
@@ -119,6 +125,8 @@ impl Config {
                 b"tcp-keepalive" => self.tcp_keepalive = try!(read_parse(args)),
                 b"set-max-intset-entries" => self.set_max_intset_entries = try!(read_parse(args)),
                 b"timeout" => self.timeout = try!(read_parse(args)),
+                b"unixsocket" => self.unixsocket = Some(try!(read_string(args)).to_owned()),
+                b"unixsocketperm" => self.unixsocketperm = try!(u32::from_str_radix(&*try!(read_string(args)), 8)),
                 b"pidfile" => self.pidfile = try!(read_string(args)).to_owned(),
                 b"include" => if args.len() != 2 {
                     return Err(ConfigError::InvalidFormat)
@@ -249,5 +257,12 @@ mod tests {
     fn parse_timeout() {
         let config = config!(b"timeout 23456");
         assert_eq!(config.timeout, 23456);
+    }
+
+    #[test]
+    fn parse_unixsocket() {
+        let config = config!(b"unixsocket /dev/null\nunixsocketperm 777");
+        assert_eq!(config.unixsocket, Some("/dev/null".to_owned()));
+        assert_eq!(config.unixsocketperm, 511);
     }
 }

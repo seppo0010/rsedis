@@ -2,6 +2,7 @@
 #![feature(socket_timeout)]
 #![feature(tcp)]
 #[cfg(unix)]extern crate libc;
+#[cfg(unix)]extern crate unix_socket;
 
 extern crate config;
 extern crate util;
@@ -12,6 +13,7 @@ extern crate command;
 
 use std::collections::HashMap;
 use std::time::Duration;
+use std::io;
 use std::io::{Read, Write};
 use std::net::{ToSocketAddrs, TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
@@ -24,6 +26,7 @@ use std::thread;
 #[cfg(unix)] use libc::funcs::posix88::unistd::fork;
 #[cfg(unix)] use libc::funcs::c95::stdlib::exit;
 #[cfg(unix)] use libc::funcs::posix88::unistd::getpid;
+#[cfg(unix)] use unix_socket::{UnixStream, UnixListener};
 
 use config::Config;
 use database::{Database, PubsubEvent};
@@ -32,8 +35,59 @@ use command::command;
 use parser::parse;
 use parser::ParseError;
 
+enum Stream {
+    Tcp(TcpStream),
+    Unix(UnixStream),
+}
+
+impl Stream {
+    fn try_clone(&self) -> io::Result<Stream> {
+        match *self {
+            Stream::Tcp(ref s) => Ok(Stream::Tcp(try!(s.try_clone()))),
+            Stream::Unix(ref s) => Ok(Stream::Unix(try!(s.try_clone()))),
+        }
+    }
+
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        match *self {
+            Stream::Tcp(ref mut s) => s.write(buf),
+            Stream::Unix(ref mut s) => s.write(buf),
+        }
+    }
+
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        match *self {
+            Stream::Tcp(ref mut s) => s.read(buf),
+            Stream::Unix(ref mut s) => s.read(buf),
+        }
+    }
+
+    fn set_keepalive(&self, seconds: Option<u32>) -> io::Result<()> {
+        match *self {
+            Stream::Tcp(ref s) => s.set_keepalive(seconds),
+            Stream::Unix(_) => Ok(()),
+        }
+    }
+
+    fn set_write_timeout(&self, dur: Option<Duration>) -> io::Result<()> {
+        match *self {
+            Stream::Tcp(ref s) => s.set_write_timeout(dur),
+            // TODO: couldn't figure out how to enable this in unix_socket
+            Stream::Unix(_) => Ok(()),
+        }
+    }
+
+    fn set_read_timeout(&self, dur: Option<Duration>) -> io::Result<()> {
+        match *self {
+            Stream::Tcp(ref s) => s.set_read_timeout(dur),
+            // TODO: couldn't figure out how to enable this in unix_socket
+            Stream::Unix(_) => Ok(()),
+        }
+    }
+}
+
 struct Client {
-    stream: TcpStream,
+    stream: Stream,
     db: Arc<Mutex<Database>>
 }
 
@@ -45,9 +99,16 @@ pub struct Server {
 }
 
 impl Client {
-    pub fn new(stream: TcpStream, db: Arc<Mutex<Database>>) -> Client {
+    pub fn tcp(stream: TcpStream, db: Arc<Mutex<Database>>) -> Client {
         return Client {
-            stream: stream,
+            stream: Stream::Tcp(stream),
+            db: db,
+        }
+    }
+
+    pub fn unix(stream: UnixStream, db: Arc<Mutex<Database>>) -> Client {
+        return Client {
+            stream: Stream::Unix(stream),
             db: db,
         }
     }
@@ -143,6 +204,32 @@ impl Client {
     }
 }
 
+macro_rules! handle_listener {
+    ($listener: expr, $server: expr, $rx: expr, $tcp_keepalive: expr, $timeout: expr, $t: ident) => ({
+        let db = $server.db.clone();
+        thread::spawn(move || {
+            for stream in $listener.incoming() {
+                if $rx.try_recv().is_ok() {
+                    // any new message should break
+                    break;
+                }
+                match stream {
+                    Ok(stream) => {
+                        let db1 = db.clone();
+                        thread::spawn(move || {
+                            let mut client = Client::$t(stream, db1);
+                            client.stream.set_keepalive(if $tcp_keepalive > 0 { Some($tcp_keepalive) } else { None }).unwrap();
+                            client.stream.set_read_timeout(if $timeout > 0 { Some(Duration::new($timeout, 0)) } else { None }).unwrap();
+                            client.stream.set_write_timeout(if $timeout > 0 { Some(Duration::new($timeout, 0)) } else { None }).unwrap();
+                            client.run();
+                        });
+                    }
+                    Err(e) => { println!("error {}", e); }
+                }
+            }
+        })
+    })
+}
 impl Server {
     pub fn new(config: Config) -> Server {
         let db = Database::new(&config);
@@ -203,29 +290,30 @@ impl Server {
             let (tx, rx) = channel();
             self.listener_channels.push(tx);
             let listener = TcpListener::bind(addr).unwrap();
-            let db = self.db.clone();
-            let th =  thread::spawn(move || {
-                for stream in listener.incoming() {
-                    if rx.try_recv().is_ok() {
-                        // any new message should break
-                        break;
-                    }
-                    match stream {
-                        Ok(stream) => {
-                            let db1 = db.clone();
-                            thread::spawn(move || {
-                                stream.set_keepalive(if tcp_keepalive > 0 { Some(tcp_keepalive) } else { None }).unwrap();
-                                stream.set_read_timeout(if timeout > 0 { Some(Duration::new(timeout, 0)) } else { None }).unwrap();
-                                stream.set_write_timeout(if timeout > 0 { Some(Duration::new(timeout, 0)) } else { None }).unwrap();
-                                let mut client = Client::new(stream, db1);
-                                client.run();
-                            });
-                        }
-                        Err(e) => { println!("error {}", e); }
-                    }
-                }
-            });
+            let th = handle_listener!(listener, self, rx, tcp_keepalive, timeout, tcp);
             self.listener_threads.push(th);
+        }
+        self.handle_unixsocket();
+    }
+
+    #[cfg(unix)]
+    fn handle_unixsocket(&mut self) {
+        if let Some(ref unixsocket) = self.config.unixsocket {
+            let tcp_keepalive = self.config.tcp_keepalive;
+            let timeout = self.config.timeout;
+
+            let (tx, rx) = channel();
+            self.listener_channels.push(tx);
+            let listener = UnixListener::bind(&*unixsocket).unwrap();
+            let th = handle_listener!(listener, self, rx, tcp_keepalive, timeout, unix);
+            self.listener_threads.push(th);
+        }
+    }
+
+    #[cfg(not(unix))]
+    fn handle_unixsocket() {
+        if self.config.unixsocket.is_some() {
+            writeln!(&mut std::io::stderr(), "Ignoring unixsocket in non unix environment\n");
         }
     }
 
