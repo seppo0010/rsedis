@@ -1169,7 +1169,7 @@ fn ping(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
             Err(err) => Response::Error(err.to_string()),
         }
     } else {
-        Response::Data(b"PONG".to_vec())
+        Response::Status("PONG".to_owned())
     }
 }
 
