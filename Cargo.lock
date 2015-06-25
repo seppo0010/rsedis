@@ -5,6 +5,7 @@ dependencies = [
  "command 0.1.0",
  "config 0.1.0",
  "database 0.1.0",
+ "logger 0.1.0",
  "networking 0.1.0",
  "parser 0.1.0",
  "response 0.1.0",
@@ -25,6 +26,7 @@ dependencies = [
 name = "config"
 version = "0.1.0"
 dependencies = [
+ "logger 0.1.0",
  "rand 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "time 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "util 0.1.0",
@@ -35,6 +37,7 @@ name = "database"
 version = "0.1.0"
 dependencies = [
  "config 0.1.0",
+ "logger 0.1.0",
  "rand 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "rehashinghashmap 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "response 0.1.0",
@@ -58,6 +61,10 @@ version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "logger"
+version = "0.1.0"
+
+[[package]]
 name = "networking"
 version = "0.1.0"
 dependencies = [
@@ -65,6 +72,7 @@ dependencies = [
  "config 0.1.0",
  "database 0.1.0",
  "libc 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "logger 0.1.0",
  "parser 0.1.0",
  "response 0.1.0",
  "unix_socket 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",

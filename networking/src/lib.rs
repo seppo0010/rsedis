@@ -3,7 +3,7 @@
 #![feature(tcp)]
 #[cfg(unix)]extern crate libc;
 #[cfg(unix)]extern crate unix_socket;
-
+#[macro_use(log, sendlog)] extern crate logger;
 extern crate config;
 extern crate util;
 extern crate parser;
@@ -28,12 +28,13 @@ use std::thread;
 #[cfg(unix)] use libc::funcs::posix88::unistd::getpid;
 #[cfg(unix)] use unix_socket::{UnixStream, UnixListener};
 
+use command::command;
 use config::Config;
 use database::{Database, PubsubEvent};
-use response::{Response, ResponseError};
-use command::command;
+use logger::Level;
 use parser::parse;
 use parser::ParseError;
+use response::{Response, ResponseError};
 
 enum Stream {
     Tcp(TcpStream),
@@ -91,8 +92,8 @@ struct Client {
     db: Arc<Mutex<Database>>
 }
 
-pub struct Server {
-    config: Config,
+pub struct Server<'a> {
+    config: Config<'a>,
     db: Arc<Mutex<Database>>,
     listener_channels: Vec<Sender<u8>>,
     listener_threads: Vec<thread::JoinHandle<()>>,
@@ -113,16 +114,20 @@ impl Client {
         }
     }
 
-    pub fn run(&mut self) {
+    pub fn run(&mut self, sender: Sender<(Level, String)>) {
         #![allow(unused_must_use)]
         let (stream_tx, rx) = channel::<Option<Response>>();
         {
             let mut stream = self.stream.try_clone().unwrap();
+            let sender = sender.clone();
             thread::spawn(move || {
                 loop {
                     match rx.recv() {
                         Ok(m) => match m {
-                            Some(msg) => stream.write(&*msg.as_bytes()),
+                            Some(msg) => match stream.write(&*msg.as_bytes()) {
+                                Ok(_) => (),
+                                Err(e) => sendlog!(sender, Warning, "Error writing to client: {:?}", e).unwrap(),
+                            },
                             None => break,
                         },
                         Err(_) => break,
@@ -153,16 +158,23 @@ impl Client {
         loop {
             let len = match self.stream.read(&mut buffer) {
                 Ok(r) => r,
-                Err(_) => break,
+                Err(err) => {
+                    sendlog!(sender, Verbose, "Reading from client: {:?}", err);
+                    break;
+                },
             };
             if len == 0 {
+                sendlog!(sender, Verbose, "Client closed connection");
                 break;
             }
             let parser = match parse(&buffer, len) {
                 Ok(p) => p,
                 Err(err) => match err {
                     ParseError::Incomplete => { continue; }
-                    _ => { break; }
+                    _ =>  {
+                        sendlog!(sender, Verbose, "Protocol error from client: {:?}", err);
+                        break;
+                    }
                 },
             };
 
@@ -205,8 +217,9 @@ impl Client {
 }
 
 macro_rules! handle_listener {
-    ($listener: expr, $server: expr, $rx: expr, $tcp_keepalive: expr, $timeout: expr, $t: ident) => ({
+    ($logger: expr, $listener: expr, $server: expr, $rx: expr, $tcp_keepalive: expr, $timeout: expr, $t: ident) => ({
         let db = $server.db.clone();
+        let sender = $logger.sender();
         thread::spawn(move || {
             for stream in $listener.incoming() {
                 if $rx.try_recv().is_ok() {
@@ -215,23 +228,25 @@ macro_rules! handle_listener {
                 }
                 match stream {
                     Ok(stream) => {
+                        sendlog!(sender, Verbose, "Accepted connection to {:?}", stream).unwrap();
                         let db1 = db.clone();
+                        let mysender = sender.clone();
                         thread::spawn(move || {
                             let mut client = Client::$t(stream, db1);
                             client.stream.set_keepalive(if $tcp_keepalive > 0 { Some($tcp_keepalive) } else { None }).unwrap();
                             client.stream.set_read_timeout(if $timeout > 0 { Some(Duration::new($timeout, 0)) } else { None }).unwrap();
                             client.stream.set_write_timeout(if $timeout > 0 { Some(Duration::new($timeout, 0)) } else { None }).unwrap();
-                            client.run();
+                            client.run(mysender);
                         });
                     }
-                    Err(e) => { println!("error {}", e); }
+                    Err(e) => sendlog!(sender, Warning, "Accepting client connection: {:?}", e).unwrap(),
                 }
             }
         })
     })
 }
-impl Server {
-    pub fn new(config: Config) -> Server {
+impl<'a> Server<'a> {
+    pub fn new(config: Config<'a>) -> Server<'a> {
         let db = Database::new(&config);
         return Server {
             config: config,
@@ -250,8 +265,8 @@ impl Server {
                     0 => {
                         if let Ok(mut fp) = File::create(Path::new(&*self.config.pidfile)) {
                             match write!(fp, "{}", getpid()) {
-                                // TODO warn on error?
-                                _ => (),
+                                Ok(_) => (),
+                                Err(e) => log!(self.config.logger, Warning, "Error writing pid: {}", e),
                             }
                         }
                         self.start();
@@ -289,8 +304,14 @@ impl Server {
         for addr in self.config.addresses() {
             let (tx, rx) = channel();
             self.listener_channels.push(tx);
-            let listener = TcpListener::bind(addr).unwrap();
-            let th = handle_listener!(listener, self, rx, tcp_keepalive, timeout, tcp);
+            let listener = match TcpListener::bind(addr) {
+                Ok(l) => l,
+                Err(err) => {
+                    log!(self.config.logger, Warning, "Creating Server TCP listening socket {:?}: {:?}", addr, err);
+                    continue;
+                }
+            };
+            let th = handle_listener!(self.config.logger, listener, self, rx, tcp_keepalive, timeout, tcp);
             self.listener_threads.push(th);
         }
         self.handle_unixsocket();
@@ -304,8 +325,14 @@ impl Server {
 
             let (tx, rx) = channel();
             self.listener_channels.push(tx);
-            let listener = UnixListener::bind(&*unixsocket).unwrap();
-            let th = handle_listener!(listener, self, rx, tcp_keepalive, timeout, unix);
+            let listener = match UnixListener::bind(unixsocket) {
+                Ok(l) => l,
+                Err(err) => {
+                    log!(self.config.logger, Warning, "Creating Server Unix socket {}: {:?}", unixsocket, err);
+                    return;
+                }
+            };
+            let th = handle_listener!(self.config.logger, listener, self, rx, tcp_keepalive, timeout, unix);
             self.listener_threads.push(th);
         }
     }
@@ -333,11 +360,13 @@ impl Server {
 
 #[cfg(test)]
 mod test_networking {
+
     use std::io::{Read, Write};
     use std::net::TcpStream;
     use std::str::from_utf8;
 
     use config::Config;
+    use logger::Logger;
 
     use super::Server;
 
@@ -345,7 +374,8 @@ mod test_networking {
     fn parse_ping() {
         let port = 6379;
 
-        let mut server = Server::new(Config::mock(port));
+        let mut logger = Logger::null();
+        let mut server = Server::new(Config::mock(port, &mut logger));
         server.start();
 
         let addr = format!("127.0.0.1:{}", port);
@@ -366,7 +396,8 @@ mod test_networking {
     #[test]
     fn allow_multiwrite() {
         let port = 6380;
-        let mut server = Server::new(Config::mock(port));
+        let mut logger = Logger::null();
+        let mut server = Server::new(Config::mock(port, &mut logger));
         server.start();
 
         let addr = format!("127.0.0.1:{}", port);
@@ -389,7 +420,8 @@ mod test_networking {
     #[test]
     fn allow_stop() {
         let port = 6381;
-        let mut server = Server::new(Config::mock(port));
+        let mut logger = Logger::null();
+        let mut server = Server::new(Config::mock(port, &mut logger));
         server.start();
         {
             let addr = format!("127.0.0.1:{}", port);

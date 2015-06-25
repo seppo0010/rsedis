@@ -6,6 +6,7 @@ script:
   - cargo test --verbose --package command
   - cargo test --verbose --package config
   - cargo test --verbose --package database
+  - cargo test --verbose --package logger
   - cargo test --verbose --package networking
   - cargo test --verbose --package parser
   - cargo test --verbose --package response

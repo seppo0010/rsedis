@@ -3,6 +3,7 @@
 #![feature(vecmap)]
 
 extern crate config;
+extern crate logger;
 extern crate rand;
 extern crate rehashinghashmap;
 extern crate response;
@@ -29,6 +30,7 @@ use util::mstime;
 
 use error::OperationError;
 use list::ValueList;
+use logger::Logger;
 use set::ValueSet;
 use string::ValueString;
 use zset::SortedSetMember;
@@ -484,10 +486,10 @@ pub struct Database {
 
 impl Database {
     pub fn mock() -> Database {
-        Database::new(&Config::new())
+        Database::new(&Config::new(&mut Logger::null()))
     }
 
-    pub fn new(config: &Config) -> Database {
+    pub fn new<'a>(config: &Config) -> Database {
         let size = config.databases as usize;
         let mut data = Vec::with_capacity(size);
         let mut data_expiration_ns = Vec::with_capacity(size);
@@ -709,6 +711,7 @@ mod test_command {
     use util::mstime;
 
     use list::ValueList;
+    use logger::Logger;
     use string::ValueString;
     use set::ValueSet;
     use zset::ValueSortedSet;
@@ -1680,7 +1683,8 @@ mod test_command {
 
     #[test]
     fn no_rehashing() {
-        let mut config = Config::new();
+        let mut logger = Logger::null();
+        let mut config = Config::new(&mut logger);
         config.databases = 1;
         config.active_rehashing = false;
         let mut database = Database::new(&config);

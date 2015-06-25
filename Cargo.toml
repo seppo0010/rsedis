@@ -32,3 +32,6 @@ path = "command"
 
 [dependencies.networking]
 path = "networking"
+
+[dependencies.logger]
+path = "logger"

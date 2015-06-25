@@ -1,3 +1,5 @@
+#[macro_use(log)]
+extern crate logger;
 extern crate rand;
 extern crate time;
 extern crate util;
@@ -8,14 +10,16 @@ use std::io::BufReader;
 use std::io::Error as IOError;
 use std::io::Write;
 use std::num::ParseIntError;
-use std::str::Utf8Error;
 use std::path::Path;
 use std::str::from_utf8;
 use std::str::FromStr;
+use std::str::Utf8Error;
 
 use util::splitargs;
+use logger::{Logger, Level};
 
-pub struct Config {
+pub struct Config<'a> {
+    pub logger: &'a mut Logger,
     pub daemonize: bool,
     pub databases: u8,
     pub pidfile: String,
@@ -34,6 +38,7 @@ pub enum ConfigError {
     InvalidFormat,
     InvalidParameter,
     IOError(IOError),
+    FileNotFound,
 }
 
 fn read_string(args: Vec<Vec<u8>>) -> Result<String, ConfigError> {
@@ -61,9 +66,10 @@ fn read_bool(args: Vec<Vec<u8>>) -> Result<bool, ConfigError> {
     })
 }
 
-impl Config {
-    pub fn mock(port: u16) -> Config {
+impl<'a> Config<'a> {
+    pub fn mock(port: u16, logger: &'a mut Logger) -> Config<'a> {
         Config {
+            logger: logger,
             active_rehashing: true,
             daemonize: false,
             databases: 16,
@@ -78,8 +84,9 @@ impl Config {
         }
     }
 
-    pub fn new() -> Config {
+    pub fn new(logger: &'a mut Logger) -> Config<'a> {
         Config {
+            logger: logger,
             active_rehashing: true,
             daemonize: false,
             databases: 16,
@@ -96,7 +103,13 @@ impl Config {
 
     pub fn parsefile(&mut self, fname: String) -> Result<(), ConfigError> {
         let path = Path::new(&*fname);
-        let file = BufReader::new(try!(File::open(&path)));
+        let file = BufReader::new(match File::open(&path) {
+            Ok(f) => f,
+            Err(_) => {
+                log!(self.logger, Warning, "Fatal error, can't open config file '{}'", fname);
+                return Err(ConfigError::FileNotFound);
+            }
+        });
         for line_iter in file.lines() {
             let lline = try!(line_iter);
             let line = lline.trim();
@@ -128,6 +141,14 @@ impl Config {
                 b"unixsocket" => self.unixsocket = Some(try!(read_string(args)).to_owned()),
                 b"unixsocketperm" => self.unixsocketperm = try!(u32::from_str_radix(&*try!(read_string(args)), 8)),
                 b"pidfile" => self.pidfile = try!(read_string(args)).to_owned(),
+                b"logfile" => try!(self.logger.set_logfile(&*try!(read_string(args)))),
+                b"loglevel" => self.logger.set_loglevel(match &*try!(read_string(args)) {
+                    "debug" => Level::Debug,
+                    "verbose" => Level::Verbose,
+                    "notice" => Level::Notice,
+                    "warning" => Level::Warning,
+                    _ => return Err(ConfigError::InvalidParameter),
+                }),
                 b"include" => if args.len() != 2 {
                     return Err(ConfigError::InvalidFormat)
                 } else {
@@ -169,16 +190,17 @@ mod tests {
     use std::io::Write;
     use rand::random;
 
+    use logger::Logger;
     use util::mstime;
 
     macro_rules! config {
-        ($str: expr) => ({
+        ($str: expr, $logger: expr) => ({
             let dirpath = format!("tmp/{}", mstime());
             let filepath = format!("{}/{}.conf", dirpath, random::<u64>());
             match create_dir("tmp") { _ => () }
             match create_dir(dirpath) { _ => () }
             match File::create(filepath.clone()).unwrap().write_all($str) { _ => () }
-            let mut config = Config::new();
+            let mut config = Config::new(&mut $logger);
             config.parsefile(filepath).unwrap();
             config
         })
@@ -186,82 +208,95 @@ mod tests {
 
     #[test]
     fn parse_bind() {
-        let config = config!(b"bind 1.2.3.4\nbind 5.6.7.8");
+        let mut logger = Logger::null();
+        let config = config!(b"bind 1.2.3.4\nbind 5.6.7.8", logger);
         assert_eq!(config.bind, vec!["1.2.3.4", "5.6.7.8"]);
         assert_eq!(config.port, 6379);
     }
 
     #[test]
     fn parse_port() {
-        let config = config!(b"port 12345");
+        let mut logger = Logger::null();
+        let config = config!(b"port 12345", logger);
         assert_eq!(config.port, 12345);
         assert_eq!(config.addresses(), vec![("127.0.0.1", 12345)]);
     }
 
     #[test]
     fn parse_bind_port() {
-        let config = config!(b"bind 127.0.0.1\nport 12345");
+        let mut logger = Logger::null();
+        let config = config!(b"bind 127.0.0.1\nport 12345", logger);
         assert_eq!(config.bind, vec!["127.0.0.1"]);
         assert_eq!(config.port, 12345);
     }
 
     #[test]
     fn parse_daemonize_yes() {
-        let config = config!(b"daemonize yes");
+        let mut logger = Logger::null();
+        let config = config!(b"daemonize yes", logger);
         assert!(config.daemonize);
     }
 
     #[test]
     fn parse_daemonize_no() {
-        let config = config!(b"daemonize no");
+        let mut logger = Logger::null();
+        let config = config!(b"daemonize no", logger);
         assert!(!config.daemonize);
     }
 
     #[test]
     fn parse_active_rehashing_yes() {
-        let config = config!(b"activerehashing yes");
+        let mut logger = Logger::null();
+        let config = config!(b"activerehashing yes", logger);
         assert!(config.active_rehashing);
     }
 
     #[test]
     fn parse_active_rehashing_no() {
-        let config = config!(b"activerehashing no");
+        let mut logger = Logger::null();
+        let config = config!(b"activerehashing no", logger);
         assert!(!config.active_rehashing);
     }
 
     #[test]
     fn parse_databases() {
-        let config = config!(b"databases 20");
+        let mut logger = Logger::null();
+        let config = config!(b"databases 20", logger);
         assert_eq!(config.databases, 20);
     }
 
     #[test]
     fn parse_keepalive() {
-        let config = config!(b"tcp-keepalive 123");
+        let mut logger = Logger::null();
+        let config = config!(b"tcp-keepalive 123", logger);
         assert_eq!(config.tcp_keepalive, 123);
     }
 
     #[test]
     fn parse_keepalive_quotes() {
-        let config = config!(b"tcp-keepalive \"123\"");
+        let mut logger = Logger::null();
+        let config = config!(b"tcp-keepalive \"123\"", logger);
         assert_eq!(config.tcp_keepalive, 123);
     }
 
     #[test]
     fn parse_set_max_intset_entries() {
-        let config = config!(b"set-max-intset-entries 123456");
+        let mut logger = Logger::null();
+        let config = config!(b"set-max-intset-entries 123456", logger);
         assert_eq!(config.set_max_intset_entries, 123456);
     }
 
     #[test]
     fn parse_timeout() {
-        let config = config!(b"timeout 23456");
+        let mut logger = Logger::null();
+        let config = config!(b"timeout 23456", logger);
         assert_eq!(config.timeout, 23456);
     }
 
     #[test]
     fn parse_unixsocket() {
-        let config = config!(b"unixsocket /dev/null\nunixsocketperm 777");
+        let mut logger = Logger::null();
+        let config = config!(b"unixsocket /dev/null\nunixsocketperm 777", logger);
         assert_eq!(config.unixsocket, Some("/dev/null".to_owned()));
         assert_eq!(config.unixsocketperm, 511);
     }

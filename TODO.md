@@ -174,8 +174,8 @@
     - [x] unixsocketperm
     - [x] timeout
     - [x] tcp-keepalive
-    - [ ] loglevel
-    - [ ] logfile
+    - [x] loglevel
+    - [x] logfile
     - [ ] syslog-enabled
     - [ ] syslog-ident
     - [ ] syslog-facility
