@@ -4,6 +4,7 @@ extern crate rand;
 extern crate time;
 extern crate util;
 
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufRead;
 use std::io::BufReader;
@@ -18,8 +19,8 @@ use std::str::Utf8Error;
 use util::splitargs;
 use logger::{Logger, Level};
 
-pub struct Config<'a> {
-    pub logger: &'a mut Logger,
+pub struct Config {
+    pub logger: Logger,
     pub daemonize: bool,
     pub databases: u8,
     pub pidfile: String,
@@ -31,6 +32,7 @@ pub struct Config<'a> {
     pub timeout: u64,
     pub unixsocket: Option<String>,
     pub unixsocketperm: u32,
+    pub rename_commands: HashMap<String, Option<String>>,
 }
 
 #[derive(Debug)]
@@ -66,8 +68,8 @@ fn read_bool(args: Vec<Vec<u8>>) -> Result<bool, ConfigError> {
     })
 }
 
-impl<'a> Config<'a> {
-    pub fn mock(port: u16, logger: &'a mut Logger) -> Config<'a> {
+impl Config {
+    pub fn mock(port: u16, logger: Logger) -> Config {
         Config {
             logger: logger,
             active_rehashing: true,
@@ -81,10 +83,11 @@ impl<'a> Config<'a> {
             timeout: 0,
             unixsocket: None,
             unixsocketperm: 0700,
+            rename_commands: HashMap::new(),
         }
     }
 
-    pub fn new(logger: &'a mut Logger) -> Config<'a> {
+    pub fn new(logger: Logger) -> Config {
         Config {
             logger: logger,
             active_rehashing: true,
@@ -98,6 +101,7 @@ impl<'a> Config<'a> {
             timeout: 0,
             unixsocket: None,
             unixsocketperm: 0700,
+            rename_commands: HashMap::new(),
         }
     }
 
@@ -149,6 +153,18 @@ impl<'a> Config<'a> {
                     "warning" => Level::Warning,
                     _ => return Err(ConfigError::InvalidParameter),
                 }),
+                b"rename-command" => {
+                    if args.len() != 3 {
+                        return Err(ConfigError::InvalidFormat)
+                    } else {
+                        let command = try!(from_utf8(&*args[1])).to_owned();
+                        let newname = try!(from_utf8(&*args[2])).to_owned();
+                        if newname.len() > 0 {
+                            self.rename_commands.insert(newname, Some(command.clone()));
+                        }
+                        self.rename_commands.insert(command, None);
+                    }
+                },
                 b"include" => if args.len() != 2 {
                     return Err(ConfigError::InvalidFormat)
                 } else {
@@ -161,11 +177,11 @@ impl<'a> Config<'a> {
         Ok(())
     }
 
-    pub fn addresses(&self) -> Vec<(&str, u16)> {
+    pub fn addresses(&self) -> Vec<(String, u16)> {
         if self.bind.len() == 0 {
-            vec![("127.0.0.1", self.port)]
+            vec![("127.0.0.1".to_owned(), self.port)]
         } else {
-            self.bind.iter().map(|s| (&s[..], self.port)).collect::<Vec<_>>()
+            self.bind.iter().map(|s| (s.clone(), self.port)).collect::<Vec<_>>()
         }
     }
 }
@@ -185,9 +201,11 @@ impl From<Utf8Error> for ConfigError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
     use std::fs::File;
     use std::fs::create_dir;
     use std::io::Write;
+
     use rand::random;
 
     use logger::Logger;
@@ -200,7 +218,7 @@ mod tests {
             match create_dir("tmp") { _ => () }
             match create_dir(dirpath) { _ => () }
             match File::create(filepath.clone()).unwrap().write_all($str) { _ => () }
-            let mut config = Config::new(&mut $logger);
+            let mut config = Config::new($logger);
             config.parsefile(filepath).unwrap();
             config
         })
@@ -208,96 +226,94 @@ mod tests {
 
     #[test]
     fn parse_bind() {
-        let mut logger = Logger::null();
-        let config = config!(b"bind 1.2.3.4\nbind 5.6.7.8", logger);
+        let config = config!(b"bind 1.2.3.4\nbind 5.6.7.8", Logger::null());
         assert_eq!(config.bind, vec!["1.2.3.4", "5.6.7.8"]);
         assert_eq!(config.port, 6379);
     }
 
     #[test]
     fn parse_port() {
-        let mut logger = Logger::null();
-        let config = config!(b"port 12345", logger);
+        let config = config!(b"port 12345", Logger::null());
         assert_eq!(config.port, 12345);
-        assert_eq!(config.addresses(), vec![("127.0.0.1", 12345)]);
+        assert_eq!(config.addresses(), vec![("127.0.0.1".to_owned(), 12345)]);
     }
 
     #[test]
     fn parse_bind_port() {
-        let mut logger = Logger::null();
-        let config = config!(b"bind 127.0.0.1\nport 12345", logger);
+        let config = config!(b"bind 127.0.0.1\nport 12345", Logger::null());
         assert_eq!(config.bind, vec!["127.0.0.1"]);
         assert_eq!(config.port, 12345);
     }
 
     #[test]
     fn parse_daemonize_yes() {
-        let mut logger = Logger::null();
-        let config = config!(b"daemonize yes", logger);
+        let config = config!(b"daemonize yes", Logger::null());
         assert!(config.daemonize);
     }
 
     #[test]
     fn parse_daemonize_no() {
-        let mut logger = Logger::null();
-        let config = config!(b"daemonize no", logger);
+        let config = config!(b"daemonize no", Logger::null());
         assert!(!config.daemonize);
     }
 
     #[test]
     fn parse_active_rehashing_yes() {
-        let mut logger = Logger::null();
-        let config = config!(b"activerehashing yes", logger);
+        let config = config!(b"activerehashing yes", Logger::null());
         assert!(config.active_rehashing);
     }
 
     #[test]
     fn parse_active_rehashing_no() {
-        let mut logger = Logger::null();
-        let config = config!(b"activerehashing no", logger);
+        let config = config!(b"activerehashing no", Logger::null());
         assert!(!config.active_rehashing);
     }
 
     #[test]
     fn parse_databases() {
-        let mut logger = Logger::null();
-        let config = config!(b"databases 20", logger);
+        let config = config!(b"databases 20", Logger::null());
         assert_eq!(config.databases, 20);
     }
 
     #[test]
     fn parse_keepalive() {
-        let mut logger = Logger::null();
-        let config = config!(b"tcp-keepalive 123", logger);
+        let config = config!(b"tcp-keepalive 123", Logger::null());
         assert_eq!(config.tcp_keepalive, 123);
     }
 
     #[test]
     fn parse_keepalive_quotes() {
-        let mut logger = Logger::null();
-        let config = config!(b"tcp-keepalive \"123\"", logger);
+        let config = config!(b"tcp-keepalive \"123\"", Logger::null());
         assert_eq!(config.tcp_keepalive, 123);
     }
 
     #[test]
     fn parse_set_max_intset_entries() {
-        let mut logger = Logger::null();
-        let config = config!(b"set-max-intset-entries 123456", logger);
+        let config = config!(b"set-max-intset-entries 123456", Logger::null());
         assert_eq!(config.set_max_intset_entries, 123456);
     }
 
     #[test]
     fn parse_timeout() {
-        let mut logger = Logger::null();
-        let config = config!(b"timeout 23456", logger);
+        let config = config!(b"timeout 23456", Logger::null());
         assert_eq!(config.timeout, 23456);
     }
 
     #[test]
     fn parse_unixsocket() {
-        let mut logger = Logger::null();
-        let config = config!(b"unixsocket /dev/null\nunixsocketperm 777", logger);
+        let config = config!(b"unixsocket /dev/null\nunixsocketperm 777", Logger::null());
         assert_eq!(config.unixsocket, Some("/dev/null".to_owned()));
         assert_eq!(config.unixsocketperm, 511);
+    }
+
+    #[test]
+    fn parse_rename_commands() {
+        let config = config!(b"rename-command c1 c2\nrename-command hello world", Logger::null());
+        let mut h = HashMap::new();
+        h.insert("c2".to_owned(), Some("c1".to_owned()));
+        h.insert("c1".to_owned(), None);
+        h.insert("world".to_owned(), Some("hello".to_owned()));
+        h.insert("hello".to_owned(), None);
+        assert_eq!(config.rename_commands, h);
     }
 }

@@ -30,7 +30,6 @@ use util::mstime;
 
 use error::OperationError;
 use list::ValueList;
-use logger::Logger;
 use set::ValueSet;
 use string::ValueString;
 use zset::SortedSetMember;
@@ -473,6 +472,7 @@ impl Value {
 }
 
 pub struct Database {
+    pub config: Config,
     data: Vec<RehashingHashMap<Vec<u8>, Value>>,
     data_expiration_ns: Vec<RehashingHashMap<Vec<u8>, i64>>,
     pub size: usize,
@@ -480,16 +480,10 @@ pub struct Database {
     pattern_subscribers: HashMap<Vec<u8>, HashMap<usize, Sender<Option<PubsubEvent>>>>,
     key_subscribers: Vec<RehashingHashMap<Vec<u8>, HashMap<usize, Sender<bool>>>>,
     subscriber_id: usize,
-    active_rehashing: bool,
-    pub set_max_intset_entries: usize,
 }
 
-impl Database {
-    pub fn mock() -> Database {
-        Database::new(&Config::new(&mut Logger::null()))
-    }
-
-    pub fn new<'a>(config: &Config) -> Database {
+impl Database{
+    pub fn new(config: Config) -> Database {
         let size = config.databases as usize;
         let mut data = Vec::with_capacity(size);
         let mut data_expiration_ns = Vec::with_capacity(size);
@@ -500,6 +494,7 @@ impl Database {
             key_subscribers.push(RehashingHashMap::new());
         }
         return Database {
+            config: config,
             data: data,
             data_expiration_ns: data_expiration_ns,
             size: size,
@@ -507,8 +502,6 @@ impl Database {
             pattern_subscribers: HashMap::new(),
             key_subscribers: key_subscribers,
             subscriber_id: 0,
-            active_rehashing: config.active_rehashing,
-            set_max_intset_entries: config.set_max_intset_entries,
         }
     }
 
@@ -542,7 +535,7 @@ impl Database {
             r = None;
         }
         self.data_expiration_ns[index].remove(key);
-        if self.active_rehashing {
+        if self.config.active_rehashing {
             if self.data[index].len() * 10 / 12 < self.data[index].capacity() {
                 self.data[index].shrink_to_fit();
             }
@@ -597,7 +590,7 @@ impl Database {
     }
 
     pub fn key_publish(&mut self, index: usize, key: &Vec<u8>) {
-        if self.active_rehashing {
+        if self.config.active_rehashing {
             self.data[index].rehash();
             self.data_expiration_ns[index].rehash();
             self.key_subscribers[index].rehash();
@@ -697,6 +690,16 @@ impl Database {
             self.data[index].clear();
         }
     }
+
+    pub fn mapped_command(&self, command: &String) -> Option<String> {
+        match self.config.rename_commands.get(command) {
+            Some(c) => match c {
+                &Some(ref s) => Some(s.clone()),
+                &None => None,
+            },
+            None => Some(command.clone()),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -707,9 +710,9 @@ mod test_command {
     use std::sync::mpsc::channel;
     use std::usize;
 
-    use config::Config;
     use util::mstime;
 
+    use config::Config;
     use list::ValueList;
     use logger::Logger;
     use string::ValueString;
@@ -1166,7 +1169,8 @@ mod test_command {
 
     #[test]
     fn get_empty() {
-        let database = Database::mock();
+        let config = Config::new(Logger::null());
+        let database = Database::new(config);
         let key = vec![1u8];
         assert!(database.get(0, &key).is_none());
     }
@@ -1203,7 +1207,8 @@ mod test_command {
 
     #[test]
     fn remove_value() {
-        let mut database = Database::mock();
+        let config = Config::new(Logger::null());
+        let mut database = Database::new(config);
         let key = vec![1u8];
         let value = vec![1u8, 2, 3, 4];
         assert!(database.get_or_create(0, &key).set(value).is_ok());
@@ -1242,7 +1247,8 @@ mod test_command {
 
     #[test]
     fn set_expire_get() {
-        let mut database = Database::mock();
+        let config = Config::new(Logger::null());
+        let mut database = Database::new(config);
         let key = vec![1u8];
         let value = vec![1u8, 2, 3, 4];
         assert!(database.get_or_create(0, &key).set(value).is_ok());
@@ -1252,7 +1258,8 @@ mod test_command {
 
     #[test]
     fn set_will_expire_get() {
-        let mut database = Database::mock();
+        let config = Config::new(Logger::null());
+        let mut database = Database::new(config);
         let key = vec![1u8];
         let value = vec![1u8, 2, 3, 4];
         let expected = Vec::clone(&value);
@@ -1632,7 +1639,8 @@ mod test_command {
 
     #[test]
     fn pubsub_basic() {
-        let mut database = Database::mock();
+        let config = Config::new(Logger::null());
+        let mut database = Database::new(config);
         let channel_name = vec![1u8, 2, 3];
         let message = vec![2u8, 3, 4, 5, 6];
         let (tx, rx) = channel();
@@ -1643,7 +1651,8 @@ mod test_command {
 
     #[test]
     fn unsubscribe() {
-        let mut database = Database::mock();
+        let config = Config::new(Logger::null());
+        let mut database = Database::new(config);
         let channel_name = vec![1u8, 2, 3];
         let message = vec![2u8, 3, 4, 5, 6];
         let (tx, rx) = channel();
@@ -1655,7 +1664,8 @@ mod test_command {
 
     #[test]
     fn pubsub_pattern() {
-        let mut database = Database::mock();
+        let config = Config::new(Logger::null());
+        let mut database = Database::new(config);
         let channel_name = vec![1u8, 2, 3];
         let message = vec![2u8, 3, 4, 5, 6];
         let (tx, rx) = channel();
@@ -1666,7 +1676,8 @@ mod test_command {
 
     #[test]
     fn rehashing() {
-        let mut database = Database::mock();
+        let config = Config::new(Logger::null());
+        let mut database = Database::new(config);
         for i in 0u32..1000 {
             let key = vec![(i % 256) as u8, (i / 256) as u8];
             database.get_or_create(0, &key).set(key.clone()).unwrap();
@@ -1683,11 +1694,10 @@ mod test_command {
 
     #[test]
     fn no_rehashing() {
-        let mut logger = Logger::null();
-        let mut config = Config::new(&mut logger);
+        let mut config = Config::new(Logger::null());
         config.databases = 1;
         config.active_rehashing = false;
-        let mut database = Database::new(&config);
+        let mut database = Database::new(config);
         for i in 0u32..1000 {
             let key = vec![(i % 256) as u8, (i / 256) as u8];
             database.get_or_create(0, &key).set(key.clone()).unwrap();
@@ -1726,5 +1736,16 @@ mod test_command {
             },
             _ => panic!("Must be set"),
         }
+    }
+
+    #[test]
+    fn mapcommand() {
+        let mut config = Config::new(Logger::null());
+        config.rename_commands.insert("disabled".to_owned(), None);
+        config.rename_commands.insert("source".to_owned(), Some("target".to_owned()));
+        let database = Database::new(config);
+        assert_eq!(database.mapped_command(&"disabled".to_owned()), None);
+        assert_eq!(database.mapped_command(&"source".to_owned()), Some("target".to_owned()));
+        assert_eq!(database.mapped_command(&"other".to_owned()), Some("other".to_owned()));
     }
 }

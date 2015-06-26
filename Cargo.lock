@@ -16,7 +16,9 @@ dependencies = [
 name = "command"
 version = "0.1.0"
 dependencies = [
+ "config 0.1.0",
  "database 0.1.0",
+ "logger 0.1.0",
  "parser 0.1.0",
  "response 0.1.0",
  "util 0.1.0",

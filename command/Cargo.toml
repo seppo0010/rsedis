@@ -3,14 +3,20 @@ name = "command"
 version = "0.1.0"
 authors = ["Sebastian Waisbrot <seppo0010@gmail.com>"]
 
+[dependencies.config]
+path = "../config"
+
+[dependencies.database]
+path = "../database"
+
+[dependencies.logger]
+path = "../logger"
+
 [dependencies.parser]
 path = "../parser"
 
 [dependencies.response]
 path = "../response"
-
-[dependencies.database]
-path = "../database"
 
 [dependencies.util]
 path = "../util"

@@ -201,7 +201,7 @@
     - [ ] min-slaves-to-write
     - [ ] min-slaves-max-lag
     - [ ] requirepass
-    - [ ] rename-command
+    - [x] rename-command
     - [ ] maxclients
     - [ ] maxmemory
     - [ ] maxmemory-policy

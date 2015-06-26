@@ -188,6 +188,8 @@ impl Logger {
     }
 }
 
+unsafe impl Sync for Logger {}
+
 #[cfg(test)]
 mod test_log {
     use super::{Logger, Level};

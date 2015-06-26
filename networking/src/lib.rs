@@ -92,8 +92,7 @@ struct Client {
     db: Arc<Mutex<Database>>
 }
 
-pub struct Server<'a> {
-    config: Config<'a>,
+pub struct Server {
     db: Arc<Mutex<Database>>,
     listener_channels: Vec<Sender<u8>>,
     listener_threads: Vec<thread::JoinHandle<()>>,
@@ -245,11 +244,10 @@ macro_rules! handle_listener {
         })
     })
 }
-impl<'a> Server<'a> {
-    pub fn new(config: Config<'a>) -> Server<'a> {
-        let db = Database::new(&config);
+impl Server {
+    pub fn new(config: Config) -> Server {
+        let db = Database::new(config);
         return Server {
-            config: config,
             db: Arc::new(Mutex::new(db)),
             listener_channels: Vec::new(),
             listener_threads: Vec::new(),
@@ -258,15 +256,22 @@ impl<'a> Server<'a> {
 
     #[cfg(unix)]
     pub fn run(&mut self) {
-        if self.config.daemonize {
+        let (daemonize, pidfile) = {
+            let db = self.db.lock().unwrap();
+            (db.config.daemonize.clone(), db.config.pidfile.clone())
+        };
+        if daemonize {
             unsafe {
                 match fork() {
                     -1 => panic!("Fork failed"),
                     0 => {
-                        if let Ok(mut fp) = File::create(Path::new(&*self.config.pidfile)) {
+                        if let Ok(mut fp) = File::create(Path::new(&*pidfile)) {
                             match write!(fp, "{}", getpid()) {
                                 Ok(_) => (),
-                                Err(e) => log!(self.config.logger, Warning, "Error writing pid: {}", e),
+                                Err(e) => {
+                                    let db = self.db.lock().unwrap();
+                                    log!(db.config.logger, Warning, "Error writing pid: {}", e);
+                                },
                             }
                         }
                         self.start();
@@ -283,7 +288,8 @@ impl<'a> Server<'a> {
 
     #[cfg(not(unix))]
     pub fn run(&mut self) {
-        if self.config.daemonize {
+        let db = self.db.lock().unwrap();
+        if db.config.daemonize {
             panic!("Cannot daemonize in non-unix");
         } else {
             self.start();
@@ -299,47 +305,57 @@ impl<'a> Server<'a> {
     }
 
     pub fn start(&mut self) {
-        let tcp_keepalive = self.config.tcp_keepalive;
-        let timeout = self.config.timeout;
-        for addr in self.config.addresses() {
+        let (tcp_keepalive, timeout, addresses) = {
+            let db = self.db.lock().unwrap();
+            (db.config.tcp_keepalive.clone(),
+             db.config.timeout.clone(),
+             db.config.addresses().clone())
+        };
+        for (host, port) in addresses {
             let (tx, rx) = channel();
             self.listener_channels.push(tx);
-            let listener = match TcpListener::bind(addr) {
+            let listener = match TcpListener::bind((&host[..], port)) {
                 Ok(l) => l,
                 Err(err) => {
-                    log!(self.config.logger, Warning, "Creating Server TCP listening socket {:?}: {:?}", addr, err);
+                    let db = self.db.lock().unwrap();
+                    log!(db.config.logger, Warning, "Creating Server TCP listening socket {}:{}: {:?}", host, port, err);
                     continue;
                 }
             };
-            let th = handle_listener!(self.config.logger, listener, self, rx, tcp_keepalive, timeout, tcp);
-            self.listener_threads.push(th);
+            {
+                let db = self.db.lock().unwrap();
+                let th = handle_listener!(db.config.logger, listener, self, rx, tcp_keepalive, timeout, tcp);
+                self.listener_threads.push(th);
+            }
         }
         self.handle_unixsocket();
     }
 
     #[cfg(unix)]
     fn handle_unixsocket(&mut self) {
-        if let Some(ref unixsocket) = self.config.unixsocket {
-            let tcp_keepalive = self.config.tcp_keepalive;
-            let timeout = self.config.timeout;
+        let db = self.db.lock().unwrap();
+        if let Some(ref unixsocket) = db.config.unixsocket {
+            let tcp_keepalive = db.config.tcp_keepalive;
+            let timeout = db.config.timeout;
 
             let (tx, rx) = channel();
             self.listener_channels.push(tx);
             let listener = match UnixListener::bind(unixsocket) {
                 Ok(l) => l,
                 Err(err) => {
-                    log!(self.config.logger, Warning, "Creating Server Unix socket {}: {:?}", unixsocket, err);
+                    log!(db.config.logger, Warning, "Creating Server Unix socket {}: {:?}", unixsocket, err);
                     return;
                 }
             };
-            let th = handle_listener!(self.config.logger, listener, self, rx, tcp_keepalive, timeout, unix);
+            let th = handle_listener!(db.config.logger, listener, self, rx, tcp_keepalive, timeout, unix);
             self.listener_threads.push(th);
         }
     }
 
     #[cfg(not(unix))]
     fn handle_unixsocket() {
-        if self.config.unixsocket.is_some() {
+        let db = self.db.lock().unwrap();
+        if db.config.unixsocket.is_some() {
             writeln!(&mut std::io::stderr(), "Ignoring unixsocket in non unix environment\n");
         }
     }
@@ -348,8 +364,9 @@ impl<'a> Server<'a> {
         #![allow(unused_must_use)]
         for sender in self.listener_channels.iter() {
             sender.send(0);
-            for addr in self.config.addresses() {
-                for addrs in addr.to_socket_addrs().unwrap() {
+            let db = self.db.lock().unwrap();
+            for (host, port) in db.config.addresses() {
+                for addrs in (&host[..], port).to_socket_addrs().unwrap() {
                     TcpStream::connect(addrs);
                 }
             }
@@ -374,8 +391,7 @@ mod test_networking {
     fn parse_ping() {
         let port = 6379;
 
-        let mut logger = Logger::null();
-        let mut server = Server::new(Config::mock(port, &mut logger));
+        let mut server = Server::new(Config::mock(port, Logger::null()));
         server.start();
 
         let addr = format!("127.0.0.1:{}", port);
@@ -396,8 +412,7 @@ mod test_networking {
     #[test]
     fn allow_multiwrite() {
         let port = 6380;
-        let mut logger = Logger::null();
-        let mut server = Server::new(Config::mock(port, &mut logger));
+        let mut server = Server::new(Config::mock(port, Logger::null()));
         server.start();
 
         let addr = format!("127.0.0.1:{}", port);
@@ -420,8 +435,7 @@ mod test_networking {
     #[test]
     fn allow_stop() {
         let port = 6381;
-        let mut logger = Logger::null();
-        let mut server = Server::new(Config::mock(port, &mut logger));
+        let mut server = Server::new(Config::mock(port, Logger::null()));
         server.start();
         {
             let addr = format!("127.0.0.1:{}", port);
