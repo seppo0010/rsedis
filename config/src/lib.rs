@@ -36,6 +36,7 @@ pub struct Config {
     pub unixsocket: Option<String>,
     pub unixsocketperm: u32,
     pub rename_commands: HashMap<String, Option<String>>,
+    pub requirepass: Option<String>,
 }
 
 #[derive(Debug)]
@@ -87,6 +88,7 @@ impl Config {
             unixsocket: None,
             unixsocketperm: 0700,
             rename_commands: HashMap::new(),
+            requirepass: None,
         }
     }
 
@@ -105,6 +107,7 @@ impl Config {
             unixsocket: None,
             unixsocketperm: 0700,
             rename_commands: HashMap::new(),
+            requirepass: None,
         }
     }
 
@@ -173,6 +176,7 @@ impl Config {
                         self.rename_commands.insert(command.into_ascii_lowercase(), None);
                     }
                 },
+                b"requirepass" => self.requirepass = Some(try!(read_string(args)).to_owned()),
                 b"include" => if args.len() != 2 {
                     return Err(ConfigError::InvalidFormat)
                 } else {
@@ -323,5 +327,11 @@ mod tests {
         h.insert("world".to_owned(), Some("hello".to_owned()));
         h.insert("hello".to_owned(), None);
         assert_eq!(config.rename_commands, h);
+    }
+
+    #[test]
+    fn parse_requirepass() {
+        let config = config!(b"requirepass THISISASTRONGPASSWORD", Logger::null());
+        assert_eq!(config.requirepass, Some("THISISASTRONGPASSWORD".to_owned()));
     }
 }

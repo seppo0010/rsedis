@@ -150,6 +150,7 @@ impl Client {
                 tx.send(None);
             });
         }
+        let mut auth = false;
         let mut buffer = [0u8; 512];
         let mut dbindex = 0;
         let mut subscriptions = HashMap::new();
@@ -183,7 +184,7 @@ impl Client {
                     Ok(db) => db,
                     Err(_) => break,
                 };
-                match command(&parser, &mut *db, &mut dbindex, Some(&mut subscriptions), Some(&mut psubscriptions), Some(&pubsub_tx)) {
+                match command(&parser, &mut *db, &mut dbindex, &mut auth, Some(&mut subscriptions), Some(&mut psubscriptions), Some(&pubsub_tx)) {
                     Ok(response) => {
                         match stream_tx.send(Some(response)) {
                             Ok(_) => (),

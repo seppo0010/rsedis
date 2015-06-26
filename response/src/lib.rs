@@ -39,4 +39,11 @@ impl Response {
                 ].concat()
         }
     }
+
+    pub fn is_error(&self) -> bool {
+        match *self {
+            Response::Error(_) => true,
+            _ => false,
+        }
+    }
 }

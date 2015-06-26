@@ -102,7 +102,7 @@
     - [ ] keys
     - [ ] scan
     - [ ] dbsize
-    - [ ] auth
+    - [x] auth
     - [x] ping
     - [ ] echo
     - [ ] save
@@ -200,7 +200,7 @@
     - [ ] slave-priority
     - [ ] min-slaves-to-write
     - [ ] min-slaves-max-lag
-    - [ ] requirepass
+    - [x] requirepass
     - [x] rename-command
     - [ ] maxclients
     - [ ] maxmemory
