@@ -1,9 +1,12 @@
+#![feature(owned_ascii_ext)]
+
 #[macro_use(log)]
 extern crate logger;
 extern crate rand;
 extern crate time;
 extern crate util;
 
+use std::ascii::OwnedAsciiExt;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufRead;
@@ -145,7 +148,12 @@ impl Config {
                 b"unixsocket" => self.unixsocket = Some(try!(read_string(args)).to_owned()),
                 b"unixsocketperm" => self.unixsocketperm = try!(u32::from_str_radix(&*try!(read_string(args)), 8)),
                 b"pidfile" => self.pidfile = try!(read_string(args)).to_owned(),
-                b"logfile" => try!(self.logger.set_logfile(&*try!(read_string(args)))),
+                b"logfile" => {
+                    let logfile = try!(read_string(args));
+                    if logfile.len() > 0 {
+                        try!(self.logger.set_logfile(&*logfile))
+                    }
+                },
                 b"loglevel" => self.logger.set_loglevel(match &*try!(read_string(args)) {
                     "debug" => Level::Debug,
                     "verbose" => Level::Verbose,
@@ -160,9 +168,9 @@ impl Config {
                         let command = try!(from_utf8(&*args[1])).to_owned();
                         let newname = try!(from_utf8(&*args[2])).to_owned();
                         if newname.len() > 0 {
-                            self.rename_commands.insert(newname, Some(command.clone()));
+                            self.rename_commands.insert(newname.into_ascii_lowercase(), Some(command.clone().into_ascii_lowercase()));
                         }
-                        self.rename_commands.insert(command, None);
+                        self.rename_commands.insert(command.into_ascii_lowercase(), None);
                     }
                 },
                 b"include" => if args.len() != 2 {
@@ -308,7 +316,7 @@ mod tests {
 
     #[test]
     fn parse_rename_commands() {
-        let config = config!(b"rename-command c1 c2\nrename-command hello world", Logger::null());
+        let config = config!(b"rename-command C1 C2\nrename-command HELLO world", Logger::null());
         let mut h = HashMap::new();
         h.insert("c2".to_owned(), Some("c1".to_owned()));
         h.insert("c1".to_owned(), None);
