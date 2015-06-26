@@ -5,14 +5,14 @@ extern crate networking;
 
 use std::env::args;
 use std::process::exit;
+use std::thread;
 
 use config::Config;
 use networking::Server;
 use logger::{Logger, Level};
 
 fn main() {
-    let mut logger = Logger::new(Level::Notice);
-    let mut config = Config::new(&mut logger);
+    let mut config = Config::new(Logger::new(Level::Notice));
     match args().nth(1) {
         Some(f) => match config.parsefile(f) {
             Ok(_) => (),
