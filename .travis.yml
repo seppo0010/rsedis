@@ -10,6 +10,7 @@ script:
   - cargo test --verbose --package networking
   - cargo test --verbose --package parser
   - cargo test --verbose --package response
+  - cargo test --verbose --package rdbutil
   - cargo test --verbose --package util
 
 notifications:

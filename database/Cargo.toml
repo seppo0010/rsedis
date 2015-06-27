@@ -6,11 +6,19 @@ authors = ["Sebastian Waisbrot <seppo0010@gmail.com>"]
 [dependencies.config]
 path = "../config"
 
+# TODO: publish the repository in crates.io
+# Do not forget to do that before pushing
+[dependencies.crc64]
+path = "../../crc64"
+
 [dependencies.logger]
 path = "../logger"
 
 [dependencies.util]
 path = "../util"
+
+[dependencies.rdbutil]
+path = "./rdbutil"
 
 [dependencies.response]
 path = "../response"

@@ -3,8 +3,10 @@
 #![feature(vecmap)]
 
 extern crate config;
+extern crate crc64;
 extern crate logger;
 extern crate rand;
+extern crate rdbutil;
 extern crate rehashinghashmap;
 extern crate response;
 extern crate skiplist;
@@ -20,9 +22,11 @@ pub mod zset;
 use std::collections::Bound;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::io::Write;
 use std::sync::mpsc::{Sender, channel};
 
 use config::Config;
+use crc64::crc64;
 use rehashinghashmap::RehashingHashMap;
 use response::Response;
 use util::glob_match;
@@ -30,6 +34,7 @@ use util::mstime;
 
 use error::OperationError;
 use list::ValueList;
+use rdbutil::u64_to_vec_u8;
 use set::ValueSet;
 use string::ValueString;
 use zset::SortedSetMember;
@@ -468,6 +473,18 @@ impl Value {
             &Value::SortedSet(ref value) => Ok(value.zrank(el)),
             _ => Err(OperationError::WrongTypeError),
         }
+    }
+
+    pub fn dump<T: Write>(&self, writer: &mut T) -> Result<usize, OperationError> {
+        let mut data = vec![];
+        match *self {
+            Value::Nil => return Ok(0), // maybe panic instead?
+            Value::String(ref s) => try!(s.dump(&mut data)),
+            _ => panic!("niy"),
+        };
+        let crc = u64_to_vec_u8(crc64(&*data));
+        data.extend(crc.iter());
+        Ok(try!(writer.write(&*data)))
     }
 }
 
@@ -1747,5 +1764,12 @@ mod test_command {
         assert_eq!(database.mapped_command(&"disabled".to_owned()), None);
         assert_eq!(database.mapped_command(&"source".to_owned()), Some("target".to_owned()));
         assert_eq!(database.mapped_command(&"other".to_owned()), Some("other".to_owned()));
+    }
+
+    #[test]
+    fn dump_integer() {
+        let mut v = vec![];
+        Value::String(ValueString::Integer(1)).dump(&mut v).unwrap();
+        assert_eq!(&*v, b"\x00\xc0\x01\x07\x00\xd9J2E\xd9\xcb\xc4\xe6");
     }
 }

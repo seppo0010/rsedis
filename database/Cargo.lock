@@ -3,8 +3,10 @@ name = "database"
 version = "0.1.0"
 dependencies = [
  "config 0.1.0",
+ "crc64 0.1.0",
  "logger 0.1.0",
  "rand 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rdbutil 0.1.0",
  "rehashinghashmap 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "response 0.1.0",
  "skiplist 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -20,6 +22,10 @@ dependencies = [
  "time 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "util 0.1.0",
 ]
+
+[[package]]
+name = "crc64"
+version = "0.1.0"
 
 [[package]]
 name = "gcc"
@@ -42,6 +48,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "libc 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
+
+[[package]]
+name = "rdbutil"
+version = "0.1.0"
 
 [[package]]
 name = "rehashinghashmap"

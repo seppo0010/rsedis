@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::fmt;
+use std::io;
 use std::num::ParseIntError;
 use std::str::Utf8Error;
 
@@ -10,6 +11,7 @@ pub enum OperationError {
     UnknownKeyError,
     WrongTypeError,
     OutOfBoundsError,
+    IOError(io::Error),
 }
 
 impl fmt::Display for OperationError {
@@ -30,4 +32,8 @@ impl From<Utf8Error> for OperationError {
 
 impl From<ParseIntError> for OperationError {
     fn from(_: ParseIntError) -> OperationError { OperationError::ValueError }
+}
+
+impl From<io::Error> for OperationError {
+    fn from(e: io::Error) -> OperationError { OperationError::IOError(e) }
 }

@@ -1,7 +1,11 @@
+use std::io;
+use std::io::Write;
 use std::str::from_utf8;
 
-use error::OperationError;
 use dbutil::normalize_position;
+use error::OperationError;
+use rdbutil::constants::*;
+use rdbutil::{EncodeError, encode_i64};
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum ValueString {
@@ -152,5 +156,38 @@ impl ValueString {
             index += 1;
         }
         d.len()
+    }
+
+    pub fn dump<T: Write>(&self, writer: &mut T) -> io::Result<usize> {
+        let mut v = vec![];
+        match *self {
+            ValueString::Integer(ref i) => match encode_i64(i.clone(), &mut v) {
+                Ok(s) => s,
+                Err(e) => match e {
+                    EncodeError::IOError(e) => return Err(e),
+                    EncodeError::OverflowError => panic!("niy"),
+                }
+            },
+            ValueString::Data(_) => panic!("niy"),
+        };
+        let data = [
+            vec![TYPE_STRING],
+            v,
+            vec![(VERSION & 0xff) as u8],
+            vec![((VERSION >> 8) & 0xff) as u8],
+        ].concat();
+        writer.write(&*data)
+    }
+}
+
+#[cfg(test)]
+mod test_rdb {
+    use super::ValueString;
+
+    #[test]
+    fn dump_integer() {
+        let mut v = vec![];
+        ValueString::Integer(1).dump(&mut v).unwrap();
+        assert_eq!(&*v, b"\x00\xc0\x01\x07\x00");
     }
 }
