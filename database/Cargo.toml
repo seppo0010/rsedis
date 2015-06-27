@@ -6,9 +6,6 @@ authors = ["Sebastian Waisbrot <seppo0010@gmail.com>"]
 [dependencies.config]
 path = "../config"
 
-[dependencies.rediscrc]
-path = "../../rediscrc"
-
 [dependencies.logger]
 path = "../logger"
 
@@ -22,6 +19,7 @@ path = "./rdbutil"
 path = "../response"
 
 [dependencies]
+crc64 = "0.2.2"
 rand = "0.3.8"
 skiplist = "0.2.6"
 rehashinghashmap = "0.1.0"

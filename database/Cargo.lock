@@ -3,7 +3,7 @@ name = "database"
 version = "0.1.0"
 dependencies = [
  "config 0.1.0",
- "crc64 0.1.0",
+ "crc64 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "logger 0.1.0",
  "rand 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "rdbutil 0.1.0",
@@ -25,7 +25,8 @@ dependencies = [
 
 [[package]]
 name = "crc64"
-version = "0.1.0"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "gcc"

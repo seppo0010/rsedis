@@ -6,7 +6,7 @@ extern crate config;
 extern crate logger;
 extern crate rand;
 extern crate rdbutil;
-extern crate rediscrc;
+extern crate crc64;
 extern crate rehashinghashmap;
 extern crate response;
 extern crate skiplist;
@@ -27,7 +27,7 @@ use std::sync::mpsc::{Sender, channel};
 
 use config::Config;
 use rehashinghashmap::RehashingHashMap;
-use rediscrc::crc64;
+use crc64::crc64;
 use response::Response;
 use util::glob_match;
 use util::mstime;
@@ -482,7 +482,7 @@ impl Value {
             Value::String(ref s) => try!(s.dump(&mut data)),
             _ => panic!("niy"),
         };
-        let crc = u64_to_slice_u8(crc64(&*data));
+        let crc = u64_to_slice_u8(crc64(0, &*data));
         data.extend(crc.iter());
         Ok(try!(writer.write(&*data)))
     }
