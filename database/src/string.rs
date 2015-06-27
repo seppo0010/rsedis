@@ -5,7 +5,7 @@ use std::str::from_utf8;
 use dbutil::normalize_position;
 use error::OperationError;
 use rdbutil::constants::*;
-use rdbutil::{EncodeError, encode_i64};
+use rdbutil::{EncodeError, encode_i64, encode_slice_u8};
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum ValueString {
@@ -165,10 +165,10 @@ impl ValueString {
                 Ok(s) => s,
                 Err(e) => match e {
                     EncodeError::IOError(e) => return Err(e),
-                    EncodeError::OverflowError => panic!("niy"),
+                    EncodeError::OverflowError => try!(encode_slice_u8(&*self.to_vec(), &mut v))
                 }
             },
-            ValueString::Data(_) => panic!("niy"),
+            ValueString::Data(ref d) => try!(encode_slice_u8(&*d, &mut v)),
         };
         let data = [
             vec![TYPE_STRING],
@@ -182,6 +182,8 @@ impl ValueString {
 
 #[cfg(test)]
 mod test_rdb {
+    use std::i64;
+
     use super::ValueString;
 
     #[test]
@@ -189,5 +191,19 @@ mod test_rdb {
         let mut v = vec![];
         ValueString::Integer(1).dump(&mut v).unwrap();
         assert_eq!(&*v, b"\x00\xc0\x01\x07\x00");
+    }
+
+    #[test]
+    fn dump_integer_overflow() {
+        let mut v = vec![];
+        ValueString::Integer(i64::MAX).dump(&mut v).unwrap();
+        assert_eq!(&*v, b"\x00\x139223372036854775807\x07\x00");
+    }
+
+    #[test]
+    fn dump_string() {
+        let mut v = vec![];
+        ValueString::Data(b"hello world".to_vec()).dump(&mut v).unwrap();
+        assert_eq!(&*v, b"\x00\x0bhello world\x07\x00");
     }
 }

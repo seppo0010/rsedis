@@ -191,6 +191,6 @@ fn test_encode_slice_u8_integer() {
 #[test]
 fn test_encode_slice_u8_data() {
     let mut v = vec![];
-    assert_eq!(encode_slice_u8(b"hello world", &mut v).unwrap(), 23);
+    assert_eq!(encode_slice_u8(b"hello world", &mut v).unwrap(), 12);
     assert_eq!(v, b"\x0bhello world");
 }
