@@ -80,7 +80,7 @@ pub fn encode_usize<W: io::Write>(value: usize, enc: &mut W) -> Result<usize, En
     Ok(try!(encode_i64(value as i64, enc)))
 }
 
-pub fn u64_to_vec_u8(value: u64) -> [u8; 8] {
+pub fn u64_to_slice_u8(value: u64) -> [u8; 8] {
     [
             (value & 0xFF) as u8,
             ((value >> 8) & 0xFF) as u8,

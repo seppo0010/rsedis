@@ -189,6 +189,21 @@ fn del(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     return Response::Integer(c);
 }
 
+fn dump(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() == 2, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let mut data = vec![];
+
+    let obj = db.get(dbindex, &key);
+    match obj {
+        Some(value) => match value.dump(&mut data) {
+            Ok(_) => Response::Data(data),
+            Err(err) => Response::Error(err.to_string()),
+        },
+        None => Response::Nil,
+    }
+}
+
 fn generic_expire(db: &mut Database, dbindex: usize, key: Vec<u8>, msexpiration: i64) -> Response {
     Response::Integer(match db.get(dbindex, &key) {
         Some(_) => {
@@ -1376,6 +1391,7 @@ pub fn command(
         "zrangebyscore" => zrangebyscore(parser, db, dbindex),
         "zrevrangebyscore" => zrevrangebyscore(parser, db, dbindex),
         "zrank" => zrank(parser, db, dbindex),
+        "dump" => dump(parser, db, dbindex),
         "subscribe" => return subscribe(parser, db, subscriptions.unwrap(), pattern_subscriptions.unwrap().len(), sender.unwrap()),
         "unsubscribe" => return unsubscribe(parser, db, subscriptions.unwrap(), pattern_subscriptions.unwrap().len(), sender.unwrap()),
         "psubscribe" => return psubscribe(parser, db, subscriptions.unwrap().len(), pattern_subscriptions.unwrap(), sender.unwrap()),
@@ -2436,5 +2452,12 @@ mod test_command {
         assert_eq!(auth, false);
         assert!(!command(&parser!(b"auth helloworld"), &mut db, &mut 0, &mut auth, None, None, None).unwrap().is_error());
         assert_eq!(auth, true);
+    }
+
+    #[test]
+    fn dump_command() {
+        let mut db = Database::new(Config::new(Logger::null()));
+        assert!(db.get_or_create(0, &b"key".to_vec()).set(b"1".to_vec()).is_ok());
+        assert_eq!(command(&parser!(b"dump key"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Data(b"\x00\xc0\x01\x07\x00\xd9J2E\xd9\xcb\xc4\xe6".to_vec()));
     }
 }

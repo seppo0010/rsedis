@@ -3,10 +3,10 @@
 #![feature(vecmap)]
 
 extern crate config;
-extern crate crc64;
 extern crate logger;
 extern crate rand;
 extern crate rdbutil;
+extern crate rediscrc;
 extern crate rehashinghashmap;
 extern crate response;
 extern crate skiplist;
@@ -26,15 +26,15 @@ use std::io::Write;
 use std::sync::mpsc::{Sender, channel};
 
 use config::Config;
-use crc64::crc64;
 use rehashinghashmap::RehashingHashMap;
+use rediscrc::crc64;
 use response::Response;
 use util::glob_match;
 use util::mstime;
 
 use error::OperationError;
 use list::ValueList;
-use rdbutil::u64_to_vec_u8;
+use rdbutil::u64_to_slice_u8;
 use set::ValueSet;
 use string::ValueString;
 use zset::SortedSetMember;
@@ -482,7 +482,7 @@ impl Value {
             Value::String(ref s) => try!(s.dump(&mut data)),
             _ => panic!("niy"),
         };
-        let crc = u64_to_vec_u8(crc64(&*data));
+        let crc = u64_to_slice_u8(crc64(&*data));
         data.extend(crc.iter());
         Ok(try!(writer.write(&*data)))
     }
