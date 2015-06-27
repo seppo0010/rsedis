@@ -220,11 +220,22 @@ pub fn splitargs(args: &[u8]) -> Result<Vec<Vec<u8>>, ()> {
     Ok(result)
 }
 
+pub fn htonl(v: u32) -> [u8; 4] {
+    // maybe it should use C api instead?
+    [
+        ((v >> 24) & 0xFF) as u8,
+        ((v >> 16) & 0xFF) as u8,
+        ((v >> 8) & 0xFF) as u8,
+        ((v >> 0) & 0xFF) as u8,
+    ]
+}
+
 #[cfg(test)]
 mod test_util {
+    use std::{u8, u32};
     use std::thread::sleep_ms;
 
-    use super::{mstime, splitargs, glob_match};
+    use super::{mstime, splitargs, glob_match, htonl};
 
     #[test]
     fn mstime_sleep() {
@@ -301,5 +312,12 @@ mod test_util {
         assert_eq!(splitargs(&b"\"hello\" world".to_vec()).unwrap(), vec![b"hello".to_vec(), b"world".to_vec()]);
         assert!(splitargs(&b"\"hello\"world".to_vec()).is_err());
         assert!(splitargs(&b"\'hello\'world".to_vec()).is_err());
+    }
+
+    #[test]
+    fn htonl_basic() {
+        assert_eq!(htonl(1), [0, 0, 0, 1]);
+        assert_eq!(htonl(256), [0, 0, 1, 0]);
+        assert_eq!(htonl(u32::MAX), [u8::MAX, u8::MAX, u8::MAX, u8::MAX]);
     }
 }
