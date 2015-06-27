@@ -1,8 +1,13 @@
+extern crate util;
 pub mod constants;
 
+use std::u32;
 use std::i64;
 use std::io;
+use std::str::from_utf8;
 #[cfg(test)] use std::usize;
+
+use util::htonl;
 
 use constants::*;
 
@@ -93,6 +98,43 @@ pub fn u64_to_slice_u8(value: u64) -> [u8; 8] {
     ]
 }
 
+fn encode_len<W: io::Write>(len: usize, enc: &mut W) -> Result<usize, EncodeError> {
+    if len > u32::MAX as usize {
+        panic!("Length does not fit in four bytes");
+    }
+
+    if len < (1 << 6) {
+        Ok(try!(enc.write(&[((len & 0xFF) as u8) | (BITLEN6 << 6)])))
+    } else if len < (1 << 14) {
+        Ok(try!(enc.write(&[
+                (((len >> 8) as u8) & 0xFF) | (BITLEN14 << 6),
+                (len & 0xFF) as u8,
+        ])))
+    } else {
+        let mut s = try!(enc.write(&[BITLEN32 << 6]));
+        s += try!(enc.write(&htonl(len as u32)));
+        Ok(s)
+    }
+}
+
+pub fn encode_slice_u8<W: io::Write>(data: &[u8], enc: &mut W) -> Result<usize, io::Error> {
+    if data.len() <= 11 {
+        if let Ok(s) = from_utf8(data) {
+            if let Ok(i) = s.parse::<i64>() {
+                if let Ok(w) = encode_i64(i, enc) {
+                    return Ok(w);
+                }
+            }
+        }
+    }
+
+    // TODO: lzf compression
+
+    let mut len = encode_len(data.len(), enc).unwrap();
+    len += try!(enc.write(data));
+    Ok(len)
+}
+
 #[test]
 fn test_encode_i64() {
     let mut v = vec![];
@@ -137,4 +179,18 @@ fn test_encode_usize_overflow() {
         EncodeError::OverflowError => (),
         _ => panic!("Unexpected error"),
     }
+}
+
+#[test]
+fn test_encode_slice_u8_integer() {
+    let mut v = vec![];
+    assert_eq!(encode_slice_u8(b"1", &mut v).unwrap(), 2);
+    assert_eq!(v, vec![192, 1]);
+}
+
+#[test]
+fn test_encode_slice_u8_data() {
+    let mut v = vec![];
+    assert_eq!(encode_slice_u8(b"hello world", &mut v).unwrap(), 23);
+    assert_eq!(v, b"\x0bhello world");
 }
