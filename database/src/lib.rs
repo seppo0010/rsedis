@@ -480,6 +480,7 @@ impl Value {
         match *self {
             Value::Nil => return Ok(0), // maybe panic instead?
             Value::String(ref s) => try!(s.dump(&mut data)),
+            Value::List(ref l) => try!(l.dump(&mut data)),
             _ => panic!("niy"),
         };
         let crc = u64_to_slice_u8(crc64(0, &*data));

@@ -98,7 +98,7 @@ pub fn u64_to_slice_u8(value: u64) -> [u8; 8] {
     ]
 }
 
-fn encode_len<W: io::Write>(len: usize, enc: &mut W) -> Result<usize, EncodeError> {
+pub fn encode_len<W: io::Write>(len: usize, enc: &mut W) -> Result<usize, EncodeError> {
     if len > u32::MAX as usize {
         panic!("Length does not fit in four bytes");
     }

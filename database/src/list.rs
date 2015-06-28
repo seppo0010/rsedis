@@ -1,7 +1,11 @@
 use std::collections::LinkedList;
+use std::io;
+use std::io::Write;
 
 use dbutil::normalize_position;
 use error::OperationError;
+use rdbutil::constants::*;
+use rdbutil::{encode_slice_u8, encode_len};
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum ValueList {
@@ -173,5 +177,40 @@ impl ValueList {
         };
         *self = ValueList::Data(list);
         Ok(())
+    }
+
+    pub fn dump<T: Write>(&self, writer: &mut T) -> io::Result<usize> {
+        let mut v = vec![];
+        match *self {
+            ValueList::Data(ref list) => {
+                encode_len(list.len(), &mut v).unwrap();
+                for ref item in list {
+                    try!(encode_slice_u8(&*item, &mut v));
+                }
+            }
+        };
+        let data = [
+            vec![TYPE_LIST],
+            v,
+            vec![(VERSION & 0xff) as u8],
+            vec![((VERSION >> 8) & 0xff) as u8],
+        ].concat();
+        writer.write(&*data)
+    }
+}
+
+#[cfg(test)]
+mod test_rdb {
+    use super::ValueList;
+
+    #[test]
+    fn dump_string_list() {
+        let mut v = vec![];
+        let mut list = ValueList::new();
+        for item in [b"a", b"b", b"c", b"d", b"e"].iter() {
+            list.push(item.to_vec(), true);
+        }
+        list.dump(&mut v).unwrap();
+        assert_eq!(v, b"\x01\x05\x01a\x01b\x01c\x01d\x01e\x07\x00".to_vec());
     }
 }
