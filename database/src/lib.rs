@@ -34,7 +34,7 @@ use util::mstime;
 
 use error::OperationError;
 use list::ValueList;
-use rdbutil::u64_to_slice_u8;
+use rdbutil::encode_u64_to_slice_u8;
 use set::ValueSet;
 use string::ValueString;
 use zset::SortedSetMember;
@@ -481,10 +481,11 @@ impl Value {
             Value::Nil => return Ok(0), // maybe panic instead?
             Value::String(ref s) => try!(s.dump(&mut data)),
             Value::List(ref l) => try!(l.dump(&mut data)),
+            Value::Set(ref s) => try!(s.dump(&mut data)),
             _ => panic!("niy"),
         };
-        let crc = u64_to_slice_u8(crc64(0, &*data));
-        data.extend(crc.iter());
+        let crc = crc64(0, &*data);
+        encode_u64_to_slice_u8(crc, &mut data).unwrap();
         Ok(try!(writer.write(&*data)))
     }
 }

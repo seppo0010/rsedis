@@ -85,8 +85,24 @@ pub fn encode_usize<W: io::Write>(value: usize, enc: &mut W) -> Result<usize, En
     Ok(try!(encode_i64(value as i64, enc)))
 }
 
-pub fn u64_to_slice_u8(value: u64) -> [u8; 8] {
-    [
+pub fn encode_u16_to_slice_u8<W: io::Write>(value: u16, enc: &mut W) -> Result<usize, EncodeError> {
+    Ok(try!(enc.write(&[
+            (value & 0xFF) as u8,
+            ((value >> 8) & 0xFF) as u8,
+    ])))
+}
+
+pub fn encode_u32_to_slice_u8<W: io::Write>(value: u32, enc: &mut W) -> Result<usize, EncodeError> {
+    Ok(try!(enc.write(&[
+            (value & 0xFF) as u8,
+            ((value >> 8) & 0xFF) as u8,
+            ((value >> 16) & 0xFF) as u8,
+            ((value >> 24) & 0xFF) as u8,
+    ])))
+}
+
+pub fn encode_u64_to_slice_u8<W: io::Write>(value: u64, enc: &mut W) -> Result<usize, EncodeError> {
+    Ok(try!(enc.write(&[
             (value & 0xFF) as u8,
             ((value >> 8) & 0xFF) as u8,
             ((value >> 16) & 0xFF) as u8,
@@ -95,7 +111,7 @@ pub fn u64_to_slice_u8(value: u64) -> [u8; 8] {
             ((value >> 40) & 0xFF) as u8,
             ((value >> 48) & 0xFF) as u8,
             ((value >> 56) & 0xFF) as u8,
-    ]
+    ])))
 }
 
 pub fn encode_len<W: io::Write>(len: usize, enc: &mut W) -> Result<usize, EncodeError> {

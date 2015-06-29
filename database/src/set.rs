@@ -1,8 +1,13 @@
 use std::collections::VecMap;
 use std::collections::HashSet;
+use std::io;
+use std::io::Write;
 
 use dbutil::usize_to_vec;
 use dbutil::vec_to_usize;
+use rdbutil::constants::*;
+use rdbutil::{EncodeError, encode_slice_u8, encode_len};
+use rdbutil::{encode_u16_to_slice_u8, encode_u32_to_slice_u8, encode_u64_to_slice_u8};
 
 use rand::thread_rng;
 use rand::distributions::{Sample, IndependentSample, Range};
@@ -272,6 +277,61 @@ impl ValueSet {
         }
         result
     }
+
+    pub fn dump<T: Write>(&self, writer: &mut T) -> io::Result<usize> {
+        let mut v = vec![];
+        let settype;
+        match *self {
+            ValueSet::Integer(ref set) => {
+                settype = TYPE_SET_INTSET;
+                let max = set.keys().rev().take(1).next().unwrap();
+                let encoding = if max <= 0xff {
+                    2
+                } else if max <= 0xffff {
+                    4
+                } else if max <= 0xffffffff {
+                    8
+                } else {
+                    panic!("Set element is too large")
+                };
+
+                let mut tmp = vec![];
+                encode_u32_to_slice_u8(encoding, &mut tmp).unwrap();
+                encode_u32_to_slice_u8(set.len() as u32, &mut tmp).unwrap();
+                for item in set.keys() {
+                    let r = match encoding {
+                        2 => encode_u16_to_slice_u8(item as u16, &mut tmp),
+                        4 => encode_u32_to_slice_u8(item as u32, &mut tmp),
+                        8 => encode_u64_to_slice_u8(item as u64, &mut tmp),
+                        _ => panic!("Unexpected encoding {}", encoding),
+                    };
+                    match r {
+                        Ok(_) => (),
+                        Err(err) => match err {
+                            EncodeError::IOError(err) => return Err(err),
+                            _ => panic!("Unexpected error {:?}", err),
+                        }
+                    }
+                }
+                encode_len(tmp.len(), &mut v).unwrap();
+                v.extend(tmp);
+            }
+            ValueSet::Data(ref set) => {
+                settype = TYPE_SET;
+                encode_len(set.len(), &mut v).unwrap();
+                for ref item in set {
+                    try!(encode_slice_u8(&*item, &mut v));
+                }
+            }
+        };
+        let data = [
+            vec![settype],
+            v,
+            vec![(VERSION & 0xff) as u8],
+            vec![((VERSION >> 8) & 0xff) as u8],
+        ].concat();
+        writer.write(&*data)
+    }
 }
 
 #[cfg(test)]
@@ -450,5 +510,29 @@ mod test_set {
                     b"123".to_vec(),
                     b"456".to_vec(),
                     ]));
+    }
+
+    #[test]
+    fn dump_string_set() {
+        let mut v = vec![];
+        let mut set = ValueSet::new();
+        for item in [b"a", b"b"].iter() {
+            set.sadd(item.to_vec(), 0);
+        }
+        set.dump(&mut v).unwrap();
+        assert!(v == b"\x02\x02\x01a\x01b\x07\x00".to_vec() ||
+                v == b"\x02\x02\x01b\x01a\x07\x00".to_vec());
+    }
+
+    #[test]
+    fn dump_int_set() {
+        let mut v = vec![];
+        let mut set = ValueSet::new();
+        for item in [b"1", b"2"].iter() {
+            set.sadd(item.to_vec(), 10);
+        }
+        set.dump(&mut v).unwrap();
+        assert!(v == b"\x0b\x0c\x02\x00\x00\x00\x02\x00\x00\x00\x01\x00\x02\x00\x07\x00".to_vec() ||
+                v == b"\x0b\x0c\x02\x00\x00\x00\x02\x00\x00\x00\x02\x00\x01\x00\x07\x00".to_vec());
     }
 }
