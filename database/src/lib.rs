@@ -482,7 +482,7 @@ impl Value {
             Value::String(ref s) => try!(s.dump(&mut data)),
             Value::List(ref l) => try!(l.dump(&mut data)),
             Value::Set(ref s) => try!(s.dump(&mut data)),
-            _ => panic!("niy"),
+            Value::SortedSet(ref s) => try!(s.dump(&mut data)),
         };
         let crc = crc64(0, &*data);
         encode_u64_to_slice_u8(crc, &mut data).unwrap();

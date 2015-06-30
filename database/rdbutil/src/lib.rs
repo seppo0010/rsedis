@@ -133,8 +133,8 @@ pub fn encode_len<W: io::Write>(len: usize, enc: &mut W) -> Result<usize, Encode
     }
 }
 
-pub fn encode_slice_u8<W: io::Write>(data: &[u8], enc: &mut W) -> Result<usize, io::Error> {
-    if data.len() <= 11 {
+pub fn encode_slice_u8<W: io::Write>(data: &[u8], enc: &mut W, as_int: bool) -> Result<usize, io::Error> {
+    if as_int && data.len() <= 11 {
         if let Ok(s) = from_utf8(data) {
             if let Ok(i) = s.parse::<i64>() {
                 if let Ok(w) = encode_i64(i, enc) {
@@ -200,13 +200,13 @@ fn test_encode_usize_overflow() {
 #[test]
 fn test_encode_slice_u8_integer() {
     let mut v = vec![];
-    assert_eq!(encode_slice_u8(b"1", &mut v).unwrap(), 2);
+    assert_eq!(encode_slice_u8(b"1", &mut v, true).unwrap(), 2);
     assert_eq!(v, vec![192, 1]);
 }
 
 #[test]
 fn test_encode_slice_u8_data() {
     let mut v = vec![];
-    assert_eq!(encode_slice_u8(b"hello world", &mut v).unwrap(), 12);
+    assert_eq!(encode_slice_u8(b"hello world", &mut v, true).unwrap(), 12);
     assert_eq!(v, b"\x0bhello world");
 }

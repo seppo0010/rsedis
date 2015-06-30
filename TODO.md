@@ -144,7 +144,7 @@
     - [ ] asking
     - [ ] readonly
     - [ ] readwrite
-    - [ ] dump
+    - [x] dump
     - [ ] object
     - [ ] client
     - [ ] eval

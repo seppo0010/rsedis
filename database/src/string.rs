@@ -165,10 +165,10 @@ impl ValueString {
                 Ok(s) => s,
                 Err(e) => match e {
                     EncodeError::IOError(e) => return Err(e),
-                    EncodeError::OverflowError => try!(encode_slice_u8(&*self.to_vec(), &mut v))
+                    EncodeError::OverflowError => try!(encode_slice_u8(&*self.to_vec(), &mut v, false))
                 }
             },
-            ValueString::Data(ref d) => try!(encode_slice_u8(&*d, &mut v)),
+            ValueString::Data(ref d) => try!(encode_slice_u8(&*d, &mut v, true)),
         };
         let data = [
             vec![TYPE_STRING],

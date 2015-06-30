@@ -185,7 +185,7 @@ impl ValueList {
             ValueList::Data(ref list) => {
                 encode_len(list.len(), &mut v).unwrap();
                 for ref item in list {
-                    try!(encode_slice_u8(&*item, &mut v));
+                    try!(encode_slice_u8(&*item, &mut v, true));
                 }
             }
         };

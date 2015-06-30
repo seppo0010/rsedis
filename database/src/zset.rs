@@ -1,10 +1,15 @@
 use std::cmp::Ordering;
 use std::collections::Bound;
 use std::collections::HashMap;
+use std::io;
+use std::io::Write;
+use std::f64::{INFINITY, NEG_INFINITY, NAN};
 
 use skiplist::OrderedSkipList;
 
 use dbutil::normalize_position;
+use rdbutil::constants::*;
+use rdbutil::{encode_slice_u8, encode_len};
 
 /**
  * SortedSetMember is a wrapper around f64 to implement ordering and equality.
@@ -277,4 +282,46 @@ impl ValueSortedSet {
         let member = SortedSetMember::new(score.clone(), el);
         return Some(skiplist.range(Bound::Unbounded, Bound::Included(&member)).collect::<Vec<_>>().len() - 1);
     }
+
+    pub fn dump<T: Write>(&self, writer: &mut T) -> io::Result<usize> {
+        let mut v = vec![];
+        let settype;
+        match *self {
+            ValueSortedSet::Data(_, ref hash) => {
+                settype = TYPE_ZSET;
+                encode_len(hash.len(), &mut v).unwrap();
+                for (value, score) in hash {
+                    try!(encode_slice_u8(&*value, &mut v, true));
+                    if score == &NAN {
+                        try!(v.write(&[253]));
+                    } else if score == &INFINITY {
+                        try!(v.write(&[254]));
+                    } else if score == &NEG_INFINITY {
+                        try!(v.write(&[255]));
+                    } else {
+                        let scorestr = format!("{}", score.abs()).to_owned();
+                        try!(encode_slice_u8(scorestr.as_bytes(), &mut v, false));
+                    }
+                }
+            }
+        };
+        let data = [
+            vec![settype],
+            v,
+            vec![(VERSION & 0xff) as u8],
+            vec![((VERSION >> 8) & 0xff) as u8],
+        ].concat();
+        writer.write(&*data)
+    }
+}
+
+#[test]
+fn dump_zset() {
+    let mut v = vec![];
+    let mut zset = ValueSortedSet::new();
+    zset.zadd(1.0, b"a".to_vec(), false, false, false, false);
+    zset.zadd(2.0, b"b".to_vec(), false, false, false, false);
+    zset.dump(&mut v).unwrap();
+    assert!(v == b"\x03\x02\x01b\x012\x01a\x011\x07\x00".to_vec() ||
+            v == b"\x03\x02\x01a\x011\x01b\x012\x07\x00".to_vec());
 }
