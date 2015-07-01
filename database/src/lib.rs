@@ -430,6 +430,14 @@ impl Value {
         }
     }
 
+    pub fn zcard(&self) -> Result<usize, OperationError> {
+        match self {
+            &Value::Nil => Ok(0),
+            &Value::SortedSet(ref value) => Ok(value.zcard()),
+            _ => Err(OperationError::WrongTypeError),
+        }
+    }
+
     pub fn zincrby(&mut self, increment: f64, member: Vec<u8>) -> Result<f64, OperationError> {
         match self {
             &mut Value::Nil => {
@@ -1630,6 +1638,15 @@ mod test_command {
         assert_eq!(value.zrange(0, -1, true, false).unwrap(), vec![v1.clone(), b"1".to_vec()]);
         assert_eq!(value.zadd(incr, v1.clone(), false, false, true, true).unwrap(), true);
         assert_eq!(value.zrange(0, -1, true, false).unwrap(), vec![v1.clone(), b"3".to_vec()]);
+    }
+
+    #[test]
+    fn zcard() {
+        let mut value = Value::Nil;
+        assert_eq!(zadd!(value, 0.0, vec![1, 2, 3, 4]), true);
+        assert_eq!(value.zcard().unwrap(), 1);
+        assert_eq!(zadd!(value, 1.0, vec![1, 2, 3, 5]), true);
+        assert_eq!(value.zcard().unwrap(), 2);
     }
 
     #[test]

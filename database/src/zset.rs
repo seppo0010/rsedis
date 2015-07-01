@@ -124,6 +124,12 @@ impl ValueSortedSet {
         }
     }
 
+    pub fn zcard(&self) -> usize {
+        match *self {
+            ValueSortedSet::Data(_, ref hmap) => hmap.len()
+        }
+    }
+
     pub fn zincrby(&mut self, increment: f64, member: Vec<u8>) -> f64 {
         match *self {
             ValueSortedSet::Data(ref mut skiplist, ref mut hmap) => {
