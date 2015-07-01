@@ -65,7 +65,7 @@
     - [ ] zlexcount
     - [x] zrevrange
     - [x] zcard
-    - [ ] zscore
+    - [x] zscore
     - [x] zrank
     - [ ] zrevrank
     - [ ] zscan

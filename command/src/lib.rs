@@ -1051,6 +1051,23 @@ fn zcard(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     }
 }
 
+fn zscore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() == 3, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let element = try_validate!(parser.get_vec(2), "Invalid element");
+    let el = match db.get(dbindex, &key) {
+        Some(e) => e,
+        None => return Response::Nil,
+    };
+    return match el.zscore(element) {
+        Ok(s) => match s {
+            Some(score) => Response::Data(format!("{}", score).into_bytes()),
+            None => Response::Nil,
+        },
+        Err(err) => return Response::Error(err.to_string()),
+    }
+}
+
 fn zincrby(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 4, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
@@ -1397,6 +1414,7 @@ pub fn command(
         "sunionstore" => sunionstore(parser, db, dbindex),
         "zadd" => zadd(parser, db, dbindex),
         "zcard" => zcard(parser, db, dbindex),
+        "zscore" => zscore(parser, db, dbindex),
         "zincrby" => zincrby(parser, db, dbindex),
         "zrem" => zrem(parser, db, dbindex),
         "zcount" => zcount(parser, db, dbindex),
@@ -2276,6 +2294,15 @@ mod test_command {
         let mut db = Database::new(Config::new(Logger::null()));
         assert_eq!(command(&parser!(b"zadd key 1 a 2 b"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(2));
         assert_eq!(command(&parser!(b"zcard key"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(2));
+    }
+
+    #[test]
+    fn zscore_command() {
+        let mut db = Database::new(Config::new(Logger::null()));
+        assert_eq!(command(&parser!(b"zadd key 1 a 2 b"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(2));
+        assert_eq!(command(&parser!(b"zscore key a"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Data(b"1".to_vec()));
+        assert_eq!(command(&parser!(b"zscore key c"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Nil);
+        assert_eq!(command(&parser!(b"zscore key2 a"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Nil);
     }
 
     #[test]
