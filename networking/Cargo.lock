@@ -7,6 +7,7 @@ dependencies = [
  "database 0.1.0",
  "libc 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "logger 0.1.0",
+ "net2 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "parser 0.1.0",
  "response 0.1.0",
  "unix_socket 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -36,12 +37,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "crc64"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "database"
 version = "0.1.0"
 dependencies = [
  "config 0.1.0",
+ "crc64 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "logger 0.1.0",
  "rand 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rdbutil 0.1.0",
  "rehashinghashmap 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "response 0.1.0",
  "skiplist 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -68,6 +76,14 @@ name = "logger"
 version = "0.1.0"
 
 [[package]]
+name = "net2"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "libc 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "parser"
 version = "0.1.0"
 
@@ -77,6 +93,13 @@ version = "0.3.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "libc 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "rdbutil"
+version = "0.1.0"
+dependencies = [
+ "util 0.1.0",
 ]
 
 [[package]]

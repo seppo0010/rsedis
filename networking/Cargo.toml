@@ -24,6 +24,9 @@ path = "../database"
 [dependencies.command]
 path = "../command"
 
+[dependencies]
+net2 = "0.1.1"
+
 [target.x86_64-unknown-linux-gnu.dependencies]
 libc ="0.1.8"
 unix_socket = "0.4.3"

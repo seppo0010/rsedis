@@ -37,6 +37,7 @@ pub struct Config {
     pub unixsocketperm: u32,
     pub rename_commands: HashMap<String, Option<String>>,
     pub requirepass: Option<String>,
+    pub tcp_backlog: i32,
 }
 
 #[derive(Debug)]
@@ -89,6 +90,7 @@ impl Config {
             unixsocketperm: 0700,
             rename_commands: HashMap::new(),
             requirepass: None,
+            tcp_backlog: 511,
         }
     }
 
@@ -108,6 +110,7 @@ impl Config {
             unixsocketperm: 0700,
             rename_commands: HashMap::new(),
             requirepass: None,
+            tcp_backlog: 511,
         }
     }
 
@@ -177,6 +180,7 @@ impl Config {
                     }
                 },
                 b"requirepass" => self.requirepass = Some(try!(read_string(args)).to_owned()),
+                b"tcp-backlog" => self.tcp_backlog = try!(read_parse(args)),
                 b"include" => if args.len() != 2 {
                     return Err(ConfigError::InvalidFormat)
                 } else {

@@ -10,12 +10,13 @@ extern crate parser;
 extern crate response;
 extern crate database;
 extern crate command;
+extern crate net2;
 
 use std::collections::HashMap;
 use std::time::Duration;
 use std::io;
 use std::io::{Read, Write};
-use std::net::{ToSocketAddrs, TcpListener, TcpStream};
+use std::net::{SocketAddr, ToSocketAddrs, TcpStream};
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{Sender, channel};
 use std::thread;
@@ -26,6 +27,7 @@ use std::thread;
 #[cfg(unix)] use libc::funcs::posix88::unistd::fork;
 #[cfg(unix)] use libc::funcs::c95::stdlib::exit;
 #[cfg(unix)] use libc::funcs::posix88::unistd::getpid;
+use net2::TcpBuilder;
 #[cfg(unix)] use unix_socket::{UnixStream, UnixListener};
 
 use command::command;
@@ -245,6 +247,15 @@ macro_rules! handle_listener {
         })
     })
 }
+
+macro_rules! create_server_error {
+    ($db: expr, $host: expr, $port: expr, $err: expr) => ({
+        let db = $db.lock().unwrap();
+        log!(db.config.logger, Warning, "Creating Server TCP listening socket {}:{}: {:?}", $host, $port, $err);
+        continue;
+    })
+}
+
 impl Server {
     pub fn new(config: Config) -> Server {
         let db = Database::new(config);
@@ -306,27 +317,43 @@ impl Server {
     }
 
     pub fn start(&mut self) {
-        let (tcp_keepalive, timeout, addresses) = {
+        let (tcp_keepalive, timeout, addresses, tcp_backlog) = {
             let db = self.db.lock().unwrap();
             (db.config.tcp_keepalive.clone(),
              db.config.timeout.clone(),
-             db.config.addresses().clone())
+             db.config.addresses().clone(),
+             db.config.tcp_backlog.clone(),
+             )
         };
         for (host, port) in addresses {
-            let (tx, rx) = channel();
-            self.listener_channels.push(tx);
-            let listener = match TcpListener::bind((&host[..], port)) {
-                Ok(l) => l,
-                Err(err) => {
-                    let db = self.db.lock().unwrap();
-                    log!(db.config.logger, Warning, "Creating Server TCP listening socket {}:{}: {:?}", host, port, err);
-                    continue;
-                }
+            let addrs = match (&host[..], port).to_socket_addrs() {
+                Ok(v) => v,
+                Err(err) => create_server_error!(self.db, host, port, err),
             };
-            {
-                let db = self.db.lock().unwrap();
-                let th = handle_listener!(db.config.logger, listener, self, rx, tcp_keepalive, timeout, tcp);
-                self.listener_threads.push(th);
+            for addr in addrs {
+                let (tx, rx) = channel();
+                let builder = match {match addr {
+                    SocketAddr::V4(_) => TcpBuilder::new_v4(),
+                    SocketAddr::V6(_) => TcpBuilder::new_v6(),
+                }} {
+                    Ok(b) => b,
+                    Err(err) => create_server_error!(self.db, host, port, err),
+                };
+                let listener = match builder.bind((&host[..], port)) {
+                    Ok(l) => {
+                        match l.listen(tcp_backlog) {
+                            Ok(l) => l,
+                            Err(err) => create_server_error!(self.db, host, port, err),
+                        }
+                    }
+                    Err(err) => create_server_error!(self.db, host, port, err),
+                };
+                self.listener_channels.push(tx);
+                {
+                    let db = self.db.lock().unwrap();
+                    let th = handle_listener!(db.config.logger, listener, self, rx, tcp_keepalive, timeout, tcp);
+                    self.listener_threads.push(th);
+                }
             }
         }
         self.handle_unixsocket();
