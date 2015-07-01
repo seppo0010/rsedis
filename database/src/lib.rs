@@ -438,6 +438,14 @@ impl Value {
         }
     }
 
+    pub fn zscore(&self, element: Vec<u8>) -> Result<Option<f64>, OperationError> {
+        match self {
+            &Value::Nil => Ok(None),
+            &Value::SortedSet(ref value) => Ok(value.zscore(&element)),
+            _ => Err(OperationError::WrongTypeError),
+        }
+    }
+
     pub fn zincrby(&mut self, increment: f64, member: Vec<u8>) -> Result<f64, OperationError> {
         match self {
             &mut Value::Nil => {
@@ -1647,6 +1655,15 @@ mod test_command {
         assert_eq!(value.zcard().unwrap(), 1);
         assert_eq!(zadd!(value, 1.0, vec![1, 2, 3, 5]), true);
         assert_eq!(value.zcard().unwrap(), 2);
+    }
+
+    #[test]
+    fn zscore() {
+        let mut value = Value::Nil;
+        let element = vec![1, 2, 3, 4];
+        assert_eq!(zadd!(value, 0.023, element), true);
+        assert_eq!(value.zscore(element).unwrap(), Some(0.023));
+        assert!(value.zscore(vec![5]).unwrap().is_none());
     }
 
     #[test]

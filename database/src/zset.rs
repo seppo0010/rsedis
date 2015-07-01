@@ -130,6 +130,12 @@ impl ValueSortedSet {
         }
     }
 
+    pub fn zscore(&self, element: &Vec<u8>) -> Option<f64> {
+        match *self {
+            ValueSortedSet::Data(_, ref hmap) => hmap.get(element).map(|x| x.clone()),
+        }
+    }
+
     pub fn zincrby(&mut self, increment: f64, member: Vec<u8>) -> f64 {
         match *self {
             ValueSortedSet::Data(ref mut skiplist, ref mut hmap) => {
