@@ -1038,6 +1038,19 @@ fn zadd(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     return Response::Integer(count);
 }
 
+fn zcard(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() == 2, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let el = match db.get(dbindex, &key) {
+        Some(e) => e,
+        None => return Response::Integer(0),
+    };
+    return match el.zcard() {
+        Ok(count) => Response::Integer(count as i64),
+        Err(err) => return Response::Error(err.to_string()),
+    }
+}
+
 fn zincrby(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 4, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
@@ -1383,6 +1396,7 @@ pub fn command(
         "sunion" => sunion(parser, db, dbindex),
         "sunionstore" => sunionstore(parser, db, dbindex),
         "zadd" => zadd(parser, db, dbindex),
+        "zcard" => zcard(parser, db, dbindex),
         "zincrby" => zincrby(parser, db, dbindex),
         "zrem" => zrem(parser, db, dbindex),
         "zcount" => zcount(parser, db, dbindex),
@@ -2255,6 +2269,13 @@ mod test_command {
         assert_eq!(command(&parser!(b"zadd key CH 2 a 2 b 2 c"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(2));
         assert_eq!(command(&parser!(b"zadd key NX 1 a 2 b 3 c 4 d"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(1));
         assert_eq!(command(&parser!(b"zadd key XX CH 2 b 2 d 2 e"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(1));
+    }
+
+    #[test]
+    fn zcard_command() {
+        let mut db = Database::new(Config::new(Logger::null()));
+        assert_eq!(command(&parser!(b"zadd key 1 a 2 b"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(2));
+        assert_eq!(command(&parser!(b"zcard key"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(2));
     }
 
     #[test]
