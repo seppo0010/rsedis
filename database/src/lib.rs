@@ -396,7 +396,8 @@ impl Value {
     /// let mut val = Value::Nil;
     /// assert_eq!(val.push(vec![1], true).unwrap(), 1);
     /// assert_eq!(val.push(vec![2], true).unwrap(), 2);
-    /// assert_eq!(val.lrange(0, -1).unwrap(), vec![&vec![1], &vec![2]]);
+    /// assert_eq!(val.push(vec![0], false).unwrap(), 3);
+    /// assert_eq!(val.lrange(0, -1).unwrap(), vec![&vec![0], &vec![1], &vec![2]]);
     /// ```
     pub fn push(&mut self, el: Vec<u8>, right: bool) -> Result<usize, OperationError> {
         Ok(match *self {
@@ -420,8 +421,10 @@ impl Value {
     /// let mut val = Value::Nil;
     /// val.push(vec![1], true).unwrap();
     /// val.push(vec![2], true).unwrap();
+    /// val.push(vec![3], true).unwrap();
+    /// assert_eq!(val.pop(true).unwrap(), Some(vec![3]));
+    /// assert_eq!(val.pop(false).unwrap(), Some(vec![1]));
     /// assert_eq!(val.pop(true).unwrap(), Some(vec![2]));
-    /// assert_eq!(val.pop(true).unwrap(), Some(vec![1]));
     /// assert_eq!(val.pop(true).unwrap(), None);
     /// ```
     pub fn pop(&mut self, right: bool) -> Result<Option<Vec<u8>>, OperationError> {
