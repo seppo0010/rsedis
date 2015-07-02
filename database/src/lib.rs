@@ -730,7 +730,6 @@ impl Value {
     /// ```
     ///
     /// ```
-    /// use std::collections::HashSet;
     /// use database::Value;
     ///
     /// let mut val = Value::Nil;
