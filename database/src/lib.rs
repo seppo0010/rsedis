@@ -666,6 +666,19 @@ impl Value {
         }
     }
 
+    /// Returns the number of elements in a set.
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// assert_eq!(val.scard().unwrap(), 0);
+    /// val.sadd(vec![1], 3).unwrap();
+    /// assert_eq!(val.scard().unwrap(), 1);
+    /// val.sadd(vec![2], 3).unwrap();
+    /// assert_eq!(val.scard().unwrap(), 2);
+    /// ```
     pub fn scard(&self) -> Result<usize, OperationError> {
         match *self {
             Value::Nil => Ok(0),
