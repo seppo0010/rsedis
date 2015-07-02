@@ -710,7 +710,36 @@ impl Value {
         }
     }
 
-
+    /// Returns `count` random elements from the set. When `allow_duplicates`
+    /// is false, it will return up to the number of unique elements in the set.
+    ///
+    /// # Examples
+    /// ```
+    /// use std::collections::HashSet;
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// val.sadd(vec![1], 3).unwrap();
+    /// val.sadd(vec![2], 3).unwrap();
+    /// val.sadd(vec![3], 3).unwrap();
+    /// let elements = val.srandmember(10, false).unwrap();
+    /// assert_eq!(elements.len(), 3);
+    /// let set1 = elements.into_iter().collect::<HashSet<_>>();
+    /// let set2 = vec![vec![1], vec![2], vec![3]].into_iter().collect::<HashSet<_>>();
+    /// assert_eq!(set1, set2);
+    /// ```
+    ///
+    /// ```
+    /// use std::collections::HashSet;
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// val.sadd(vec![1], 3).unwrap();
+    /// val.sadd(vec![2], 3).unwrap();
+    /// val.sadd(vec![3], 3).unwrap();
+    /// let elements = val.srandmember(10, true).unwrap();
+    /// assert_eq!(elements.len(), 10);
+    /// ```
     pub fn srandmember(&self, count: usize, allow_duplicates: bool) -> Result<Vec<Vec<u8>>, OperationError> {
         match *self {
             Value::Nil => Ok(Vec::new()),
