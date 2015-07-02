@@ -411,6 +411,19 @@ impl Value {
         })
     }
 
+    /// Takes an element from a list.
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// val.push(vec![1], true).unwrap();
+    /// val.push(vec![2], true).unwrap();
+    /// assert_eq!(val.pop(true).unwrap(), Some(vec![2]));
+    /// assert_eq!(val.pop(true).unwrap(), Some(vec![1]));
+    /// assert_eq!(val.pop(true).unwrap(), None);
+    /// ```
     pub fn pop(&mut self, right: bool) -> Result<Option<Vec<u8>>, OperationError> {
         Ok(match self {
             &mut Value::Nil => None,
