@@ -592,6 +592,21 @@ impl Value {
         }
     }
 
+    /// Adds an element to a set.
+    /// Returns true if the element was inserted or false if was already in the set.
+    /// `set_max_intset_entries` is the maximum number of elements a set can
+    /// have while keeping an internal intset encoding.
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// assert_eq!(val.sadd(vec![1], 3).unwrap(), true);
+    /// assert_eq!(val.sadd(vec![2], 3).unwrap(), true);
+    /// assert_eq!(val.sadd(vec![3], 3).unwrap(), true);
+    /// assert_eq!(val.sadd(vec![1], 3).unwrap(), false);
+    /// ```
     pub fn sadd(&mut self, el: Vec<u8>, set_max_intset_entries: usize) -> Result<bool, OperationError> {
         match *self {
             Value::Nil => {
