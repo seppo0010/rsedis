@@ -364,6 +364,20 @@ impl Value {
         }
     }
 
+    /// Gets the status of a given bit by index.
+    /// Negative index starts from the end.
+    /// Fails if the value is not a string.
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// assert_eq!(val.getbit(0).unwrap(), false);
+    /// val.setbit(0, true).unwrap();
+    /// assert_eq!(val.getbit(1).unwrap(), false);
+    /// assert_eq!(val.getbit(0).unwrap(), true);
+    /// ```
     pub fn getbit(&self, bitoffset: usize) -> Result<bool, OperationError> {
         match self {
             &Value::Nil => return Ok(false),
