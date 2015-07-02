@@ -452,6 +452,20 @@ impl Value {
         }
     }
 
+    /// Insert an element in a list `before` or after a `pivot`
+    /// Returns the new length of the list, or None if the pivot was not found.
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// val.push(vec![1], true).unwrap();
+    /// val.push(vec![3], true).unwrap();
+    /// assert_eq!(val.linsert(true, vec![3], vec![2]).unwrap(), Some(3));
+    /// assert_eq!(val.linsert(true, vec![5], vec![4]).unwrap(), None);
+    /// assert_eq!(val.lrange(0, -1).unwrap(), vec![&vec![1], &vec![2], &vec![3]]);
+    /// ```
     pub fn linsert(&mut self, before: bool, pivot: Vec<u8>, newvalue: Vec<u8>) -> Result<Option<usize>, OperationError> {
         match self {
             &mut Value::Nil => Ok(None),
