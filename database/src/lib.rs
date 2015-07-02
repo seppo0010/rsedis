@@ -644,6 +644,20 @@ impl Value {
         }
     }
 
+    /// Checks if an element is in the set.
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// assert_eq!(val.sismember(&vec![0]).unwrap(), false);
+    /// val.sadd(vec![1], 3).unwrap();
+    /// val.sadd(vec![2], 3).unwrap();
+    /// val.sadd(vec![3], 3).unwrap();
+    /// assert_eq!(val.sismember(&vec![1]).unwrap(), true);
+    /// assert_eq!(val.sismember(&vec![4]).unwrap(), false);
+    /// ```
     pub fn sismember(&self, el: &Vec<u8>) -> Result<bool, OperationError> {
         match *self {
             Value::Nil => Ok(false),
