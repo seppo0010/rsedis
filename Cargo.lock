@@ -74,6 +74,14 @@ name = "logger"
 version = "0.1.0"
 
 [[package]]
+name = "net2"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "libc 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "networking"
 version = "0.1.0"
 dependencies = [
@@ -82,6 +90,7 @@ dependencies = [
  "database 0.1.0",
  "libc 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "logger 0.1.0",
+ "net2 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "parser 0.1.0",
  "response 0.1.0",
  "unix_socket 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",

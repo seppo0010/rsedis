@@ -224,7 +224,7 @@ mod tests {
 
     use rand::random;
 
-    use logger::Logger;
+    use logger::{Logger, Level};
     use util::mstime;
 
     macro_rules! config {
@@ -242,89 +242,89 @@ mod tests {
 
     #[test]
     fn parse_bind() {
-        let config = config!(b"bind 1.2.3.4\nbind 5.6.7.8", Logger::null());
+        let config = config!(b"bind 1.2.3.4\nbind 5.6.7.8", Logger::new(Level::Warning));
         assert_eq!(config.bind, vec!["1.2.3.4", "5.6.7.8"]);
         assert_eq!(config.port, 6379);
     }
 
     #[test]
     fn parse_port() {
-        let config = config!(b"port 12345", Logger::null());
+        let config = config!(b"port 12345", Logger::new(Level::Warning));
         assert_eq!(config.port, 12345);
         assert_eq!(config.addresses(), vec![("127.0.0.1".to_owned(), 12345)]);
     }
 
     #[test]
     fn parse_bind_port() {
-        let config = config!(b"bind 127.0.0.1\nport 12345", Logger::null());
+        let config = config!(b"bind 127.0.0.1\nport 12345", Logger::new(Level::Warning));
         assert_eq!(config.bind, vec!["127.0.0.1"]);
         assert_eq!(config.port, 12345);
     }
 
     #[test]
     fn parse_daemonize_yes() {
-        let config = config!(b"daemonize yes", Logger::null());
+        let config = config!(b"daemonize yes", Logger::new(Level::Warning));
         assert!(config.daemonize);
     }
 
     #[test]
     fn parse_daemonize_no() {
-        let config = config!(b"daemonize no", Logger::null());
+        let config = config!(b"daemonize no", Logger::new(Level::Warning));
         assert!(!config.daemonize);
     }
 
     #[test]
     fn parse_active_rehashing_yes() {
-        let config = config!(b"activerehashing yes", Logger::null());
+        let config = config!(b"activerehashing yes", Logger::new(Level::Warning));
         assert!(config.active_rehashing);
     }
 
     #[test]
     fn parse_active_rehashing_no() {
-        let config = config!(b"activerehashing no", Logger::null());
+        let config = config!(b"activerehashing no", Logger::new(Level::Warning));
         assert!(!config.active_rehashing);
     }
 
     #[test]
     fn parse_databases() {
-        let config = config!(b"databases 20", Logger::null());
+        let config = config!(b"databases 20", Logger::new(Level::Warning));
         assert_eq!(config.databases, 20);
     }
 
     #[test]
     fn parse_keepalive() {
-        let config = config!(b"tcp-keepalive 123", Logger::null());
+        let config = config!(b"tcp-keepalive 123", Logger::new(Level::Warning));
         assert_eq!(config.tcp_keepalive, 123);
     }
 
     #[test]
     fn parse_keepalive_quotes() {
-        let config = config!(b"tcp-keepalive \"123\"", Logger::null());
+        let config = config!(b"tcp-keepalive \"123\"", Logger::new(Level::Warning));
         assert_eq!(config.tcp_keepalive, 123);
     }
 
     #[test]
     fn parse_set_max_intset_entries() {
-        let config = config!(b"set-max-intset-entries 123456", Logger::null());
+        let config = config!(b"set-max-intset-entries 123456", Logger::new(Level::Warning));
         assert_eq!(config.set_max_intset_entries, 123456);
     }
 
     #[test]
     fn parse_timeout() {
-        let config = config!(b"timeout 23456", Logger::null());
+        let config = config!(b"timeout 23456", Logger::new(Level::Warning));
         assert_eq!(config.timeout, 23456);
     }
 
     #[test]
     fn parse_unixsocket() {
-        let config = config!(b"unixsocket /dev/null\nunixsocketperm 777", Logger::null());
+        let config = config!(b"unixsocket /dev/null\nunixsocketperm 777", Logger::new(Level::Warning));
         assert_eq!(config.unixsocket, Some("/dev/null".to_owned()));
         assert_eq!(config.unixsocketperm, 511);
     }
 
     #[test]
     fn parse_rename_commands() {
-        let config = config!(b"rename-command C1 C2\nrename-command HELLO world", Logger::null());
+        let config = config!(b"rename-command C1 C2\nrename-command HELLO world", Logger::new(Level::Warning));
         let mut h = HashMap::new();
         h.insert("c2".to_owned(), Some("c1".to_owned()));
         h.insert("c1".to_owned(), None);
@@ -335,7 +335,7 @@ mod tests {
 
     #[test]
     fn parse_requirepass() {
-        let config = config!(b"requirepass THISISASTRONGPASSWORD", Logger::null());
+        let config = config!(b"requirepass THISISASTRONGPASSWORD", Logger::new(Level::Warning));
         assert_eq!(config.requirepass, Some("THISISASTRONGPASSWORD".to_owned()));
     }
 }

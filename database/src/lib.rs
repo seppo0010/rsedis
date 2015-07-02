@@ -749,7 +749,7 @@ mod test_command {
 
     use config::Config;
     use list::ValueList;
-    use logger::Logger;
+    use logger::{Logger, Level};
     use string::ValueString;
     use set::ValueSet;
     use zset::ValueSortedSet;
@@ -1204,7 +1204,7 @@ mod test_command {
 
     #[test]
     fn get_empty() {
-        let config = Config::new(Logger::null());
+        let config = Config::new(Logger::new(Level::Warning));
         let database = Database::new(config);
         let key = vec![1u8];
         assert!(database.get(0, &key).is_none());
@@ -1242,7 +1242,7 @@ mod test_command {
 
     #[test]
     fn remove_value() {
-        let config = Config::new(Logger::null());
+        let config = Config::new(Logger::new(Level::Warning));
         let mut database = Database::new(config);
         let key = vec![1u8];
         let value = vec![1u8, 2, 3, 4];
@@ -1282,7 +1282,7 @@ mod test_command {
 
     #[test]
     fn set_expire_get() {
-        let config = Config::new(Logger::null());
+        let config = Config::new(Logger::new(Level::Warning));
         let mut database = Database::new(config);
         let key = vec![1u8];
         let value = vec![1u8, 2, 3, 4];
@@ -1293,7 +1293,7 @@ mod test_command {
 
     #[test]
     fn set_will_expire_get() {
-        let config = Config::new(Logger::null());
+        let config = Config::new(Logger::new(Level::Warning));
         let mut database = Database::new(config);
         let key = vec![1u8];
         let value = vec![1u8, 2, 3, 4];
@@ -1692,7 +1692,7 @@ mod test_command {
 
     #[test]
     fn pubsub_basic() {
-        let config = Config::new(Logger::null());
+        let config = Config::new(Logger::new(Level::Warning));
         let mut database = Database::new(config);
         let channel_name = vec![1u8, 2, 3];
         let message = vec![2u8, 3, 4, 5, 6];
@@ -1704,7 +1704,7 @@ mod test_command {
 
     #[test]
     fn unsubscribe() {
-        let config = Config::new(Logger::null());
+        let config = Config::new(Logger::new(Level::Warning));
         let mut database = Database::new(config);
         let channel_name = vec![1u8, 2, 3];
         let message = vec![2u8, 3, 4, 5, 6];
@@ -1717,7 +1717,7 @@ mod test_command {
 
     #[test]
     fn pubsub_pattern() {
-        let config = Config::new(Logger::null());
+        let config = Config::new(Logger::new(Level::Warning));
         let mut database = Database::new(config);
         let channel_name = vec![1u8, 2, 3];
         let message = vec![2u8, 3, 4, 5, 6];
@@ -1729,7 +1729,7 @@ mod test_command {
 
     #[test]
     fn rehashing() {
-        let config = Config::new(Logger::null());
+        let config = Config::new(Logger::new(Level::Warning));
         let mut database = Database::new(config);
         for i in 0u32..1000 {
             let key = vec![(i % 256) as u8, (i / 256) as u8];
@@ -1747,7 +1747,7 @@ mod test_command {
 
     #[test]
     fn no_rehashing() {
-        let mut config = Config::new(Logger::null());
+        let mut config = Config::new(Logger::new(Level::Warning));
         config.databases = 1;
         config.active_rehashing = false;
         let mut database = Database::new(config);
@@ -1793,7 +1793,7 @@ mod test_command {
 
     #[test]
     fn mapcommand() {
-        let mut config = Config::new(Logger::null());
+        let mut config = Config::new(Logger::new(Level::Warning));
         config.rename_commands.insert("disabled".to_owned(), None);
         config.rename_commands.insert("source".to_owned(), Some("target".to_owned()));
         let database = Database::new(config);

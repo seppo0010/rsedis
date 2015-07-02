@@ -22,7 +22,6 @@ macro_rules! sendlog {
 }
 
 enum Output {
-    Null,
     Channel(Sender<Vec<u8>>),
     Stderr,
     File(File, String),
@@ -31,7 +30,6 @@ enum Output {
 impl Debug for Output {
     fn fmt(&self, fmt: &mut Formatter) -> Result<(), Error> {
         match *self {
-            Output::Null => Ok(()),
             Output::Channel(_) => fmt.write_str("Channel"),
             Output::Stderr => fmt.write_str("Stderr"),
             Output::File(_, ref filename) => fmt.write_fmt(format_args!("File: {}", filename)),
@@ -42,7 +40,6 @@ impl Debug for Output {
 impl Write for Output {
     fn write(&mut self, data: &[u8]) -> io::Result<usize> {
         match *self {
-            Output::Null => Ok(0),
             Output::Channel(ref v) => { v.send(Vec::from_iter(data.iter().cloned())).unwrap(); Ok(data.len()) },
             Output::Stderr => stderr().write(data),
             Output::File(ref mut v, _) => v.write(data),
@@ -51,7 +48,6 @@ impl Write for Output {
 
     fn flush(&mut self) -> io::Result<()> {
         match *self {
-            Output::Null => Ok(()),
             Output::Channel(_) => Ok(()),
             Output::Stderr => stderr().flush(),
             Output::File(ref mut v, _) => v.flush(),
@@ -62,7 +58,6 @@ impl Write for Output {
 impl Clone for Output {
     fn clone(&self) -> Self {
         match *self {
-            Output::Null => Output::Null,
             Output::Channel(ref v) => Output::Channel(v.clone()),
             Output::Stderr => Output::Stderr,
             Output::File(_, ref path) => Output::File(OpenOptions::new().write(true).create(true).open(path).unwrap(), path.clone()),
@@ -149,10 +144,6 @@ impl Logger {
 
     pub fn file(level: Level, path: &str) -> io::Result<Self> {
         Ok(Self::create(level, Output::File(try!(File::create(Path::new(path))), path.to_owned())))
-    }
-
-    pub fn null() -> Self {
-        Self::create(Level::Warning, Output::Null)
     }
 
     pub fn set_logfile(&mut self, path: &str) -> io::Result<()> {

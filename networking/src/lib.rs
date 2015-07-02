@@ -403,7 +403,7 @@ mod test_networking {
     use std::str::from_utf8;
 
     use config::Config;
-    use logger::Logger;
+    use logger::{Logger, Level};
 
     use super::Server;
 
@@ -411,7 +411,7 @@ mod test_networking {
     fn parse_ping() {
         let port = 16379;
 
-        let mut server = Server::new(Config::mock(port, Logger::null()));
+        let mut server = Server::new(Config::mock(port, Logger::new(Level::Warning)));
         server.start();
 
         let addr = format!("127.0.0.1:{}", port);
@@ -432,7 +432,7 @@ mod test_networking {
     #[test]
     fn allow_multiwrite() {
         let port = 16380;
-        let mut server = Server::new(Config::mock(port, Logger::null()));
+        let mut server = Server::new(Config::mock(port, Logger::new(Level::Warning)));
         server.start();
 
         let addr = format!("127.0.0.1:{}", port);
@@ -455,7 +455,7 @@ mod test_networking {
     #[test]
     fn allow_stop() {
         let port = 16381;
-        let mut server = Server::new(Config::mock(port, Logger::null()));
+        let mut server = Server::new(Config::mock(port, Logger::new(Level::Warning)));
         server.start();
         {
             let addr = format!("127.0.0.1:{}", port);
