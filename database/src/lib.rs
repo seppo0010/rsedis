@@ -776,6 +776,9 @@ impl Value {
         }
     }
 
+    /// Gets all ValueSet references from a list of Value references.
+    /// If a Value is nil, `default` is used.
+    /// If any of the values is not a set, an error is returned instead.
     fn get_set_list<'a>(&'a self, set_values: &Vec<&'a Value>, default: &'a ValueSet) -> Result<Vec<&ValueSet>, OperationError> {
         let mut sets = Vec::with_capacity(set_values.len());
         for value in set_values {
