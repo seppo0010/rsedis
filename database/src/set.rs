@@ -108,7 +108,7 @@ impl ValueSet {
             for _ in 0..count {
                 r.push(range.ind_sample(&mut rng));
             }
-            r.sort();
+            r.sort_by(|a, b| a.cmp(b).reverse());
             r
         } else {
             let min = if len < count { len } else { count };
@@ -117,7 +117,7 @@ impl ValueSet {
                 r.insert(range.sample(&mut rng));
             }
             let mut vec = r.iter().cloned().collect::<Vec<_>>();
-            vec.sort();
+            vec.sort_by(|a, b| a.cmp(b).reverse());
             vec
         }
     }
