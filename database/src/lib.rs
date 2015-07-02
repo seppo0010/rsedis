@@ -337,6 +337,20 @@ impl Value {
         }
     }
 
+    /// Updates the string value turning the bit in the index on or off.
+    /// Negative index starts from the end.
+    /// If the string had less bits than the index, it is filled with null bytes.
+    /// Fails if the value is not a string.
+    /// Returns the previous bit value.
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// assert_eq!(val.setbit(0, true).unwrap(), false);
+    /// assert_eq!(val.get().unwrap(), vec![128]);
+    /// ```
     pub fn setbit(&mut self, bitoffset: usize, on: bool) -> Result<bool, OperationError> {
         match self {
             &mut Value::Nil => *self = Value::String(ValueString::Data(Vec::new())),
