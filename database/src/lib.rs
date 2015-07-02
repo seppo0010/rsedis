@@ -747,6 +747,27 @@ impl Value {
         }
     }
 
+    /// Removes and returns `count` elements from the set. If `count` is larger
+    /// than the number of elements in the set, it removes up to that number.
+    ///
+    /// # Examples
+    /// ```
+    /// use std::collections::HashSet;
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// val.sadd(vec![1], 3).unwrap();
+    /// val.sadd(vec![2], 3).unwrap();
+    /// val.sadd(vec![3], 3).unwrap();
+    /// let elements1 = val.spop(2).unwrap();
+    /// assert_eq!(elements1.len(), 2);
+    /// let mut set1 = elements1.into_iter().collect::<HashSet<_>>();
+    /// let elements2 = val.spop(10).unwrap();
+    /// assert_eq!(elements2.len(), 1);
+    /// set1.extend(elements2.into_iter());
+    /// let set2 = vec![vec![1], vec![2], vec![3]].into_iter().collect::<HashSet<_>>();
+    /// assert_eq!(set1, set2);
+    /// ```
     pub fn spop(&mut self, count: usize) -> Result<Vec<Vec<u8>>, OperationError> {
         match *self {
             Value::Nil => Ok(Vec::new()),
