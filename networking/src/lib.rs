@@ -417,7 +417,7 @@ mod test_networking {
 
     #[test]
     fn parse_ping() {
-        let port = 6379;
+        let port = 16379;
 
         let mut server = Server::new(Config::mock(port, Logger::null()));
         server.start();
@@ -439,7 +439,7 @@ mod test_networking {
 
     #[test]
     fn allow_multiwrite() {
-        let port = 6380;
+        let port = 16380;
         let mut server = Server::new(Config::mock(port, Logger::null()));
         server.start();
 
@@ -462,7 +462,7 @@ mod test_networking {
 
     #[test]
     fn allow_stop() {
-        let port = 6381;
+        let port = 16381;
         let mut server = Server::new(Config::mock(port, Logger::null()));
         server.start();
         {
