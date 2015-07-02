@@ -386,6 +386,18 @@ impl Value {
         }
     }
 
+    /// Adds an element to a list.
+    /// Returns the size of the list.
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// assert_eq!(val.push(vec![1], true).unwrap(), 1);
+    /// assert_eq!(val.push(vec![2], true).unwrap(), 2);
+    /// assert_eq!(val.lrange(0, -1).unwrap(), vec![&vec![1], &vec![2]]);
+    /// ```
     pub fn push(&mut self, el: Vec<u8>, right: bool) -> Result<usize, OperationError> {
         Ok(match self {
             &mut Value::Nil => {
