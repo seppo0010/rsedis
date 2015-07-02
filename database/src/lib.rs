@@ -687,6 +687,21 @@ impl Value {
         }
     }
 
+    /// Returns all elements in the set.
+    ///
+    /// # Examples
+    /// ```
+    /// use std::collections::HashSet;
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// val.sadd(vec![1], 3).unwrap();
+    /// val.sadd(vec![2], 3).unwrap();
+    /// val.sadd(vec![3], 3).unwrap();
+    /// let set1 = val.smembers().unwrap().into_iter().collect::<HashSet<_>>();
+    /// let set2 = vec![vec![1], vec![2], vec![3]].into_iter().collect::<HashSet<_>>();
+    /// assert_eq!(set1, set2);
+    /// ```
     pub fn smembers(&self) -> Result<Vec<Vec<u8>>, OperationError> {
         match *self {
             Value::Nil => Ok(vec![]),
