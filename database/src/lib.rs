@@ -474,6 +474,19 @@ impl Value {
         }
     }
 
+    /// Gets the length of the list.
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// assert_eq!(val.llen().unwrap(), 0);
+    /// val.push(vec![1], true).unwrap();
+    /// assert_eq!(val.llen().unwrap(), 1);
+    /// val.push(vec![2], true).unwrap();
+    /// assert_eq!(val.llen().unwrap(), 2);
+    /// ```
     pub fn llen(&self) -> Result<usize, OperationError> {
         return match self {
             &Value::Nil => Ok(0),
