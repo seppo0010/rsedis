@@ -550,6 +550,19 @@ impl Value {
         }
     }
 
+    /// Updates the `index`-th element in the list to `newvalue`.
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// val.push(vec![1], true).unwrap();
+    /// val.push(vec![3], true).unwrap();
+    /// val.push(vec![3], true).unwrap();
+    /// val.lset(1, vec![2]).unwrap();
+    /// assert_eq!(val.lrange(0, -1).unwrap(), vec![&vec![1], &vec![2], &vec![3]]);
+    /// ```
     pub fn lset(&mut self, index: i64, newvalue: Vec<u8>) -> Result<(), OperationError> {
         match *self {
             Value::Nil => Err(OperationError::UnknownKeyError),
