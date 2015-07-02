@@ -432,6 +432,19 @@ impl Value {
         })
     }
 
+    /// Gets an element from a list.
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// val.push(vec![1], true).unwrap();
+    /// val.push(vec![2], true).unwrap();
+    /// assert_eq!(val.lindex(0).unwrap(), Some(&vec![1]));
+    /// assert_eq!(val.lindex(1).unwrap(), Some(&vec![2]));
+    /// assert_eq!(val.lindex(2).unwrap(), None);
+    /// ```
     pub fn lindex(&self, index: i64) -> Result<Option<&Vec<u8>>, OperationError> {
         match *self {
             Value::List(ref value) => Ok(value.lindex(index)),
