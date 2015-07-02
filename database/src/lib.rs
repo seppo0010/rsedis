@@ -519,8 +519,32 @@ impl Value {
         }
     }
 
+    /// Remove up to `limit` elements, starting from either side, that match
+    /// `newvalue`.
+    /// Returns the number of removed elements.
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// assert_eq!(val.lrem(false, 2, vec![3]).unwrap(), 0);
+    /// val.push(vec![2], true).unwrap();
+    /// val.push(vec![3], true).unwrap();
+    /// val.push(vec![2], true).unwrap();
+    /// val.push(vec![1], true).unwrap();
+    /// val.push(vec![3], true).unwrap();
+    /// val.push(vec![3], true).unwrap();
+    /// assert_eq!(val.lrem(false, 2, vec![3]).unwrap(), 2);
+    /// assert_eq!(val.lrange(0, -1).unwrap(), vec![&vec![2], &vec![3], &vec![2], &vec![1]]);
+    /// assert_eq!(val.lrem(true, 1, vec![2]).unwrap(), 1);
+    /// assert_eq!(val.lrange(0, -1).unwrap(), vec![&vec![3], &vec![2], &vec![1]]);
+    /// assert_eq!(val.lrem(true, 1, vec![4]).unwrap(), 0);
+    /// assert_eq!(val.lrange(0, -1).unwrap(), vec![&vec![3], &vec![2], &vec![1]]);
+    /// ```
     pub fn lrem(&mut self, left: bool, limit: usize, newvalue: Vec<u8>) -> Result<usize, OperationError> {
         match *self {
+            Value::Nil => Ok(0),
             Value::List(ref mut value) => Ok(value.lrem(left, limit, newvalue)),
             _ => Err(OperationError::WrongTypeError),
         }
