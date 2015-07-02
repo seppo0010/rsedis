@@ -620,6 +620,22 @@ impl Value {
         }
     }
 
+    /// Removes an element from a set.
+    /// Returns true if the element was present.
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// assert_eq!(val.srem(&vec![0]).unwrap(), false);
+    /// val.sadd(vec![1], 3).unwrap();
+    /// val.sadd(vec![2], 3).unwrap();
+    /// val.sadd(vec![3], 3).unwrap();
+    /// assert_eq!(val.srem(&vec![3]).unwrap(), true);
+    /// assert_eq!(val.srem(&vec![3]).unwrap(), false);
+    /// assert_eq!(val.srem(&vec![4]).unwrap(), false);
+    /// ```
     pub fn srem(&mut self, el: &Vec<u8>) -> Result<bool, OperationError> {
         match *self {
             Value::Nil => Ok(false),
