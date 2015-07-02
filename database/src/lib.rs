@@ -69,36 +69,36 @@ pub enum PubsubEvent {
 impl PubsubEvent {
     /// Serialize the event into a Response object.
     pub fn as_response(&self) -> Response {
-        match self {
-            &PubsubEvent::Message(ref channel, ref pattern, ref message) => match pattern {
-                &Some(ref pattern) => Response::Array(vec![
+        match *self {
+            PubsubEvent::Message(ref channel, ref pattern, ref message) => match *pattern {
+                Some(ref pattern) => Response::Array(vec![
                         Response::Data(b"message".to_vec()),
                         Response::Data(channel.clone()),
                         Response::Data(pattern.clone()),
                         Response::Data(message.clone()),
                         ]),
-                &None => Response::Array(vec![
+                None => Response::Array(vec![
                         Response::Data(b"message".to_vec()),
                         Response::Data(channel.clone()),
                         Response::Data(message.clone()),
                         ]),
             },
-            &PubsubEvent::Subscription(ref channel, ref subscriptions) => Response::Array(vec![
+            PubsubEvent::Subscription(ref channel, ref subscriptions) => Response::Array(vec![
                     Response::Data(b"subscribe".to_vec()),
                     Response::Data(channel.clone()),
                     Response::Integer(subscriptions.clone() as i64),
                     ]),
-            &PubsubEvent::Unsubscription(ref channel, ref subscriptions) => Response::Array(vec![
+            PubsubEvent::Unsubscription(ref channel, ref subscriptions) => Response::Array(vec![
                     Response::Data(b"unsubscribe".to_vec()),
                     Response::Data(channel.clone()),
                     Response::Integer(subscriptions.clone() as i64),
                     ]),
-            &PubsubEvent::PatternSubscription(ref pattern, ref subscriptions) => Response::Array(vec![
+            PubsubEvent::PatternSubscription(ref pattern, ref subscriptions) => Response::Array(vec![
                     Response::Data(b"psubscribe".to_vec()),
                     Response::Data(pattern.clone()),
                     Response::Integer(subscriptions.clone() as i64),
                     ]),
-            &PubsubEvent::PatternUnsubscription(ref pattern, ref subscriptions) => Response::Array(vec![
+            PubsubEvent::PatternUnsubscription(ref pattern, ref subscriptions) => Response::Array(vec![
                     Response::Data(b"punsubscribe".to_vec()),
                     Response::Data(pattern.clone()),
                     Response::Integer(subscriptions.clone() as i64),
@@ -119,8 +119,8 @@ impl Value {
     /// assert!(!Value::String(ValueString::Integer(1)).is_nil());
     /// ```
     pub fn is_nil(&self) -> bool {
-        match self {
-            &Value::Nil => true,
+        match *self {
+            Value::Nil => true,
             _ => false,
         }
     }
@@ -136,8 +136,8 @@ impl Value {
     /// assert!(Value::String(ValueString::Integer(1)).is_string());
     /// ```
     pub fn is_string(&self) -> bool {
-        match self {
-            &Value::String(_) => true,
+        match *self {
+            Value::String(_) => true,
             _ => false,
         }
     }
@@ -153,8 +153,8 @@ impl Value {
     /// assert!(Value::List(ValueList::new()).is_list());
     /// ```
     pub fn is_list(&self) -> bool {
-        match self {
-            &Value::List(_) => true,
+        match *self {
+            Value::List(_) => true,
             _ => false,
         }
     }
@@ -170,8 +170,8 @@ impl Value {
     /// assert!(Value::Set(ValueSet::new()).is_set());
     /// ```
     pub fn is_set(&self) -> bool {
-        match self {
-            &Value::Set(_) => true,
+        match *self {
+            Value::Set(_) => true,
             _ => false,
         }
     }
@@ -210,9 +210,9 @@ impl Value {
     /// assert!(Value::List(ValueList::new()).get().is_err());
     /// ```
     pub fn get(&self) -> Result<Vec<u8>, OperationError> {
-        match self {
-            &Value::Nil => Ok(vec![]),
-            &Value::String(ref value) => Ok(value.to_vec()),
+        match *self {
+            Value::Nil => Ok(vec![]),
+            Value::String(ref value) => Ok(value.to_vec()),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -229,9 +229,9 @@ impl Value {
     /// assert_eq!(val.strlen().unwrap(), 3);
     /// ```
     pub fn strlen(&self) -> Result<usize, OperationError> {
-        match self {
-            &Value::Nil => Ok(0),
-            &Value::String(ref val) => Ok(val.strlen()),
+        match *self {
+            Value::Nil => Ok(0),
+            Value::String(ref val) => Ok(val.strlen()),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -249,13 +249,13 @@ impl Value {
     /// assert_eq!(val.append(vec![4, 5, 6]).unwrap(), 6);
     /// ```
     pub fn append(&mut self, newvalue: Vec<u8>) -> Result<usize, OperationError> {
-        match self {
-            &mut Value::Nil => {
+        match *self {
+            Value::Nil => {
                 let len = newvalue.len();
                 *self = Value::String(ValueString::new(newvalue));
                 Ok(len)
             },
-            &mut Value::String(ref mut val) => { val.append(newvalue); Ok(val.strlen()) },
+            Value::String(ref mut val) => { val.append(newvalue); Ok(val.strlen()) },
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -274,13 +274,13 @@ impl Value {
     /// ```
     pub fn incr(&mut self, incr: i64) -> Result<i64, OperationError> {
         let mut newval:i64;
-        match self {
-            &mut Value::Nil => {
+        match *self {
+            Value::Nil => {
                 newval = incr;
                 *self = Value::String(ValueString::Integer(newval.clone()));
                 return Ok(newval);
             },
-            &mut Value::String(ref mut value) => value.incr(incr),
+            Value::String(ref mut value) => value.incr(incr),
             _ => return Err(OperationError::WrongTypeError),
         }
     }
@@ -301,9 +301,9 @@ impl Value {
     /// assert_eq!(val.getrange(10, 1).unwrap(), b"".to_vec());
     /// ```
     pub fn getrange(&self, start: i64, stop: i64) -> Result<Vec<u8>, OperationError> {
-        match self {
-            &Value::Nil => Ok(Vec::new()),
-            &Value::String(ref value) => Ok(value.getrange(start, stop)),
+        match *self {
+            Value::Nil => Ok(Vec::new()),
+            Value::String(ref value) => Ok(value.getrange(start, stop)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -325,14 +325,14 @@ impl Value {
     /// assert_eq!(val.get().unwrap(), vec![0, 1, 100, 101]);
     /// ```
     pub fn setrange(&mut self, index: i64, data: Vec<u8>) -> Result<usize, OperationError> {
-        match self {
-            &mut Value::Nil => *self = Value::String(ValueString::Data(Vec::new())),
-            &mut Value::String(_) => (),
+        match *self {
+            Value::Nil => *self = Value::String(ValueString::Data(Vec::new())),
+            Value::String(_) => (),
             _ => return Err(OperationError::WrongTypeError),
         };
 
-        match self {
-            &mut Value::String(ref mut value) => Ok(value.setrange(index, data)),
+        match *self {
+            Value::String(ref mut value) => Ok(value.setrange(index, data)),
             _ => panic!("Expected value to be a string"),
         }
     }
@@ -352,14 +352,14 @@ impl Value {
     /// assert_eq!(val.get().unwrap(), vec![128]);
     /// ```
     pub fn setbit(&mut self, bitoffset: usize, on: bool) -> Result<bool, OperationError> {
-        match self {
-            &mut Value::Nil => *self = Value::String(ValueString::Data(Vec::new())),
-            &mut Value::String(_) => (),
+        match *self {
+            Value::Nil => *self = Value::String(ValueString::Data(Vec::new())),
+            Value::String(_) => (),
             _ => return Err(OperationError::WrongTypeError),
         }
 
-        match self {
-            &mut Value::String(ref mut value) => Ok(value.setbit(bitoffset, on)),
+        match *self {
+            Value::String(ref mut value) => Ok(value.setbit(bitoffset, on)),
             _ => panic!("Value must be a string")
         }
     }
@@ -379,9 +379,9 @@ impl Value {
     /// assert_eq!(val.getbit(0).unwrap(), true);
     /// ```
     pub fn getbit(&self, bitoffset: usize) -> Result<bool, OperationError> {
-        match self {
-            &Value::Nil => return Ok(false),
-            &Value::String(ref value) => Ok(value.getbit(bitoffset)),
+        match *self {
+            Value::Nil => return Ok(false),
+            Value::String(ref value) => Ok(value.getbit(bitoffset)),
             _ => return Err(OperationError::WrongTypeError),
         }
     }
@@ -399,14 +399,14 @@ impl Value {
     /// assert_eq!(val.lrange(0, -1).unwrap(), vec![&vec![1], &vec![2]]);
     /// ```
     pub fn push(&mut self, el: Vec<u8>, right: bool) -> Result<usize, OperationError> {
-        Ok(match self {
-            &mut Value::Nil => {
+        Ok(match *self {
+            Value::Nil => {
                 let mut list = ValueList::new();
                 list.push(el, right);
                 *self = Value::List(list);
                 1
             },
-            &mut Value::List(ref mut list) => { list.push(el, right); list.llen() },
+            Value::List(ref mut list) => { list.push(el, right); list.llen() },
             _ => return Err(OperationError::WrongTypeError),
         })
     }
@@ -425,9 +425,9 @@ impl Value {
     /// assert_eq!(val.pop(true).unwrap(), None);
     /// ```
     pub fn pop(&mut self, right: bool) -> Result<Option<Vec<u8>>, OperationError> {
-        Ok(match self {
-            &mut Value::Nil => None,
-            &mut Value::List(ref mut list) => list.pop(right),
+        Ok(match *self {
+            Value::Nil => None,
+            Value::List(ref mut list) => list.pop(right),
             _ => return Err(OperationError::WrongTypeError),
         })
     }
@@ -467,9 +467,9 @@ impl Value {
     /// assert_eq!(val.lrange(0, -1).unwrap(), vec![&vec![1], &vec![2], &vec![3]]);
     /// ```
     pub fn linsert(&mut self, before: bool, pivot: Vec<u8>, newvalue: Vec<u8>) -> Result<Option<usize>, OperationError> {
-        match self {
-            &mut Value::Nil => Ok(None),
-            &mut Value::List(ref mut value) => Ok(value.linsert(before, pivot, newvalue)),
+        match *self {
+            Value::Nil => Ok(None),
+            Value::List(ref mut value) => Ok(value.linsert(before, pivot, newvalue)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -488,101 +488,101 @@ impl Value {
     /// assert_eq!(val.llen().unwrap(), 2);
     /// ```
     pub fn llen(&self) -> Result<usize, OperationError> {
-        return match self {
-            &Value::Nil => Ok(0),
-            &Value::List(ref value) => Ok(value.llen()),
+        return match *self {
+            Value::Nil => Ok(0),
+            Value::List(ref value) => Ok(value.llen()),
             _ => Err(OperationError::WrongTypeError),
         };
     }
 
     pub fn lrange(&self, start: i64, stop: i64) -> Result<Vec<&Vec<u8>>, OperationError> {
-        match self {
-            &Value::Nil => Ok(Vec::new()),
-            &Value::List(ref value) => Ok(value.lrange(start, stop)),
+        match *self {
+            Value::Nil => Ok(Vec::new()),
+            Value::List(ref value) => Ok(value.lrange(start, stop)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
 
     pub fn lrem(&mut self, left: bool, limit: usize, newvalue: Vec<u8>) -> Result<usize, OperationError> {
-        match self {
-            &mut Value::List(ref mut value) => Ok(value.lrem(left, limit, newvalue)),
+        match *self {
+            Value::List(ref mut value) => Ok(value.lrem(left, limit, newvalue)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
 
     pub fn lset(&mut self, index: i64, newvalue: Vec<u8>) -> Result<(), OperationError> {
-        match self {
-            &mut Value::Nil => Err(OperationError::UnknownKeyError),
-            &mut Value::List(ref mut value) => value.lset(index, newvalue),
+        match *self {
+            Value::Nil => Err(OperationError::UnknownKeyError),
+            Value::List(ref mut value) => value.lset(index, newvalue),
             _ => Err(OperationError::WrongTypeError),
         }
     }
 
     pub fn ltrim(&mut self, start: i64, stop: i64) -> Result<(), OperationError> {
-        match self {
-            &mut Value::List(ref mut value) => value.ltrim(start, stop),
+        match *self {
+            Value::List(ref mut value) => value.ltrim(start, stop),
             _ => return Err(OperationError::WrongTypeError),
         }
     }
 
     pub fn sadd(&mut self, el: Vec<u8>, set_max_intset_entries: usize) -> Result<bool, OperationError> {
-        match self {
-            &mut Value::Nil => {
+        match *self {
+            Value::Nil => {
                 let mut value = ValueSet::new();
                 value.sadd(el, set_max_intset_entries);
                 *self = Value::Set(value);
                 Ok(true)
             },
-            &mut Value::Set(ref mut value) => Ok(value.sadd(el, set_max_intset_entries)),
+            Value::Set(ref mut value) => Ok(value.sadd(el, set_max_intset_entries)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
 
     pub fn srem(&mut self, el: &Vec<u8>) -> Result<bool, OperationError> {
-        match self {
-            &mut Value::Nil => Ok(false),
-            &mut Value::Set(ref mut value) => Ok(value.srem(el)),
+        match *self {
+            Value::Nil => Ok(false),
+            Value::Set(ref mut value) => Ok(value.srem(el)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
 
     pub fn sismember(&self, el: &Vec<u8>) -> Result<bool, OperationError> {
-        match self {
-            &Value::Nil => Ok(false),
-            &Value::Set(ref value) => Ok(value.sismember(el)),
+        match *self {
+            Value::Nil => Ok(false),
+            Value::Set(ref value) => Ok(value.sismember(el)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
 
     pub fn scard(&self) -> Result<usize, OperationError> {
-        match self {
-            &Value::Nil => Ok(0),
-            &Value::Set(ref value) => Ok(value.scard()),
+        match *self {
+            Value::Nil => Ok(0),
+            Value::Set(ref value) => Ok(value.scard()),
             _ => Err(OperationError::WrongTypeError),
         }
     }
 
     pub fn smembers(&self) -> Result<Vec<Vec<u8>>, OperationError> {
-        match self {
-            &Value::Nil => Ok(vec![]),
-            &Value::Set(ref value) => Ok(value.smembers()),
+        match *self {
+            Value::Nil => Ok(vec![]),
+            Value::Set(ref value) => Ok(value.smembers()),
             _ => Err(OperationError::WrongTypeError),
         }
     }
 
 
     pub fn srandmember(&self, count: usize, allow_duplicates: bool) -> Result<Vec<Vec<u8>>, OperationError> {
-        match self {
-            &Value::Nil => Ok(Vec::new()),
-            &Value::Set(ref value) => Ok(value.srandmember(count, allow_duplicates)),
+        match *self {
+            Value::Nil => Ok(Vec::new()),
+            Value::Set(ref value) => Ok(value.srandmember(count, allow_duplicates)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
 
     pub fn spop(&mut self, count: usize) -> Result<Vec<Vec<u8>>, OperationError> {
-        match self {
-            &mut Value::Nil => Ok(Vec::new()),
-            &mut Value::Set(ref mut value) => Ok(value.spop(count)),
+        match *self {
+            Value::Nil => Ok(Vec::new()),
+            Value::Set(ref mut value) => Ok(value.spop(count)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -590,9 +590,9 @@ impl Value {
     fn get_set_list<'a>(&'a self, set_values: &Vec<&'a Value>, default: &'a ValueSet) -> Result<Vec<&ValueSet>, OperationError> {
         let mut sets = Vec::with_capacity(set_values.len());
         for value in set_values {
-            sets.push(match value {
-                &&Value::Nil => default,
-                &&Value::Set(ref value) => value,
+            sets.push(match **value {
+                Value::Nil => default,
+                Value::Set(ref value) => value,
                 _ => return Err(OperationError::WrongTypeError),
             });
         }
@@ -603,9 +603,9 @@ impl Value {
         let emptyset = ValueSet::new();
         let sets = try!(self.get_set_list(set_values, &emptyset));
 
-        match self {
-            &Value::Nil => Ok(HashSet::new()),
-            &Value::Set(ref value) => Ok(value.sdiff(sets)),
+        match *self {
+            Value::Nil => Ok(HashSet::new()),
+            Value::Set(ref value) => Ok(value.sdiff(sets)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -614,9 +614,9 @@ impl Value {
         let emptyset = ValueSet::new();
         let sets = try!(self.get_set_list(set_values, &emptyset));
 
-        match self {
-            &Value::Nil => Ok(HashSet::new()),
-            &Value::Set(ref value) => Ok(value.sinter(sets)),
+        match *self {
+            Value::Nil => Ok(HashSet::new()),
+            Value::Set(ref value) => Ok(value.sinter(sets)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -625,9 +625,9 @@ impl Value {
         let emptyset = ValueSet::new();
         let sets = try!(self.get_set_list(set_values, &emptyset));
 
-        match self {
-            &Value::Nil => Ok(HashSet::new()),
-            &Value::Set(ref value) => Ok(value.sunion(sets)),
+        match *self {
+            Value::Nil => Ok(HashSet::new()),
+            Value::Set(ref value) => Ok(value.sunion(sets)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -637,10 +637,10 @@ impl Value {
     }
 
     pub fn zrem(&mut self, member: Vec<u8>) -> Result<bool, OperationError> {
-        let (skiplist, hmap) = match self {
-            &mut Value::Nil => return Ok(false),
-            &mut Value::SortedSet(ref mut value) => match value {
-                &mut ValueSortedSet::Data(ref mut skiplist, ref mut hmap) => (skiplist, hmap),
+        let (skiplist, hmap) = match *self {
+            Value::Nil => return Ok(false),
+            Value::SortedSet(ref mut value) => match *value {
+                ValueSortedSet::Data(ref mut skiplist, ref mut hmap) => (skiplist, hmap),
             },
             _ => return Err(OperationError::WrongTypeError),
         };
@@ -653,8 +653,8 @@ impl Value {
     }
 
     pub fn zadd(&mut self, s: f64, el: Vec<u8>, nx: bool, xx: bool, ch: bool, incr: bool) -> Result<bool, OperationError> {
-        match self {
-            &mut Value::Nil => {
+        match *self {
+            Value::Nil => {
                 if xx {
                     return Ok(false);
                 }
@@ -663,68 +663,68 @@ impl Value {
                 *self = Value::SortedSet(value);
                 Ok(r)
             },
-            &mut Value::SortedSet(ref mut value) => Ok(value.zadd(s, el, nx, xx, ch, incr)),
+            Value::SortedSet(ref mut value) => Ok(value.zadd(s, el, nx, xx, ch, incr)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
 
     pub fn zcard(&self) -> Result<usize, OperationError> {
-        match self {
-            &Value::Nil => Ok(0),
-            &Value::SortedSet(ref value) => Ok(value.zcard()),
+        match *self {
+            Value::Nil => Ok(0),
+            Value::SortedSet(ref value) => Ok(value.zcard()),
             _ => Err(OperationError::WrongTypeError),
         }
     }
 
     pub fn zscore(&self, element: Vec<u8>) -> Result<Option<f64>, OperationError> {
-        match self {
-            &Value::Nil => Ok(None),
-            &Value::SortedSet(ref value) => Ok(value.zscore(&element)),
+        match *self {
+            Value::Nil => Ok(None),
+            Value::SortedSet(ref value) => Ok(value.zscore(&element)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
 
     pub fn zincrby(&mut self, increment: f64, member: Vec<u8>) -> Result<f64, OperationError> {
-        match self {
-            &mut Value::Nil => {
+        match *self {
+            Value::Nil => {
                 match self.zadd(increment.clone(), member, false, false, false, false) {
                     Ok(_) => Ok(increment),
                     Err(err) => Err(err),
                 }
             },
-            &mut Value::SortedSet(ref mut value) => Ok(value.zincrby(increment, member)),
+            Value::SortedSet(ref mut value) => Ok(value.zincrby(increment, member)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
 
     pub fn zcount(&self, min: Bound<f64>, max: Bound<f64>) -> Result<usize, OperationError> {
-        match self {
-            &Value::Nil => Ok(0),
-            &Value::SortedSet(ref value) => Ok(value.zcount(min, max)),
+        match *self {
+            Value::Nil => Ok(0),
+            Value::SortedSet(ref value) => Ok(value.zcount(min, max)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
 
     pub fn zrange(&self, start: i64, stop: i64, withscores: bool, rev: bool) -> Result<Vec<Vec<u8>>, OperationError> {
-        match self {
-            &Value::Nil => Ok(vec![]),
-            &Value::SortedSet(ref value) => Ok(value.zrange(start, stop, withscores, rev)),
+        match *self {
+            Value::Nil => Ok(vec![]),
+            Value::SortedSet(ref value) => Ok(value.zrange(start, stop, withscores, rev)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
 
     pub fn zrangebyscore(&self, min: Bound<f64>, max: Bound<f64>, withscores: bool, offset: usize, count: usize, rev: bool) -> Result<Vec<Vec<u8>>, OperationError> {
-        match self {
-            &Value::Nil => Ok(vec![]),
-            &Value::SortedSet(ref value) => Ok(value.zrangebyscore(min, max, withscores, offset, count, rev)),
+        match *self {
+            Value::Nil => Ok(vec![]),
+            Value::SortedSet(ref value) => Ok(value.zrangebyscore(min, max, withscores, offset, count, rev)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
 
     pub fn zrank(&self, el: Vec<u8>) -> Result<Option<usize>, OperationError> {
-        match self {
-            &Value::Nil => Ok(None),
-            &Value::SortedSet(ref value) => Ok(value.zrank(el)),
+        match *self {
+            Value::Nil => Ok(None),
+            Value::SortedSet(ref value) => Ok(value.zrank(el)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -966,9 +966,9 @@ impl Database{
 
     pub fn mapped_command(&self, command: &String) -> Option<String> {
         match self.config.rename_commands.get(command) {
-            Some(c) => match c {
-                &Some(ref s) => Some(s.clone()),
-                &None => None,
+            Some(c) => match *c {
+                Some(ref s) => Some(s.clone()),
+                None => None,
             },
             None => Some(command.clone()),
         }
@@ -2013,16 +2013,16 @@ mod test_command {
         assert_eq!(value.sadd(v1.clone(), 2).unwrap(), true);
         assert_eq!(value.sadd(v2.clone(), 2).unwrap(), true);
         match value {
-            Value::Set(ref set) => match set {
-                &ValueSet::Integer(_) => (),
+            Value::Set(ref set) => match *set {
+                ValueSet::Integer(_) => (),
                 _ => panic!("Must be int set"),
             },
             _ => panic!("Must be set"),
         }
         assert_eq!(value.sadd(v3.clone(), 2).unwrap(), true);
         match value {
-            Value::Set(ref set) => match set {
-                &ValueSet::Data(_) => (),
+            Value::Set(ref set) => match *set {
+                ValueSet::Data(_) => (),
                 _ => panic!("Must be data set"),
             },
             _ => panic!("Must be set"),
