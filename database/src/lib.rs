@@ -498,6 +498,19 @@ impl Value {
         };
     }
 
+    /// Gets the elements in the list in a range.
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// val.push(vec![1], true).unwrap();
+    /// val.push(vec![2], true).unwrap();
+    /// val.push(vec![3], true).unwrap();
+    /// assert_eq!(val.lrange(1, 1).unwrap(), vec![&vec![2]]);
+    /// assert_eq!(val.lrange(1, -1).unwrap(), vec![&vec![2], &vec![3]]);
+    /// ```
     pub fn lrange(&self, start: i64, stop: i64) -> Result<Vec<&Vec<u8>>, OperationError> {
         match *self {
             Value::Nil => Ok(Vec::new()),
