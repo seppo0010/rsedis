@@ -40,8 +40,10 @@ use string::ValueString;
 use zset::SortedSetMember;
 use zset::ValueSortedSet;
 
+/// Any value storable in the database
 #[derive(PartialEq, Debug)]
 pub enum Value {
+    /// Nil should not be stored, but it is used as a default for initialized values
     Nil,
     String(ValueString),
     List(ValueList),
@@ -49,16 +51,23 @@ pub enum Value {
     SortedSet(ValueSortedSet),
 }
 
+/// Events relevant for clients in pubsub mode
 #[derive(PartialEq, Debug)]
 pub enum PubsubEvent {
+    /// Client subscribe to channel and its the subscription number.
     Subscription(Vec<u8>, usize),
+    /// Client unsubscribe from channel and the number of remaining subscriptions.
     Unsubscription(Vec<u8>, usize),
+    /// Client subscribe to pattern and its the subscription number.
     PatternSubscription(Vec<u8>, usize),
+    /// Client unsubscribe from pattern and the number of remaining subscriptions.
     PatternUnsubscription(Vec<u8>, usize),
+    /// A message was received, it may have matched a pattern and it was sent in a channel.
     Message(Vec<u8>, Option<Vec<u8>>, Vec<u8>),
 }
 
 impl PubsubEvent {
+    /// Serialize the event into a Response object.
     pub fn as_response(&self) -> Response {
         match self {
             &PubsubEvent::Message(ref channel, ref pattern, ref message) => match pattern {
@@ -99,6 +108,16 @@ impl PubsubEvent {
 }
 
 impl Value {
+    /// Returns true if the value is uninitialized.
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    /// use database::string::ValueString;
+    ///
+    /// assert!(Value::Nil.is_nil());
+    /// assert!(!Value::String(ValueString::Integer(1)).is_nil());
+    /// ```
     pub fn is_nil(&self) -> bool {
         match self {
             &Value::Nil => true,
@@ -106,6 +125,16 @@ impl Value {
         }
     }
 
+    /// Returns true if the value is a string.
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    /// use database::string::ValueString;
+    ///
+    /// assert!(!Value::Nil.is_string());
+    /// assert!(Value::String(ValueString::Integer(1)).is_string());
+    /// ```
     pub fn is_string(&self) -> bool {
         match self {
             &Value::String(_) => true,
@@ -113,6 +142,16 @@ impl Value {
         }
     }
 
+    /// Returns true if the value is a list.
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    /// use database::list::ValueList;
+    ///
+    /// assert!(!Value::Nil.is_list());
+    /// assert!(Value::List(ValueList::new()).is_list());
+    /// ```
     pub fn is_list(&self) -> bool {
         match self {
             &Value::List(_) => true,
@@ -120,6 +159,16 @@ impl Value {
         }
     }
 
+    /// Returns true if the value is a set.
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    /// use database::set::ValueSet;
+    ///
+    /// assert!(!Value::Nil.is_set());
+    /// assert!(Value::Set(ValueSet::new()).is_set());
+    /// ```
     pub fn is_set(&self) -> bool {
         match self {
             &Value::Set(_) => true,
@@ -127,13 +176,42 @@ impl Value {
         }
     }
 
+    /// Sets the value to a string.
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// val.set(vec![1, 245, 3]);
+    /// assert_eq!(val.get().unwrap(), vec![1, 245, 3]);
+    /// ```
     pub fn set(&mut self, newvalue: Vec<u8>) -> Result<(), OperationError> {
         *self = Value::String(ValueString::new(newvalue));
         return Ok(());
     }
 
+    /// Gets the string value. Fails if the value is not a string.
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// assert_eq!(val.get().unwrap(), vec![]);
+    /// val.set(vec![1, 245, 3]).unwrap();
+    /// assert_eq!(val.get().unwrap(), vec![1, 245, 3]);
+    /// ```
+    ///
+    /// ```
+    /// use database::Value;
+    /// use database::list::ValueList;
+    ///
+    /// assert!(Value::List(ValueList::new()).get().is_err());
+    /// ```
     pub fn get(&self) -> Result<Vec<u8>, OperationError> {
         match self {
+            &Value::Nil => Ok(vec![]),
             &Value::String(ref value) => Ok(value.to_vec()),
             _ => Err(OperationError::WrongTypeError),
         }
