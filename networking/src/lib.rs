@@ -248,14 +248,6 @@ macro_rules! handle_listener {
     })
 }
 
-macro_rules! create_server_error {
-    ($db: expr, $host: expr, $port: expr, $err: expr) => ({
-        let db = $db.lock().unwrap();
-        log!(db.config.logger, Warning, "Creating Server TCP listening socket {}:{}: {:?}", $host, $port, $err);
-        continue;
-    })
-}
-
 impl Server {
     pub fn new(config: Config) -> Server {
         let db = Database::new(config);
@@ -316,6 +308,26 @@ impl Server {
         }
     }
 
+    fn listen<T: ToSocketAddrs>(&mut self, t: T, tcp_keepalive: u32, timeout: u64, tcp_backlog: i32) -> io::Result<()> {
+        for addr in try!(t.to_socket_addrs()) {
+            let (tx, rx) = channel();
+            let builder = try!(match addr {
+                SocketAddr::V4(_) => TcpBuilder::new_v4(),
+                SocketAddr::V6(_) => TcpBuilder::new_v6(),
+            });
+            let listener = try!(try!(
+                        builder.bind(addr))
+                    .listen(tcp_backlog));
+            self.listener_channels.push(tx);
+            {
+                let db = self.db.lock().unwrap();
+                let th = handle_listener!(db.config.logger, listener, self, rx, tcp_keepalive, timeout, tcp);
+                self.listener_threads.push(th);
+            }
+        }
+        Ok(())
+    }
+
     pub fn start(&mut self) {
         let (tcp_keepalive, timeout, addresses, tcp_backlog) = {
             let db = self.db.lock().unwrap();
@@ -326,35 +338,15 @@ impl Server {
              )
         };
         for (host, port) in addresses {
-            let addrs = match (&host[..], port).to_socket_addrs() {
-                Ok(v) => v,
-                Err(err) => create_server_error!(self.db, host, port, err),
-            };
-            for addr in addrs {
-                let (tx, rx) = channel();
-                let builder = match {match addr {
-                    SocketAddr::V4(_) => TcpBuilder::new_v4(),
-                    SocketAddr::V6(_) => TcpBuilder::new_v6(),
-                }} {
-                    Ok(b) => b,
-                    Err(err) => create_server_error!(self.db, host, port, err),
-                };
-                let listener = match builder.bind((&host[..], port)) {
-                    Ok(l) => {
-                        match l.listen(tcp_backlog) {
-                            Ok(l) => l,
-                            Err(err) => create_server_error!(self.db, host, port, err),
-                        }
-                    }
-                    Err(err) => create_server_error!(self.db, host, port, err),
-                };
-                self.listener_channels.push(tx);
-                {
+            match self.listen((&host[..], port), tcp_keepalive, timeout, tcp_backlog) {
+                Ok(ok) => ok,
+                Err(err) => {
                     let db = self.db.lock().unwrap();
-                    let th = handle_listener!(db.config.logger, listener, self, rx, tcp_keepalive, timeout, tcp);
-                    self.listener_threads.push(th);
+                    log!(db.config.logger, Warning, "Creating Server TCP listening socket {}:{}: {:?}", host, port, err);
+                    continue;
                 }
             }
+
         }
         self.handle_unixsocket();
     }
