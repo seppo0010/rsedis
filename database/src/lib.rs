@@ -217,13 +217,37 @@ impl Value {
         }
     }
 
+    /// Gets the number of bytes in the string. Fails if the value is not a string.
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// assert_eq!(val.strlen().unwrap(), 0);
+    /// val.set(vec![1, 245, 3]).unwrap();
+    /// assert_eq!(val.strlen().unwrap(), 3);
+    /// ```
     pub fn strlen(&self) -> Result<usize, OperationError> {
         match self {
+            &Value::Nil => Ok(0),
             &Value::String(ref val) => Ok(val.strlen()),
             _ => Err(OperationError::WrongTypeError),
         }
     }
 
+    /// Appends the parameter to the string. Creates a new one if it is null.
+    /// Fails if the value is not a string.
+    /// Returns the number of bytes with the new data appended
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// assert_eq!(val.append(vec![1, 2, 3]).unwrap(), 3);
+    /// assert_eq!(val.append(vec![4, 5, 6]).unwrap(), 6);
+    /// ```
     pub fn append(&mut self, newvalue: Vec<u8>) -> Result<usize, OperationError> {
         match self {
             &mut Value::Nil => {
@@ -236,6 +260,18 @@ impl Value {
         }
     }
 
+    /// Increments the ASCII numeric value in the string. Creates a new one if
+    /// it didn't exist. Fails if it is not a string.
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// assert_eq!(val.incr(3).unwrap(), 3);
+    /// assert_eq!(val.incr(3).unwrap(), 6);
+    /// assert_eq!(val.get().unwrap(), b"6".to_vec());
+    /// ```
     pub fn incr(&mut self, incr: i64) -> Result<i64, OperationError> {
         let mut newval:i64;
         match self {
@@ -249,6 +285,21 @@ impl Value {
         }
     }
 
+    /// Gets the bytes in a range in the string.
+    /// Negative positions starts from the end.
+    /// If the stop index is lower than the start index, it returns and empty vec.
+    /// Fails if the value is not a string.
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// assert_eq!(val.getrange(0, -1).unwrap(), b"".to_vec());
+    /// val.set(b"foobarbaz".to_vec()).unwrap();
+    /// assert_eq!(val.getrange(3, -4).unwrap(), b"bar".to_vec());
+    /// assert_eq!(val.getrange(10, 1).unwrap(), b"".to_vec());
+    /// ```
     pub fn getrange(&self, start: i64, stop: i64) -> Result<Vec<u8>, OperationError> {
         match self {
             &Value::Nil => Ok(Vec::new()),
@@ -257,6 +308,22 @@ impl Value {
         }
     }
 
+    /// Updates the string value overwriting with provided data from the index.
+    /// Negative index starts from the end.
+    /// If the string was shorter than the index, it is filled with null bytes.
+    /// Fails if the value is not a string.
+    /// Returns the number of bytes with the new data appended
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// assert_eq!(val.setrange(1, vec![1, 2]).unwrap(), 3);
+    /// assert_eq!(val.get().unwrap(), vec![0, 1, 2]);
+    /// assert_eq!(val.setrange(-1, vec![100, 101]).unwrap(), 4);
+    /// assert_eq!(val.get().unwrap(), vec![0, 1, 100, 101]);
+    /// ```
     pub fn setrange(&mut self, index: i64, data: Vec<u8>) -> Result<usize, OperationError> {
         match self {
             &mut Value::Nil => *self = Value::String(ValueString::Data(Vec::new())),

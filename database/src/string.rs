@@ -74,11 +74,11 @@ impl ValueString {
         let len = s.len();
         let start = match normalize_position(_start, len) {
             Ok(i) => i,
-            Err(i) => if i == 0 { 0 } else { return Vec::new(); }
+            Err(g) => if !g { 0 } else { return Vec::new(); }
         } as usize;
         let stop = match normalize_position(_stop, len) {
             Ok(i) => i,
-            Err(i) => if i == 0 { return Vec::new(); } else { len }
+            Err(g) => if !g { return Vec::new(); } else { len }
         } as usize;
         let mut v = Vec::with_capacity(stop - start + 1);
         v.extend(s[start..stop + 1].iter());
@@ -143,7 +143,7 @@ impl ValueString {
 
         let mut index = match normalize_position(_index, d.len()) {
             Ok(i) => i,
-            Err(p) => if p == 0 { p } else { _index as usize },
+            Err(g) => if !g { 0 } else { _index as usize },
         };
         for _ in d.len()..index {
             d.push(0);

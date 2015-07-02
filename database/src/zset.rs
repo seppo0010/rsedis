@@ -184,20 +184,20 @@ impl ValueSortedSet {
         let (start, stop) = if rev {
             (match normalize_position(- _stop - 1, len) {
                 Ok(i) => i,
-                Err(i) => if i == 0 { 0 } else { return vec![]; },
+                Err(g) => if !g { 0 } else { return vec![]; },
             },
             match normalize_position(- _start - 1, len) {
                 Ok(i) => i,
-                Err(i) => if i == 0 { return vec![]; } else { i },
+                Err(g) => if !g { return vec![]; } else { len },
             })
         } else {
             (match normalize_position(_start, len) {
                 Ok(i) => i,
-                Err(i) => if i == 0 { 0 } else { return vec![]; },
+                Err(g) => if !g { 0 } else { return vec![]; },
             },
             match normalize_position(_stop, len) {
                 Ok(i) => i,
-                Err(i) => if i == 0 { return vec![]; } else { i },
+                Err(g) => if !g { return vec![]; } else { len },
             })
         };
 

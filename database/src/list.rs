@@ -80,11 +80,11 @@ impl ValueList {
                 let len = list.len();
                 let start = match normalize_position(_start, len) {
                     Ok(i) => i,
-                    Err(i) => if i == 0 { 0 } else { return Vec::new(); },
+                    Err(g) => if !g { 0 } else { return Vec::new(); },
                 };
                 let stop = match normalize_position(_stop, len) {
                     Ok(i) => i,
-                    Err(i) => if i == 0 { return Vec::new(); } else { i },
+                    Err(g) => if !g { return Vec::new(); } else { len },
                 };
                 list.iter().skip(start as usize).take(stop as usize - start as usize + 1).collect::<Vec<_>>()
             },
@@ -159,17 +159,17 @@ impl ValueList {
                 let len = list.len();
                 let start = match normalize_position(_start, len) {
                     Ok(i) => i,
-                    Err(i) => if i == 0 { 0 } else {
+                    Err(g) => if !g { 0 } else {
                         list.split_off(len);
                         len
                     },
                 };
                 let stop = match normalize_position(_stop, len) {
                     Ok(i) => i,
-                    Err(i) => if i == 0 {
+                    Err(g) => if !g {
                         list.split_off(len);
                         0
-                    } else { i },
+                    } else { len },
                 };
                 list.split_off(stop + 1);
                 list.split_off(start)

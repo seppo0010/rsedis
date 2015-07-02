@@ -3,10 +3,11 @@ use std::str::from_utf8;
 use error::OperationError;
 
 /// Gets the position in a list from a signed integer
-/// Redis uses this logic to start counting from the end using  negative numbers 
+/// Redis uses this logic to start counting from the end using negative numbers.
 ///
 /// When the absolute number is bigger than the len, an error is produced
-/// returning 0 for when it was negative or length when it was positive
+/// returning true if the value was greater than the last index and false
+/// if the value is lower than the first index.
 ///
 /// # Examples
 /// ```
@@ -14,20 +15,22 @@ use error::OperationError;
 ///
 /// assert_eq!(normalize_position(0, 10), Ok(0));
 /// assert_eq!(normalize_position(-1, 10), Ok(9));
-/// assert_eq!(normalize_position(10, 10), Err(10));
-/// assert_eq!(normalize_position(-11, 10), Err(0));
+/// assert_eq!(normalize_position(10, 10), Err(true));
+/// assert_eq!(normalize_position(-11, 10), Err(false));
+/// assert_eq!(normalize_position(-100, 0), Err(false));
+/// assert_eq!(normalize_position(100, 0), Err(true));
 /// ```
-pub fn normalize_position(position: i64, _len: usize) -> Result<usize, usize> {
+pub fn normalize_position(position: i64, _len: usize) -> Result<usize, bool> {
     let len = _len as i64;
     let mut pos = position;
     if pos < 0 {
         pos += len;
     }
     if pos < 0 {
-        return Err(0);
+        return Err(false);
     }
     if pos >= len {
-        return Err(len as usize);
+        return Err(true);
     }
     return Ok(pos as usize);
 }
