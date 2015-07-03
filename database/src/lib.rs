@@ -1224,9 +1224,17 @@ pub struct Database {
     data_expiration_ms: Vec<RehashingHashMap<Vec<u8>, i64>>,
     /// Number of databases.
     pub size: usize,
+    /// Maps a channel to a list of pubsub events listeners.
+    /// The `usize` key is used as a client identifier.
     subscribers: HashMap<Vec<u8>, HashMap<usize, Sender<Option<PubsubEvent>>>>,
+    /// Maps a pattern to a list of pubsub events listeners.
+    /// The `usize` key is used as a client identifier.
     pattern_subscribers: HashMap<Vec<u8>, HashMap<usize, Sender<Option<PubsubEvent>>>>,
+    /// Maps a pattern to a list of key listeners. When a key is modified a message
+    /// with `true` is published.
+    /// The `usize` key is used as a client identifier.
     key_subscribers: Vec<RehashingHashMap<Vec<u8>, HashMap<usize, Sender<bool>>>>,
+    /// A unique identifier counter to assign to clients
     subscriber_id: usize,
 }
 
