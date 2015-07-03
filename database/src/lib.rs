@@ -1215,8 +1215,14 @@ impl Value {
 pub struct Database {
     pub config: Config,
     data: Vec<RehashingHashMap<Vec<u8>, Value>>,
+    /// Maps a key to an expiration time. Expiration time is in milliseconds.
+    // FIXME: Duplicating key when it has an expiration.
+    // Options:
+    // - Use Rc
+    // - Use a reference
+    // - Move expiration to `data`
     data_expiration_ms: Vec<RehashingHashMap<Vec<u8>, i64>>,
-    /// number of databases
+    /// Number of databases.
     pub size: usize,
     subscribers: HashMap<Vec<u8>, HashMap<usize, Sender<Option<PubsubEvent>>>>,
     pattern_subscribers: HashMap<Vec<u8>, HashMap<usize, Sender<Option<PubsubEvent>>>>,
