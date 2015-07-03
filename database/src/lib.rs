@@ -1319,6 +1319,19 @@ impl Database {
         }
     }
 
+    /// Removes and returns a value by key.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use database::{Database, Value};
+    ///
+    /// let mut db = Database::mock();
+    ///
+    /// assert_eq!(db.remove(0, &vec![1]), None);
+    /// db.get_or_create(0, &vec![1]).set(vec![1]).unwrap();
+    /// assert!(db.remove(0, &vec![1]).is_some());
+    /// ```
     pub fn remove(&mut self, index: usize, key: &Vec<u8>) -> Option<Value> {
         let mut r = self.data[index].remove(key);
         if self.is_expired(index, key) {
