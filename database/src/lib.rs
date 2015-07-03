@@ -1222,8 +1222,6 @@ pub struct Database {
     // - Use a reference
     // - Move expiration to `data`
     data_expiration_ms: Vec<RehashingHashMap<Vec<u8>, i64>>,
-    /// Number of databases.
-    pub size: usize,
     /// Maps a channel to a list of pubsub events listeners.
     /// The `usize` key is used as a client identifier.
     subscribers: HashMap<Vec<u8>, HashMap<usize, Sender<Option<PubsubEvent>>>>,
@@ -1253,7 +1251,6 @@ impl Database{
             config: config,
             data: data,
             data_expiration_ms: data_expiration_ms,
-            size: size,
             subscribers: HashMap::new(),
             pattern_subscribers: HashMap::new(),
             key_subscribers: key_subscribers,
@@ -1442,7 +1439,7 @@ impl Database{
     }
 
     pub fn clearall(&mut self) {
-        for index in 0..self.size {
+        for index in 0..(self.config.databases as usize) {
             self.data[index].clear();
         }
     }
