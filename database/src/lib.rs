@@ -1007,6 +1007,7 @@ pub struct Database {
     pub config: Config,
     data: Vec<RehashingHashMap<Vec<u8>, Value>>,
     data_expiration_ns: Vec<RehashingHashMap<Vec<u8>, i64>>,
+    /// number of databases
     pub size: usize,
     subscribers: HashMap<Vec<u8>, HashMap<usize, Sender<Option<PubsubEvent>>>>,
     pattern_subscribers: HashMap<Vec<u8>, HashMap<usize, Sender<Option<PubsubEvent>>>>,
