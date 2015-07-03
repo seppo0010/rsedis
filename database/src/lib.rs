@@ -1398,12 +1398,15 @@ impl Database {
         return self.data[index].get_mut(key).unwrap();
     }
 
+    /// Sets up the hashmap to subscribe clients to a key.
     fn ensure_key_subscribers(&mut self, index: usize, key: &Vec<u8>) {
         if !self.key_subscribers[index].contains_key(key) {
             self.key_subscribers[index].insert(key.clone(), HashMap::new());
         }
     }
 
+    /// Subscribes a Sender to a key. Every time the key is modified a `true` is
+    /// sent.
     pub fn key_subscribe(&mut self, index: usize, key: &Vec<u8>, sender: Sender<bool>) -> usize {
         self.ensure_key_subscribers(index, key);
         let mut key_subscribers = self.key_subscribers[index].get_mut(key).unwrap();
@@ -1413,6 +1416,7 @@ impl Database {
         subscriber_id
     }
 
+    /// Publishes a `true` to all key listeners.
     pub fn key_publish(&mut self, index: usize, key: &Vec<u8>) {
         if self.config.active_rehashing {
             self.data[index].rehash();
