@@ -1126,6 +1126,33 @@ impl Value {
         }
     }
 
+    /// Returns the elements in a score range. If `withscores` is true, it will also
+    /// include their scores' ASCII representation.
+    /// It will skip the first `offset` elements and return up to `count`.
+    /// If `rev` is true, it will reverse the result order and offsets, and
+    /// reverse the `min` and `max` parameters.
+    ///
+    /// # Examples
+    /// ```
+    /// #![feature(collections_bound)]
+    /// use database::Value;
+    /// use std::collections::Bound;
+    ///
+    /// let mut val = Value::Nil;
+    /// val.zadd(1.0, vec![1], false, false, false, false).unwrap();
+    /// val.zadd(2.0, vec![2], false, false, false, false).unwrap();
+    /// val.zadd(3.0, vec![3], false, false, false, false).unwrap();
+    /// assert_eq!(val.zrangebyscore(Bound::Included(2.0), Bound::Unbounded, true, 0, 100, false).unwrap(), vec![
+    ///     vec![2],
+    ///     b"2".to_vec(),
+    ///     vec![3],
+    ///     b"3".to_vec(),
+    /// ]);
+    ///
+    /// assert_eq!(val.zrangebyscore(Bound::Unbounded, Bound::Included(2.0), false, 0, 1, true).unwrap(), vec![
+    ///     vec![3],
+    /// ]);
+    /// ```
     pub fn zrangebyscore(&self, min: Bound<f64>, max: Bound<f64>, withscores: bool, offset: usize, count: usize, rev: bool) -> Result<Vec<Vec<u8>>, OperationError> {
         match *self {
             Value::Nil => Ok(vec![]),
