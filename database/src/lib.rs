@@ -1373,6 +1373,22 @@ impl Database {
         self.data_expiration_ms[index].clear();
     }
 
+    /// Returns a mutable reference to a value for a key. If the value was not
+    /// present, it is initialized as Nil.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use database::{Database, Value};
+    ///
+    /// let mut db = Database::mock();
+    ///
+    /// assert_eq!(db.get(0, &vec![1]), None);
+    /// db.get_or_create(0, &vec![1]).set(vec![1]).unwrap();
+    /// assert_eq!(db.get(0, &vec![1]).unwrap().strlen().unwrap(), 1);
+    /// db.get_or_create(0, &vec![1]).append(vec![2]).unwrap();
+    /// assert_eq!(db.get(0, &vec![1]).unwrap().strlen().unwrap(), 2);
+    /// ```
     pub fn get_or_create(&mut self, index: usize, key: &Vec<u8>) -> &mut Value {
         if self.get(index, key).is_some() {
             return self.get_mut(index, key).unwrap();
