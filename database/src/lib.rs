@@ -1037,6 +1037,17 @@ impl Value {
         }
     }
 
+    /// Increments the score of an element. It creates the element if it was not
+    /// already in the sorted set. Returns the new score.
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// assert_eq!(val.zincrby(1.0, vec![1]).unwrap(), 1.0);
+    /// assert_eq!(val.zincrby(1.0, vec![1]).unwrap(), 2.0);
+    /// ```
     pub fn zincrby(&mut self, increment: f64, member: Vec<u8>) -> Result<f64, OperationError> {
         match *self {
             Value::Nil => {
