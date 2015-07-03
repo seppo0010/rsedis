@@ -895,6 +895,21 @@ impl Value {
         *self = Value::Set(ValueSet::create_with_hashset(set));
     }
 
+    /// Removes an element from a sorted set. Returns true if the element existed.
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// assert_eq!(val.zrem(vec![1]).unwrap(), false);
+    /// val.zadd(1.0, vec![1], false, false, false, false).unwrap();
+    /// val.zadd(2.0, vec![2], false, false, false, false).unwrap();
+    /// val.zadd(3.0, vec![3], false, false, false, false).unwrap();
+    /// assert_eq!(val.zrem(vec![1]).unwrap(), true);
+    /// assert_eq!(val.zrem(vec![1]).unwrap(), false);
+    /// assert_eq!(val.zcard().unwrap(), 2);
+    /// ```
     pub fn zrem(&mut self, member: Vec<u8>) -> Result<bool, OperationError> {
         let (skiplist, hmap) = match *self {
             Value::Nil => return Ok(false),
