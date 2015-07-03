@@ -926,6 +926,61 @@ impl Value {
         Ok(true)
     }
 
+    /// Adds an element to a sorted set.
+    /// If `nx` is true, it only adds new element.
+    /// If `xx` is true, it only updates an existing element.
+    /// If `ch` is true, the return value is whether the element was modified,
+    /// otherwise the return value is whether the element was created.
+    /// When `incr` is true, the element existing score is added to the provided one,
+    /// otherwise it is replaced.
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// assert_eq!(val.zadd(1.0, vec![1], false, false, false, false).unwrap(), true);
+    /// assert_eq!(val.zscore(vec![1]).unwrap(), Some(1.0));
+    /// ```
+    ///
+    /// ```
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// assert_eq!(val.zadd(1.0, vec![1], true, false, false, false).unwrap(), true);
+    /// assert_eq!(val.zscore(vec![1]).unwrap(), Some(1.0));
+    /// assert_eq!(val.zadd(2.0, vec![1], true, false, false, false).unwrap(), false);
+    /// assert_eq!(val.zscore(vec![1]).unwrap(), Some(1.0));
+    /// ```
+    ///
+    /// ```
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// assert_eq!(val.zadd(1.0, vec![1], false, true, false, false).unwrap(), false);
+    /// assert_eq!(val.zscore(vec![1]).unwrap(), None);
+    /// assert_eq!(val.zadd(1.0, vec![1], false, false, false, false).unwrap(), true);
+    /// assert_eq!(val.zadd(2.0, vec![1], false, true, false, false).unwrap(), false);
+    /// assert_eq!(val.zscore(vec![1]).unwrap(), Some(2.0));
+    /// ```
+    ///
+    /// ```
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// assert_eq!(val.zadd(1.0, vec![1], false, false, true, false).unwrap(), true);
+    /// assert_eq!(val.zadd(2.0, vec![1], false, false, true, false).unwrap(), true);
+    /// assert_eq!(val.zscore(vec![1]).unwrap(), Some(2.0));
+    /// ```
+    ///
+    /// ```
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// assert_eq!(val.zadd(1.0, vec![1], false, false, false, true).unwrap(), true);
+    /// assert_eq!(val.zadd(1.0, vec![1], false, false, false, true).unwrap(), false);
+    /// assert_eq!(val.zscore(vec![1]).unwrap(), Some(2.0));
+    /// ```
     pub fn zadd(&mut self, s: f64, el: Vec<u8>, nx: bool, xx: bool, ch: bool, incr: bool) -> Result<bool, OperationError> {
         match *self {
             Value::Nil => {
