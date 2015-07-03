@@ -1085,6 +1085,39 @@ impl Value {
         }
     }
 
+    /// Returns the elements in a position range. If `withscores` is true, it will also
+    /// include their scores' ASCII representation. If `rev` is true, it counts
+    /// the positions from the end.
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// val.zadd(1.0, vec![1], false, false, false, false).unwrap();
+    /// val.zadd(2.0, vec![2], false, false, false, false).unwrap();
+    /// val.zadd(3.0, vec![3], false, false, false, false).unwrap();
+    /// assert_eq!(val.zrange(0, -1, false, false).unwrap(), vec![
+    ///     vec![1],
+    ///     vec![2],
+    ///     vec![3],
+    /// ]);
+    /// assert_eq!(val.zrange(0, -1, true, false).unwrap(), vec![
+    ///     vec![1],
+    ///     b"1".to_vec(),
+    ///     vec![2],
+    ///     b"2".to_vec(),
+    ///     vec![3],
+    ///     b"3".to_vec(),
+    /// ]);
+    /// assert_eq!(val.zrange(0, 0, false, false).unwrap(), vec![
+    ///     vec![1],
+    /// ]);
+    /// assert_eq!(val.zrange(0, 1, false, true).unwrap(), vec![
+    ///     vec![3],
+    ///     vec![2],
+    /// ]);
+    /// ```
     pub fn zrange(&self, start: i64, stop: i64, withscores: bool, rev: bool) -> Result<Vec<Vec<u8>>, OperationError> {
         match *self {
             Value::Nil => Ok(vec![]),
