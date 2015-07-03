@@ -1297,6 +1297,19 @@ impl Database {
         }
     }
 
+    /// Gets a mutable reference to a value if exists.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use database::{Database, Value};
+    ///
+    /// let mut db = Database::mock();
+    ///
+    /// assert_eq!(db.get_mut(0, &vec![1]), None);
+    /// db.get_or_create(0, &vec![1]).set(vec![1]).unwrap();
+    /// db.get_mut(0, &vec![1]).unwrap().set(vec![2]);
+    /// ```
     pub fn get_mut(&mut self, index: usize, key: &Vec<u8>) -> Option<&mut Value> {
         if self.is_expired(index, key) {
             self.remove(index, key);
