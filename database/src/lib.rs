@@ -1161,6 +1161,21 @@ impl Value {
         }
     }
 
+    /// Returns the position in the set for a given element.
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// val.zadd(1.0, vec![1], false, false, false, false).unwrap();
+    /// val.zadd(2.0, vec![2], false, false, false, false).unwrap();
+    /// val.zadd(3.0, vec![3], false, false, false, false).unwrap();
+    /// assert_eq!(val.zrank(vec![1]).unwrap(), Some(0));
+    /// assert_eq!(val.zrank(vec![2]).unwrap(), Some(1));
+    /// assert_eq!(val.zrank(vec![3]).unwrap(), Some(2));
+    /// assert_eq!(val.zrank(vec![4]).unwrap(), None);
+    /// ```
     pub fn zrank(&self, el: Vec<u8>) -> Result<Option<usize>, OperationError> {
         match *self {
             Value::Nil => Ok(None),
