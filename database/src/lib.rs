@@ -997,6 +997,19 @@ impl Value {
         }
     }
 
+    /// Returns the number of elements in a sorted set.
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// assert_eq!(val.zcard().unwrap(), 0);
+    /// val.zadd(1.0, vec![1], false, false, false, false).unwrap();
+    /// assert_eq!(val.zcard().unwrap(), 1);
+    /// val.zadd(2.0, vec![2], false, false, false, false).unwrap();
+    /// assert_eq!(val.zcard().unwrap(), 2);
+    /// ```
     pub fn zcard(&self) -> Result<usize, OperationError> {
         match *self {
             Value::Nil => Ok(0),
