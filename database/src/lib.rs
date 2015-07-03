@@ -1184,6 +1184,19 @@ impl Value {
         }
     }
 
+    /// Serializes and writes into `writer` the object current value.
+    /// The serialized version also includes the type, the version and a crc.
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// val.set(vec![1, 2, 3]).unwrap();
+    /// let mut serialized = vec![];
+    /// assert_eq!(val.dump(&mut serialized).unwrap(), 15);
+    /// assert_eq!(serialized, vec![0, 3, 1, 2, 3, 7, 0, 229, 221, 166, 143, 248, 97, 121, 255]);
+    /// ```
     pub fn dump<T: Write>(&self, writer: &mut T) -> Result<usize, OperationError> {
         let mut data = vec![];
         match *self {
