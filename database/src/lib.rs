@@ -1352,14 +1352,17 @@ impl Database {
         r
     }
 
+    /// Sets a key expiration time, in milliseconds.
     pub fn set_msexpiration(&mut self, index: usize, key: Vec<u8>, msexpiration: i64) {
         self.data_expiration_ms[index].insert(key, msexpiration);
     }
 
+    /// Gets a key expiration time, in milliseconds.
     pub fn get_msexpiration(&mut self, index: usize, key: &Vec<u8>) -> Option<&i64> {
         self.data_expiration_ms[index].get(key)
     }
 
+    /// Removes a key expiration time.
     pub fn remove_msexpiration(&mut self, index: usize, key: &Vec<u8>) -> Option<i64> {
         self.data_expiration_ms[index].remove(key)
     }
