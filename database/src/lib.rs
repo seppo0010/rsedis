@@ -26,8 +26,9 @@ use std::io::Write;
 use std::sync::mpsc::{Sender, channel};
 
 use config::Config;
-use rehashinghashmap::RehashingHashMap;
 use crc64::crc64;
+use logger::{Level, Logger};
+use rehashinghashmap::RehashingHashMap;
 use response::Response;
 use util::glob_match;
 use util::mstime;
@@ -1236,8 +1237,14 @@ pub struct Database {
     subscriber_id: usize,
 }
 
-impl Database{
-    pub fn new(config: Config) -> Database {
+impl Database {
+    /// Creates a new empty `Database` with a mock config.
+    pub fn mock() -> Self {
+        Database::new(Config::mock(0, Logger::new(Level::Warning)))
+    }
+
+    /// Creates a new empty `Database`.
+    pub fn new(config: Config) -> Self {
         let size = config.databases as usize;
         let mut data = Vec::with_capacity(size);
         let mut data_expiration_ms = Vec::with_capacity(size);
