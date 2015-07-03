@@ -1215,7 +1215,7 @@ impl Value {
 pub struct Database {
     pub config: Config,
     data: Vec<RehashingHashMap<Vec<u8>, Value>>,
-    data_expiration_ns: Vec<RehashingHashMap<Vec<u8>, i64>>,
+    data_expiration_ms: Vec<RehashingHashMap<Vec<u8>, i64>>,
     /// number of databases
     pub size: usize,
     subscribers: HashMap<Vec<u8>, HashMap<usize, Sender<Option<PubsubEvent>>>>,
@@ -1228,17 +1228,17 @@ impl Database{
     pub fn new(config: Config) -> Database {
         let size = config.databases as usize;
         let mut data = Vec::with_capacity(size);
-        let mut data_expiration_ns = Vec::with_capacity(size);
+        let mut data_expiration_ms = Vec::with_capacity(size);
         let mut key_subscribers = Vec::with_capacity(size);
         for _ in 0..size {
             data.push(RehashingHashMap::new());
-            data_expiration_ns.push(RehashingHashMap::new());
+            data_expiration_ms.push(RehashingHashMap::new());
             key_subscribers.push(RehashingHashMap::new());
         }
         return Database {
             config: config,
             data: data,
-            data_expiration_ns: data_expiration_ns,
+            data_expiration_ms: data_expiration_ms,
             size: size,
             subscribers: HashMap::new(),
             pattern_subscribers: HashMap::new(),
@@ -1248,7 +1248,7 @@ impl Database{
     }
 
     fn is_expired(&self, index: usize, key: &Vec<u8>) -> bool {
-        match self.data_expiration_ns[index].get(key) {
+        match self.data_expiration_ms[index].get(key) {
             Some(t) => t <= &mstime(),
             None => false,
         }
@@ -1276,13 +1276,13 @@ impl Database{
         if self.is_expired(index, key) {
             r = None;
         }
-        self.data_expiration_ns[index].remove(key);
+        self.data_expiration_ms[index].remove(key);
         if self.config.active_rehashing {
             if self.data[index].len() * 10 / 12 < self.data[index].capacity() {
                 self.data[index].shrink_to_fit();
             }
-            if self.data_expiration_ns[index].len() * 10 / 12 < self.data_expiration_ns[index].capacity() {
-                self.data_expiration_ns[index].shrink_to_fit();
+            if self.data_expiration_ms[index].len() * 10 / 12 < self.data_expiration_ms[index].capacity() {
+                self.data_expiration_ms[index].shrink_to_fit();
             }
             if self.key_subscribers[index].len() * 10 / 12 < self.key_subscribers[index].capacity() {
                 self.key_subscribers[index].shrink_to_fit();
@@ -1292,15 +1292,15 @@ impl Database{
     }
 
     pub fn set_msexpiration(&mut self, index: usize, key: Vec<u8>, msexpiration: i64) {
-        self.data_expiration_ns[index].insert(key, msexpiration);
+        self.data_expiration_ms[index].insert(key, msexpiration);
     }
 
     pub fn get_msexpiration(&mut self, index: usize, key: &Vec<u8>) -> Option<&i64> {
-        self.data_expiration_ns[index].get(key)
+        self.data_expiration_ms[index].get(key)
     }
 
     pub fn remove_msexpiration(&mut self, index: usize, key: &Vec<u8>) -> Option<i64> {
-        self.data_expiration_ns[index].remove(key)
+        self.data_expiration_ms[index].remove(key)
     }
 
     pub fn clear(&mut self, index: usize) {
@@ -1334,7 +1334,7 @@ impl Database{
     pub fn key_publish(&mut self, index: usize, key: &Vec<u8>) {
         if self.config.active_rehashing {
             self.data[index].rehash();
-            self.data_expiration_ns[index].rehash();
+            self.data_expiration_ms[index].rehash();
             self.key_subscribers[index].rehash();
         }
 
