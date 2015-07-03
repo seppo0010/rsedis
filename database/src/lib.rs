@@ -880,6 +880,17 @@ impl Value {
         }
     }
 
+    /// Turns the value into a set using an existing HashSet.
+    ///
+    /// # Examples
+    /// ```
+    /// use std::collections::HashSet;
+    /// use database::Value;
+    ///
+    /// let mut val1 = Value::Nil;
+    /// val1.create_set(vec![vec![1], vec![2], vec![3]].into_iter().collect::<HashSet<_>>());
+    /// assert_eq!(val1.scard().unwrap(), 3);
+    /// ```
     pub fn create_set(&mut self, set: HashSet<Vec<u8>>) {
         *self = Value::Set(ValueSet::create_with_hashset(set));
     }
