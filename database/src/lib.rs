@@ -1061,6 +1061,22 @@ impl Value {
         }
     }
 
+    /// Counts the number of elements in a sorted set within a score range
+    ///
+    /// # Examples
+    /// ```
+    /// #![feature(collections_bound)]
+    /// use database::Value;
+    /// use std::collections::Bound;
+    ///
+    /// let mut val = Value::Nil;
+    /// assert_eq!(val.zcount(Bound::Unbounded, Bound::Unbounded).unwrap(), 0);
+    /// val.zadd(1.0, vec![1], false, false, false, false).unwrap();
+    /// val.zadd(2.0, vec![2], false, false, false, false).unwrap();
+    /// val.zadd(3.0, vec![3], false, false, false, false).unwrap();
+    /// assert_eq!(val.zcount(Bound::Included(2.0), Bound::Excluded(3.0)).unwrap(), 1);
+    /// assert_eq!(val.zcount(Bound::Unbounded, Bound::Unbounded).unwrap(), 3);
+    /// ```
     pub fn zcount(&self, min: Bound<f64>, max: Bound<f64>) -> Result<usize, OperationError> {
         match *self {
             Value::Nil => Ok(0),
