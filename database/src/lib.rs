@@ -1367,8 +1367,10 @@ impl Database {
         self.data_expiration_ms[index].remove(key)
     }
 
+    /// Removes all keys in a database.
     pub fn clear(&mut self, index: usize) {
-        self.data[index].clear()
+        self.data[index].clear();
+        self.data_expiration_ms[index].clear();
     }
 
     pub fn get_or_create(&mut self, index: usize, key: &Vec<u8>) -> &mut Value {
