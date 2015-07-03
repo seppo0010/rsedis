@@ -1394,7 +1394,7 @@ impl Database {
             return self.get_mut(index, key).unwrap();
         }
         let val = Value::Nil;
-        self.data[index].insert(Vec::clone(key), val);
+        self.data[index].insert(key.clone(), val);
         return self.data[index].get_mut(key).unwrap();
     }
 
@@ -2090,7 +2090,7 @@ mod test_command {
         let mut database = Database::new(config);
         let key = vec![1u8];
         let value = vec![1u8, 2, 3, 4];
-        let expected = Vec::clone(&value);
+        let expected = value.clone();
         assert!(database.get_or_create(0, &key).set(value).is_ok());
         database.set_msexpiration(0, key.clone(), mstime() + 10000);
         assert_eq!(database.get(0, &key), Some(&Value::String(ValueString::Data(expected))));
