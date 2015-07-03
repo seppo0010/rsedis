@@ -1272,6 +1272,23 @@ impl Database {
         }
     }
 
+    /// Gets a value from the database if exists and it is not expired.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use database::{Database, Value};
+    ///
+    /// let mut db = Database::mock();
+    ///
+    /// assert_eq!(db.get(0, &vec![1]), None);
+    /// db.get_or_create(0, &vec![1]).set(vec![1]);
+    ///
+    /// let mut value = Value::Nil;
+    /// value.set(vec![1]);
+    ///
+    /// assert_eq!(db.get(0, &vec![1]), Some(&value));
+    /// ```
     pub fn get(&self, index: usize, key: &Vec<u8>) -> Option<&Value> {
         if self.is_expired(index, key) {
             None
