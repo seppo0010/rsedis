@@ -791,6 +791,24 @@ impl Value {
         Ok(sets)
     }
 
+    /// Returns the elements in one set that are not present in another sets.
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    /// use std::collections::HashSet;
+    ///
+    /// let mut val1 = Value::Nil;
+    /// val1.sadd(vec![1], 3).unwrap();
+    /// val1.sadd(vec![2], 3).unwrap();
+    /// val1.sadd(vec![3], 3).unwrap();
+    /// let mut val2 = Value::Nil;
+    /// val2.sadd(vec![1], 3).unwrap();
+    /// let mut val3 = Value::Nil;
+    /// val3.sadd(vec![2], 3).unwrap();
+    /// let set = vec![vec![3]].into_iter().collect::<HashSet<_>>();
+    /// assert_eq!(val1.sdiff(&vec![&val2, &val3]).unwrap(), set);
+    /// ```
     pub fn sdiff(&self, set_values: &Vec<&Value>) -> Result<HashSet<Vec<u8>>, OperationError> {
         let emptyset = ValueSet::new();
         let sets = try!(self.get_set_list(set_values, &emptyset));
