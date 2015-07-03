@@ -1018,6 +1018,17 @@ impl Value {
         }
     }
 
+    /// Returns the score of a given element.
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// assert_eq!(val.zscore(vec![1]).unwrap(), None);
+    /// val.zadd(1.0, vec![1], false, false, false, false).unwrap();
+    /// assert_eq!(val.zscore(vec![1]).unwrap(), Some(1.0));
+    /// ```
     pub fn zscore(&self, element: Vec<u8>) -> Result<Option<f64>, OperationError> {
         match *self {
             Value::Nil => Ok(None),
