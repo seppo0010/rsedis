@@ -1441,12 +1441,34 @@ impl Database {
         }
     }
 
+    /// Sets up the hashmap to subscribe clients to a channel.
     fn ensure_channel(&mut self, channel: &Vec<u8>) {
         if !self.subscribers.contains_key(channel) {
             self.subscribers.insert(channel.clone(), HashMap::new());
         }
     }
 
+    /// Subscribes a Sender to a channel. Returns a subscriber_id that can be
+    /// used to unsubscribe
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Database;
+    /// # use database::PubsubEvent;
+    /// # use std::sync::mpsc::{channel, TryRecvError};
+    ///
+    /// let mut db = Database::mock();
+    ///
+    /// let (tx, rx) = channel();
+    /// db.subscribe(vec![1], tx);
+    /// db.publish(&vec![1], &vec![0, 1, 2, 3]);
+    /// assert_eq!(rx.try_recv().unwrap().unwrap(), PubsubEvent::Message(
+    ///     vec![1],
+    ///     None,
+    ///     vec![0, 1, 2, 3],
+    /// ));
+    /// assert_eq!(rx.try_recv().unwrap_err(), TryRecvError::Empty);
+    /// ```
     pub fn subscribe(&mut self, channel: Vec<u8>, sender: Sender<Option<PubsubEvent>>) -> usize {
         self.ensure_channel(&channel);
         let mut channelsubscribers = self.subscribers.get_mut(&channel).unwrap();
@@ -1456,6 +1478,23 @@ impl Database {
         subscriber_id
     }
 
+    /// Unsubscribes a Sender from a channel.
+    /// Returns true if it was subscribed
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Database;
+    /// # use std::sync::mpsc::{channel, TryRecvError};
+    ///
+    /// let mut db = Database::mock();
+    ///
+    /// let (tx, rx) = channel();
+    /// let subscriber_id = db.subscribe(vec![1], tx);
+    /// assert!(db.unsubscribe(vec![1], subscriber_id));
+    /// assert!(!db.unsubscribe(vec![1], subscriber_id));
+    /// db.publish(&vec![1], &vec![0, 1, 2, 3]);
+    /// assert_eq!(rx.try_recv().unwrap_err(), TryRecvError::Disconnected);
+    /// ```
     pub fn unsubscribe(&mut self, channel: Vec<u8>, subscriber_id: usize) -> bool {
         if !self.subscribers.contains_key(&channel) {
             return false;
@@ -1464,12 +1503,34 @@ impl Database {
         channelsubscribers.remove(&subscriber_id).is_some()
     }
 
+    /// Sets up the hashmap to subscribe clients to a pattern.
     fn pensure_channel(&mut self, pattern: &Vec<u8>) {
         if !self.pattern_subscribers.contains_key(pattern) {
             self.pattern_subscribers.insert(pattern.clone(), HashMap::new());
         }
     }
 
+    /// Subscribes a Sender to a pattern. Returns a subscriber_id that can be
+    /// used to unsubscribe
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Database;
+    /// # use database::PubsubEvent;
+    /// # use std::sync::mpsc::{channel, TryRecvError};
+    ///
+    /// let mut db = Database::mock();
+    ///
+    /// let (tx, rx) = channel();
+    /// db.psubscribe(b"foo*baz".to_vec(), tx);
+    /// db.publish(&b"foobarbaz".to_vec(), &vec![0, 1, 2, 3]);
+    /// assert_eq!(rx.try_recv().unwrap().unwrap(), PubsubEvent::Message(
+    ///     b"foobarbaz".to_vec(),
+    ///     Some(b"foo*baz".to_vec()),
+    ///     vec![0, 1, 2, 3],
+    /// ));
+    /// assert_eq!(rx.try_recv().unwrap_err(), TryRecvError::Empty);
+    /// ```
     pub fn psubscribe(&mut self, pattern: Vec<u8>, sender: Sender<Option<PubsubEvent>>) -> usize {
         self.pensure_channel(&pattern);
         let mut channelsubscribers = self.pattern_subscribers.get_mut(&pattern).unwrap();
@@ -1479,6 +1540,8 @@ impl Database {
         subscriber_id
     }
 
+    /// Unsubscribes a Sender from a pattern.
+    /// Returns true if it was subscribed
     pub fn punsubscribe(&mut self, pattern: Vec<u8>, subscriber_id: usize) -> bool {
         if !self.pattern_subscribers.contains_key(&pattern) {
             return false;
@@ -1487,6 +1550,8 @@ impl Database {
         channelsubscribers.remove(&subscriber_id).is_some()
     }
 
+    /// Publishes a message to a channel and all patterns that match the channel name.
+    /// Returns the number of recipients who receive the message.
     pub fn publish(&self, channel_name: &Vec<u8>, message: &Vec<u8>) -> usize {
         let mut c = 0;
         match self.subscribers.get(channel_name) {
@@ -1513,12 +1578,43 @@ impl Database {
         c
     }
 
+    /// Removes all data from all databases.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use database::{Database, Value};
+    ///
+    /// let mut db = Database::mock();
+    ///
+    /// assert_eq!(db.get(0, &vec![1]), None);
+    /// db.get_or_create(0, &vec![1]).set(vec![1]).unwrap();
+    /// db.get_or_create(1, &vec![1]).set(vec![1]).unwrap();
+    /// db.clearall();
+    /// assert!(!db.get(0, &vec![1]).is_some());
+    /// ```
     pub fn clearall(&mut self) {
         for index in 0..(self.config.databases as usize) {
             self.data[index].clear();
         }
     }
 
+    /// Applies the config command mapping. This mapping allows arbitrary
+    /// renaming of commands. If a command is not renamed, it is returned as sent.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use database::{Database, Value};
+    ///
+    /// let mut db = Database::mock();
+    /// db.config.rename_commands.insert("get".to_owned(), Some("getstring".to_owned()));
+    /// db.config.rename_commands.insert("set".to_owned(), None);
+    ///
+    /// assert_eq!(db.mapped_command(&"get".to_owned()), Some("getstring".to_owned()));
+    /// assert_eq!(db.mapped_command(&"set".to_owned()), None);
+    /// assert_eq!(db.mapped_command(&"del".to_owned()), Some("del".to_owned()));
+    /// ```
     pub fn mapped_command(&self, command: &String) -> Option<String> {
         match self.config.rename_commands.get(command) {
             Some(c) => match *c {
