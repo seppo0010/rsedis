@@ -23,6 +23,7 @@ use std::collections::Bound;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::io::Write;
+use std::rc::Rc;
 use std::sync::mpsc::{Sender, channel};
 
 use config::Config;
@@ -1215,14 +1216,14 @@ impl Value {
 
 pub struct Database {
     pub config: Config,
-    data: Vec<RehashingHashMap<Vec<u8>, Value>>,
+    data: Vec<RehashingHashMap<Rc<Vec<u8>>, Value>>,
     /// Maps a key to an expiration time. Expiration time is in milliseconds.
     // FIXME: Duplicating key when it has an expiration.
     // Options:
     // - Use Rc
     // - Use a reference
     // - Move expiration to `data`
-    data_expiration_ms: Vec<RehashingHashMap<Vec<u8>, i64>>,
+    data_expiration_ms: Vec<RehashingHashMap<Rc<Vec<u8>>, i64>>,
     /// Maps a channel to a list of pubsub events listeners.
     /// The `usize` key is used as a client identifier.
     subscribers: HashMap<Vec<u8>, HashMap<usize, Sender<Option<PubsubEvent>>>>,
@@ -1232,7 +1233,7 @@ pub struct Database {
     /// Maps a pattern to a list of key listeners. When a key is modified a message
     /// with `true` is published.
     /// The `usize` key is used as a client identifier.
-    key_subscribers: Vec<RehashingHashMap<Vec<u8>, HashMap<usize, Sender<bool>>>>,
+    key_subscribers: Vec<RehashingHashMap<Rc<Vec<u8>>, HashMap<usize, Sender<bool>>>>,
     /// A unique identifier counter to assign to clients
     subscriber_id: usize,
 }
@@ -1282,7 +1283,7 @@ impl Database {
     /// let mut db = Database::mock();
     ///
     /// assert_eq!(db.get(0, &vec![1]), None);
-    /// db.get_or_create(0, &vec![1]).set(vec![1]);
+    /// db.get_or_create(0, vec![1]).1.set(vec![1]);
     ///
     /// let mut value = Value::Nil;
     /// value.set(vec![1]);
@@ -1306,16 +1307,23 @@ impl Database {
     ///
     /// let mut db = Database::mock();
     ///
-    /// assert_eq!(db.get_mut(0, &vec![1]), None);
-    /// db.get_or_create(0, &vec![1]).set(vec![1]).unwrap();
-    /// db.get_mut(0, &vec![1]).unwrap().set(vec![2]);
+    /// assert_eq!(db.get_mut(0, vec![1]), None);
+    /// db.get_or_create(0, vec![1]).1.set(vec![1]).unwrap();
+    /// db.get_mut(0, vec![1]).unwrap().1.set(vec![2]);
     /// ```
-    pub fn get_mut(&mut self, index: usize, key: &Vec<u8>) -> Option<&mut Value> {
-        if self.is_expired(index, key) {
-            self.remove(index, key);
+    pub fn get_mut(&mut self, index: usize, key: Vec<u8>) -> Option<(Rc<Vec<u8>>, &mut Value)> {
+        if self.is_expired(index, &key) {
+            self.remove(index, &key);
             None
         } else {
-            self.data[index].get_mut(key)
+            let k = Rc::new(key);
+            match self.remove(index, &k) {
+                Some(v) => {
+                    self.data[index].insert(k.clone(), v);
+                    Some((k.clone(), self.data[index].get_mut(&k.clone()).unwrap()))
+                },
+                None => None,
+            }
         }
     }
 
@@ -1329,7 +1337,7 @@ impl Database {
     /// let mut db = Database::mock();
     ///
     /// assert_eq!(db.remove(0, &vec![1]), None);
-    /// db.get_or_create(0, &vec![1]).set(vec![1]).unwrap();
+    /// db.get_or_create(0, vec![1]).1.set(vec![1]).unwrap();
     /// assert!(db.remove(0, &vec![1]).is_some());
     /// ```
     pub fn remove(&mut self, index: usize, key: &Vec<u8>) -> Option<Value> {
@@ -1353,7 +1361,13 @@ impl Database {
     }
 
     /// Sets a key expiration time, in milliseconds.
-    pub fn set_msexpiration(&mut self, index: usize, key: Vec<u8>, msexpiration: i64) {
+    pub fn set_msexpiration(&mut self, index: usize, key: Rc<Vec<u8>>, msexpiration: i64) {
+        // removing and reinserting the item to have the same key in both
+        let val = match self.remove(index, &key) {
+            Some(v) => v,
+            None => Value::Nil,
+        };
+        self.data[index].insert(key.clone(), val);
         self.data_expiration_ms[index].insert(key, msexpiration);
     }
 
@@ -1384,32 +1398,33 @@ impl Database {
     /// let mut db = Database::mock();
     ///
     /// assert_eq!(db.get(0, &vec![1]), None);
-    /// db.get_or_create(0, &vec![1]).set(vec![1]).unwrap();
+    /// db.get_or_create(0, vec![1]).1.set(vec![1]).unwrap();
     /// assert_eq!(db.get(0, &vec![1]).unwrap().strlen().unwrap(), 1);
-    /// db.get_or_create(0, &vec![1]).append(vec![2]).unwrap();
+    /// db.get_or_create(0, vec![1]).1.append(vec![2]).unwrap();
     /// assert_eq!(db.get(0, &vec![1]).unwrap().strlen().unwrap(), 2);
     /// ```
-    pub fn get_or_create(&mut self, index: usize, key: &Vec<u8>) -> &mut Value {
-        if self.get(index, key).is_some() {
-            return self.get_mut(index, key).unwrap();
-        }
-        let val = Value::Nil;
-        self.data[index].insert(key.clone(), val);
-        return self.data[index].get_mut(key).unwrap();
+    pub fn get_or_create(&mut self, index: usize, key: Vec<u8>) -> (Rc<Vec<u8>>, &mut Value) {
+        let k = Rc::new(key);
+        let val = match self.remove(index, &k) {
+            Some(v) => v,
+            None => Value::Nil,
+        };
+        self.data[index].insert(k.clone(), val);
+        return (k.clone(), self.data[index].get_mut(&k).unwrap());
     }
 
     /// Sets up the hashmap to subscribe clients to a key.
-    fn ensure_key_subscribers(&mut self, index: usize, key: &Vec<u8>) {
-        if !self.key_subscribers[index].contains_key(key) {
+    fn ensure_key_subscribers(&mut self, index: usize, key: Rc<Vec<u8>>) {
+        if !self.key_subscribers[index].contains_key(&key) {
             self.key_subscribers[index].insert(key.clone(), HashMap::new());
         }
     }
 
     /// Subscribes a Sender to a key. Every time the key is modified a `true` is
     /// sent.
-    pub fn key_subscribe(&mut self, index: usize, key: &Vec<u8>, sender: Sender<bool>) -> usize {
-        self.ensure_key_subscribers(index, key);
-        let mut key_subscribers = self.key_subscribers[index].get_mut(key).unwrap();
+    pub fn key_subscribe(&mut self, index: usize, key: Rc<Vec<u8>>, sender: Sender<bool>) -> usize {
+        self.ensure_key_subscribers(index, key.clone());
+        let mut key_subscribers = self.key_subscribers[index].get_mut(&key).unwrap();
         let subscriber_id = self.subscriber_id;
         key_subscribers.insert(subscriber_id, sender);
         self.subscriber_id += 1;
@@ -1417,7 +1432,7 @@ impl Database {
     }
 
     /// Publishes a `true` to all key listeners.
-    pub fn key_publish(&mut self, index: usize, key: &Vec<u8>) {
+    pub fn key_publish(&mut self, index: usize, key: Rc<Vec<u8>>) {
         if self.config.active_rehashing {
             self.data[index].rehash();
             self.data_expiration_ms[index].rehash();
@@ -1425,7 +1440,7 @@ impl Database {
         }
 
         let mut torem = Vec::new();
-        match self.key_subscribers[index].get_mut(key) {
+        match self.key_subscribers[index].get_mut(&key) {
             Some(mut channels) => {
                 for (subscriber_id, channel) in channels.iter() {
                     match channel.send(true) {
@@ -1535,6 +1550,7 @@ mod test_command {
     use std::collections::Bound;
     use std::collections::HashSet;
     use std::i64;
+    use std::rc::Rc;
     use std::sync::mpsc::channel;
     use std::usize;
 
@@ -2039,7 +2055,7 @@ mod test_command {
         let mut database = Database::new(config);
         let key = vec![1u8];
         let value = vec![1u8, 2, 3, 4];
-        assert!(database.get_or_create(0, &key).set(value).is_ok());
+        assert!(database.get_or_create(0, key.clone()).1.set(value).is_ok());
         database.remove(0, &key).unwrap();
         assert!(database.remove(0, &key).is_none());
     }
@@ -2079,8 +2095,8 @@ mod test_command {
         let mut database = Database::new(config);
         let key = vec![1u8];
         let value = vec![1u8, 2, 3, 4];
-        assert!(database.get_or_create(0, &key).set(value).is_ok());
-        database.set_msexpiration(0, key.clone(), mstime());
+        assert!(database.get_or_create(0, key.clone()).1.set(value).is_ok());
+        database.set_msexpiration(0, Rc::new(key.clone()), mstime());
         assert_eq!(database.get(0, &key), None);
     }
 
@@ -2091,8 +2107,8 @@ mod test_command {
         let key = vec![1u8];
         let value = vec![1u8, 2, 3, 4];
         let expected = value.clone();
-        assert!(database.get_or_create(0, &key).set(value).is_ok());
-        database.set_msexpiration(0, key.clone(), mstime() + 10000);
+        assert!(database.get_or_create(0, key.clone()).1.set(value).is_ok());
+        database.set_msexpiration(0, Rc::new(key.clone()), mstime() + 10000);
         assert_eq!(database.get(0, &key), Some(&Value::String(ValueString::Data(expected))));
     }
 
@@ -2526,7 +2542,7 @@ mod test_command {
         let mut database = Database::new(config);
         for i in 0u32..1000 {
             let key = vec![(i % 256) as u8, (i / 256) as u8];
-            database.get_or_create(0, &key).set(key.clone()).unwrap();
+            database.get_or_create(0, key.clone()).1.set(key.clone()).unwrap();
         }
         assert_eq!(database.data[0].len(), 1000);
         assert!(database.data[0].capacity() >= 1000);
@@ -2546,7 +2562,7 @@ mod test_command {
         let mut database = Database::new(config);
         for i in 0u32..1000 {
             let key = vec![(i % 256) as u8, (i / 256) as u8];
-            database.get_or_create(0, &key).set(key.clone()).unwrap();
+            database.get_or_create(0, key.clone()).1.set(key.clone()).unwrap();
         }
         assert_eq!(database.data[0].len(), 1000);
         assert!(database.data[0].capacity() >= 1000);
