@@ -4,8 +4,19 @@ use std::ascii::AsciiExt;
 
 use time::get_time;
 
+/// Are two chars the same? Optionally ignoring the case.
+///
+/// # Examples
+///
+/// ```
+/// use util::match_char;
+/// assert!( match_char(&('a' as u8), &('a' as u8), false));
+/// assert!( match_char(&('a' as u8), &('a' as u8), true));
+/// assert!(!match_char(&('a' as u8), &('A' as u8), false));
+/// assert!( match_char(&('a' as u8), &('A' as u8), true));
+/// ```
 #[must_use]
-fn match_char(e1: &u8, e2: &u8, ignore_case: bool) -> bool {
+pub fn match_char(e1: &u8, e2: &u8, ignore_case: bool) -> bool {
     if ignore_case {
         // FIXME: redis uses tolower() which is locale aware
         return e1.to_ascii_lowercase() == e2.to_ascii_lowercase();
@@ -14,6 +25,20 @@ fn match_char(e1: &u8, e2: &u8, ignore_case: bool) -> bool {
     }
 }
 
+/// Whether an element matches a glob-like pattern. Optionally ignores case.
+///
+/// # Examples
+///
+/// ```
+/// use util::glob_match;
+/// assert!(glob_match(&b"".to_vec(), &b"".to_vec(), false));
+/// assert!(glob_match(&b"foo*baz".to_vec(), &b"foobarbaz".to_vec(), false));
+/// assert!(!glob_match(&b"foo*baz".to_vec(), &b"foobazbar".to_vec(), false));
+/// assert!(glob_match(&b"fooba?".to_vec(), &b"foobar".to_vec(), false));
+/// assert!(glob_match(&b"fooba?".to_vec(), &b"foobaz".to_vec(), false));
+/// assert!(!glob_match(&b"fooba?".to_vec(), &b"foofoo".to_vec(), false));
+/// ```
+#[must_use]
 pub fn glob_match(pattern: &Vec<u8>, element: &Vec<u8>, ignore_case: bool) -> bool {
     let mut patternpos = 0;
     let mut elementpos = 0;
@@ -132,15 +157,33 @@ pub fn glob_match(pattern: &Vec<u8>, element: &Vec<u8>, ignore_case: bool) -> bo
     return false;
 }
 
+/// Current timestamp in microseconds
 pub fn ustime() -> i64 {
     let tv = get_time();
     tv.sec * 1000000 + (tv.nsec / 1000) as i64
 }
 
+/// Current timestamp in milliseconds
 pub fn mstime() -> i64 {
     ustime() / 1000
 }
 
+/// Parses a config line string.
+///
+/// # Examples
+/// ```
+/// # use util::splitargs;
+/// #
+/// let res = splitargs(b"hello world").unwrap();
+/// assert_eq!(res, vec![b"hello".to_vec(), b"world".to_vec()]);
+/// ```
+///
+/// ```
+/// # use util::splitargs;
+/// #
+/// let res = splitargs(b"foo \"bar baz\"").unwrap();
+/// assert_eq!(res, vec![b"foo".to_vec(), b"bar baz".to_vec()]);
+/// ```
 pub fn splitargs(args: &[u8]) -> Result<Vec<Vec<u8>>, ()> {
     let mut i = 0;
     let mut result = Vec::new();
@@ -220,6 +263,7 @@ pub fn splitargs(args: &[u8]) -> Result<Vec<Vec<u8>>, ()> {
     Ok(result)
 }
 
+/// Creates an array of four `u8` from a `u32`.
 pub fn htonl(v: u32) -> [u8; 4] {
     // maybe it should use C api instead?
     [
