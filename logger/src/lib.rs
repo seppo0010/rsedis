@@ -1,3 +1,6 @@
+#[cfg(unix)]extern crate syslog;
+
+use std::ascii::AsciiExt;
 use std::io;
 use std::io::{Write, stderr};
 use std::iter::FromIterator;
@@ -123,45 +126,118 @@ impl Level {
     /// ```
     /// # use logger::Level;
     /// #
-    /// assert!(Level::Debug.contains(Level::Debug));
-    /// assert!(!Level::Warning.contains(Level::Debug));
-    /// assert!(Level::Debug.contains(Level::Warning));
+    /// assert!(Level::Debug.contains(&Level::Debug));
+    /// assert!(!Level::Warning.contains(&Level::Debug));
+    /// assert!(Level::Debug.contains(&Level::Warning));
     /// ```
-    pub fn contains(&self, other: Level) -> bool {
+    pub fn contains(&self, other: &Level) -> bool {
         match *self {
             Level::Debug => true,
-            Level::Verbose => other != Level::Debug,
-            Level::Notice => other == Level::Notice || other == Level::Warning,
-            Level::Warning => other == Level::Warning,
+            Level::Verbose => *other != Level::Debug,
+            Level::Notice => *other == Level::Notice || *other == Level::Warning,
+            Level::Warning => *other == Level::Warning,
         }
     }
 }
 
 #[derive(Clone)]
+#[cfg(unix)]
 pub struct Logger {
     // this might be ugly, but here it goes...
     /// To change the Output target, send `(Some(Output), None, None)`
     /// To change the Level target, send `(None, Some(Level), None)`
     /// To log a message send `(None, Some(Level), Some(String))` where the
     /// level is the message level
-    tx: Sender<(Option<Output>, Option<Level>, Option<String>)>,
+    tx: Sender<(Option<Output>, Option<Level>, Option<String>, Option<Option<Box<syslog::Writer>>>)>,
+}
+
+#[derive(Clone)]
+#[cfg(not(unix))]
+pub struct Logger {
+    // this might be ugly, but here it goes...
+    /// To change the Output target, send `(Some(Output), None, None)`
+    /// To change the Level target, send `(None, Some(Level), None)`
+    /// To log a message send `(None, Some(Level), Some(String))` where the
+    /// level is the message level
+    tx: Sender<(Option<Output>, Option<Level>, Option<String>, Option<()>)>,
 }
 
 impl Logger {
     /// Creates a new `Logger` for a given `Output` and severity `Level`.
+    #[cfg(unix)]
     fn create(level: Level, output: Output) -> Logger {
-        let (tx, rx) = channel::<(Option<Output>, Option<Level>, Option<String>)>();
+        let (tx, rx) = channel::<(Option<Output>, Option<Level>, Option<String>, Option<Option<Box<syslog::Writer>>>)>();
+        {
+            let mut level = level;
+            let mut output = output;
+            let mut syslog_writer:Option<Box<syslog::Writer>> = None;
+            thread::spawn(move || {
+                loop {
+                    let (_output, _level, _msg, _syslog_writer) = match rx.recv() {
+                        Ok(m) => m,
+                        Err(_) => break,
+                    };
+                    if _msg.is_some() {
+                        let lvl =_level.unwrap();
+                        if level.contains(&lvl) {
+                            let msg = _msg.unwrap();
+                            match write!(output, "{}", format!("{}\n", msg)) {
+                                Ok(_) => (),
+                                Err(e) => {
+                                    // failing to log a message... will write straight to stderr
+                                    // if we cannot do that, we'll panic
+                                    write!(stderr(), "Failed to log {:?} {}", e, msg).unwrap();
+                                }
+                            };
+                            if let Some(ref mut w) = syslog_writer {
+                                match w.send(match lvl {
+                                    Level::Debug => syslog::Severity::LOG_DEBUG,
+                                    Level::Verbose => syslog::Severity::LOG_INFO,
+                                    Level::Notice => syslog::Severity::LOG_NOTICE,
+                                    Level::Warning => syslog::Severity::LOG_WARNING,
+                                }, msg.clone()) {
+                                    Ok(_) => (),
+                                    Err(e) => {
+                                        // failing to log a message... will write straight to stderr
+                                        // if we cannot do that, we'll panic
+                                        write!(stderr(), "Failed to log {:?} {}", e, msg).unwrap();
+                                    }
+                                }
+                            }
+                        }
+                    } else if _level.is_some() {
+                        level = _level.unwrap();
+                    } else if _output.is_some() {
+                        output = _output.unwrap();
+                    } else if _syslog_writer.is_some() {
+                        syslog_writer = _syslog_writer.unwrap();
+                    } else {
+                        panic!("Unknown message {:?}", (_output, _level, _msg, _syslog_writer.is_some()));
+                    }
+                };
+            });
+        }
+
+        Logger {
+            tx: tx,
+        }
+    }
+
+    #[cfg(not(unix))]
+    fn create(level: Level, output: Output) -> Logger {
+        let (tx, rx) = channel::<(Option<Output>, Option<Level>, Option<String>, Option<()>)>();
         {
             let mut level = level;
             let mut output = output;
             thread::spawn(move || {
                 loop {
-                    let (_output, _level, _msg) = match rx.recv() {
+                    let (_output, _level, _msg, _) = match rx.recv() {
                         Ok(m) => m,
                         Err(_) => break,
                     };
                     if _msg.is_some() {
-                        if level.contains(_level.unwrap()) {
+                        let lvl =_level.unwrap();
+                        if level.contains(&lvl) {
                             let msg = _msg.unwrap();
                             match write!(output, "{}", format!("{}\n", msg)) {
                                 Ok(_) => (),
@@ -222,16 +298,47 @@ impl Logger {
         Ok(Self::create(level, Output::File(try!(File::create(Path::new(path))), path.to_owned())))
     }
 
+    /// Disables syslog
+    #[cfg(unix)]
+    pub fn disable_syslog(&mut self) {
+        self.tx.send((None, None, None, Some(None))).unwrap();
+    }
+
+    #[cfg(not(unix))]
+    pub fn disable_syslog(&mut self) {
+    }
+
+    /// Enables syslog.
+    #[cfg(unix)]
+    pub fn set_syslog(&mut self, ident: &String, facility: &String) {
+        let w = syslog::init(ident.clone(), match &*(&*facility.clone()).to_ascii_lowercase() {
+            "local0" => syslog::Facility::LOG_LOCAL0,
+            "local1" => syslog::Facility::LOG_LOCAL1,
+            "local2" => syslog::Facility::LOG_LOCAL2,
+            "local3" => syslog::Facility::LOG_LOCAL3,
+            "local4" => syslog::Facility::LOG_LOCAL4,
+            "local5" => syslog::Facility::LOG_LOCAL5,
+            "local6" => syslog::Facility::LOG_LOCAL6,
+            "local7" => syslog::Facility::LOG_LOCAL7,
+            _ => syslog::Facility::LOG_USER,
+        }, ident.clone()).unwrap();
+        self.tx.send((None, None, None, Some(Some(w)))).unwrap();
+    }
+
+    #[cfg(not(unix))]
+    pub fn set_syslog(&mut self, _: &String, _: &String) {
+    }
+
     /// Changes the output to be a file in `path`.
     pub fn set_logfile(&mut self, path: &str) -> io::Result<()> {
         let file = Output::File(try!(File::create(Path::new(path))), path.to_owned());
-        self.tx.send((Some(file), None, None)).unwrap();
+        self.tx.send((Some(file), None, None, None)).unwrap();
         Ok(())
     }
 
     /// Changes the log level.
     pub fn set_loglevel(&mut self, level: Level) {
-        self.tx.send((None, Some(level), None)).unwrap();
+        self.tx.send((None, Some(level), None, None)).unwrap();
     }
 
     /// Creates a new sender to log messages.
@@ -244,7 +351,7 @@ impl Logger {
                     Ok(msg) => msg,
                     Err(_) => break,
                 };
-                match tx2.send((None, Some(level), Some(message))) {
+                match tx2.send((None, Some(level), Some(message), None)) {
                     Ok(_) => (),
                     Err(_) => break,
                 };
@@ -255,7 +362,7 @@ impl Logger {
 
     /// Logs a message with a log level.
     pub fn log(&self, level: Level, msg: String) {
-        self.tx.send((None, Some(level), Some(msg))).unwrap();
+        self.tx.send((None, Some(level), Some(msg), None)).unwrap();
     }
 }
 
@@ -268,25 +375,25 @@ mod test_log {
 
     #[test]
     fn log_levels() {
-        assert!(Level::Debug.contains(Level::Debug));
-        assert!(Level::Debug.contains(Level::Verbose));
-        assert!(Level::Debug.contains(Level::Notice));
-        assert!(Level::Debug.contains(Level::Warning));
+        assert!(Level::Debug.contains(&Level::Debug));
+        assert!(Level::Debug.contains(&Level::Verbose));
+        assert!(Level::Debug.contains(&Level::Notice));
+        assert!(Level::Debug.contains(&Level::Warning));
 
-        assert!(!Level::Verbose.contains(Level::Debug));
-        assert!(Level::Verbose.contains(Level::Verbose));
-        assert!(Level::Verbose.contains(Level::Notice));
-        assert!(Level::Verbose.contains(Level::Warning));
+        assert!(!Level::Verbose.contains(&Level::Debug));
+        assert!(Level::Verbose.contains(&Level::Verbose));
+        assert!(Level::Verbose.contains(&Level::Notice));
+        assert!(Level::Verbose.contains(&Level::Warning));
 
-        assert!(!Level::Notice.contains(Level::Debug));
-        assert!(!Level::Notice.contains(Level::Verbose));
-        assert!(Level::Notice.contains(Level::Notice));
-        assert!(Level::Notice.contains(Level::Warning));
+        assert!(!Level::Notice.contains(&Level::Debug));
+        assert!(!Level::Notice.contains(&Level::Verbose));
+        assert!(Level::Notice.contains(&Level::Notice));
+        assert!(Level::Notice.contains(&Level::Warning));
 
-        assert!(!Level::Warning.contains(Level::Debug));
-        assert!(!Level::Warning.contains(Level::Verbose));
-        assert!(!Level::Warning.contains(Level::Notice));
-        assert!(Level::Warning.contains(Level::Warning));
+        assert!(!Level::Warning.contains(&Level::Debug));
+        assert!(!Level::Warning.contains(&Level::Verbose));
+        assert!(!Level::Warning.contains(&Level::Notice));
+        assert!(Level::Warning.contains(&Level::Warning));
     }
 
     #[test]

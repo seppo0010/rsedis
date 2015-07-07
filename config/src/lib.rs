@@ -38,6 +38,9 @@ pub struct Config {
     pub rename_commands: HashMap<String, Option<String>>,
     pub requirepass: Option<String>,
     pub tcp_backlog: i32,
+    pub syslog_enabled: bool,
+    pub syslog_ident: String,
+    pub syslog_facility: String,
 }
 
 #[derive(Debug)]
@@ -91,6 +94,9 @@ impl Config {
             rename_commands: HashMap::new(),
             requirepass: None,
             tcp_backlog: 511,
+            syslog_enabled: false,
+            syslog_ident: "rsedis".to_owned(),
+            syslog_facility: "local0".to_owned(),
         }
     }
 
@@ -111,6 +117,9 @@ impl Config {
             rename_commands: HashMap::new(),
             requirepass: None,
             tcp_backlog: 511,
+            syslog_enabled: false,
+            syslog_ident: "rsedis".to_owned(),
+            syslog_facility: "local0".to_owned(),
         }
     }
 
@@ -181,6 +190,9 @@ impl Config {
                 },
                 b"requirepass" => self.requirepass = Some(try!(read_string(args)).to_owned()),
                 b"tcp-backlog" => self.tcp_backlog = try!(read_parse(args)),
+                b"syslog-enabled" => self.syslog_enabled = try!(read_bool(args)),
+                b"syslog-ident" => self.syslog_ident = try!(read_string(args)).to_owned(),
+                b"syslog-facility" => self.syslog_facility = try!(read_string(args)).to_owned(),
                 b"include" => if args.len() != 2 {
                     return Err(ConfigError::InvalidFormat)
                 } else {
@@ -188,6 +200,9 @@ impl Config {
                 },
                 _ => writeln!(&mut std::io::stderr(), "Unknown configuration {:?}", line).unwrap(),
             };
+        }
+        if self.syslog_enabled {
+            self.logger.set_syslog(&self.syslog_ident, &self.syslog_facility);
         }
 
         Ok(())

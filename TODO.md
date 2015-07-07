@@ -176,9 +176,9 @@
     - [x] tcp-keepalive
     - [x] loglevel
     - [x] logfile
-    - [ ] syslog-enabled
-    - [ ] syslog-ident
-    - [ ] syslog-facility
+    - [x] syslog-enabled
+    - [x] syslog-ident
+    - [x] syslog-facility
     - [x] databases
     - [ ] save
     - [ ] stop-writes-on-bgsave-error
