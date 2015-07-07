@@ -8,26 +8,33 @@ use std::num::ParseFloatError;
 use std::error::Error;
 use std::fmt;
 
+/// A command argument
+#[derive(Debug)]
 pub struct Argument {
+    /// The position in the array
     pub pos: usize,
+    /// The length in the array
     pub len: usize,
 }
 
+/// A protocol parser
+#[derive(Debug)]
 pub struct Parser<'a> {
+    /// The data itself
     data: &'a[u8],
+    /// The arguments location and length
     pub argv: Vec<Argument>
 }
 
+/// Error parsing
+#[derive(Debug)]
 pub enum ParseError {
+    /// The received buffer is valid but needs more data
     Incomplete,
+    /// The received buffer is invalid
     BadProtocol,
+    /// Expected one type of argument and received another
     InvalidArgument,
-}
-
-impl fmt::Debug for ParseError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        return write!(f, "{}", self.description());
-    }
 }
 
 impl fmt::Display for ParseError {
@@ -61,6 +68,7 @@ impl From<ParseFloatError> for ParseError {
 }
 
 impl<'a> Parser<'a> {
+    /// Creates a new parser with the data and arguments provided
     pub fn new(data: &[u8], argv: Vec<Argument>) -> Parser {
         return Parser {
             data: data,
@@ -68,6 +76,33 @@ impl<'a> Parser<'a> {
         };
     }
 
+    /// Gets a `Bound` from a parameter.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(collections_bound)]
+    /// # use std::collections::Bound;
+    /// # use parser::{Parser, Argument};
+    /// let parser = Parser::new(b"+inf", vec![Argument { pos: 0, len: 4 }]);
+    /// assert_eq!(parser.get_f64_bound(0).unwrap(), Bound::Unbounded);
+    /// ```
+    ///
+    /// ```
+    /// # #![feature(collections_bound)]
+    /// # use std::collections::Bound;
+    /// # use parser::{Parser, Argument};
+    /// let parser = Parser::new(b"1.23", vec![Argument { pos: 0, len: 4 }]);
+    /// assert_eq!(parser.get_f64_bound(0).unwrap(), Bound::Included(1.23));
+    /// ```
+    ///
+    /// ```
+    /// # #![feature(collections_bound)]
+    /// # use std::collections::Bound;
+    /// # use parser::{Parser, Argument};
+    /// let parser = Parser::new(b"(1.23", vec![Argument { pos: 0, len: 5 }]);
+    /// assert_eq!(parser.get_f64_bound(0).unwrap(), Bound::Excluded(1.23));
+    /// ```
     pub fn get_f64_bound(&self, pos: usize) -> Result<Bound<f64>, ParseError> {
         let s = try!(self.get_str(pos));
         if s == "inf" || s == "+inf" || s == "-inf" {
@@ -80,26 +115,72 @@ impl<'a> Parser<'a> {
     }
 
     // TODO: get<T>
+
+    /// Gets an f64 from a parameter
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use parser::{Parser, Argument};
+    /// let parser = Parser::new(b"1.23", vec![Argument { pos: 0, len: 4 }]);
+    /// assert_eq!(parser.get_f64(0).unwrap(), 1.23);
+    /// ```
     pub fn get_f64(&self, pos: usize) -> Result<f64, ParseError> {
         let s = try!(self.get_str(pos));
         return Ok(try!(s.parse::<f64>()));
     }
 
+    /// Gets an i64 from a parameter
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use parser::{Parser, Argument};
+    /// let parser = Parser::new(b"-123", vec![Argument { pos: 0, len: 4 }]);
+    /// assert_eq!(parser.get_i64(0).unwrap(), -123);
+    /// ```
     pub fn get_i64(&self, pos: usize) -> Result<i64, ParseError> {
         let s = try!(self.get_str(pos));
         return Ok(try!(s.parse::<i64>()));
     }
 
+    /// Gets an str from a parameter
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use parser::{Parser, Argument};
+    /// let parser = Parser::new(b"foo", vec![Argument { pos: 0, len: 3 }]);
+    /// assert_eq!(parser.get_str(0).unwrap(), "foo");
+    /// ```
     pub fn get_str(&self, pos: usize) -> Result<&str, ParseError> {
         let data = try!(self.get_slice(pos));
         Ok(try!(from_utf8(&data)))
     }
 
+    /// Gets a Vec<u8> from a parameter
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use parser::{Parser, Argument};
+    /// let parser = Parser::new(b"foo", vec![Argument { pos: 0, len: 3 }]);
+    /// assert_eq!(parser.get_vec(0).unwrap(), b"foo".to_vec());
+    /// ```
     pub fn get_vec(&self, pos: usize) -> Result<Vec<u8>, ParseError> {
         let data = try!(self.get_slice(pos));
         return Ok(data.to_vec());
     }
 
+    /// Gets a &[u8] from a parameter
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use parser::{Parser, Argument};
+    /// let parser = Parser::new(b"foo", vec![Argument { pos: 0, len: 3 }]);
+    /// assert_eq!(parser.get_slice(0).unwrap(), b"foo");
+    /// ```
     pub fn get_slice(&self, pos: usize) -> Result<&[u8], ParseError> {
         if pos >= self.argv.len() {
             return Err(ParseError::InvalidArgument);
@@ -109,25 +190,9 @@ impl<'a> Parser<'a> {
     }
 }
 
-impl<'a> fmt::Debug for Parser<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        return write!(f, "{}", self.description());
-    }
-}
-
-impl<'a> fmt::Display for Parser<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        return self.description().fmt(f);
-    }
-}
-
-impl<'a> Error for Parser<'a> {
-    fn description(&self) -> &str {
-        return "parser";
-    }
-    fn cause(&self) -> Option<&Error> { None }
-}
-
+/// Parses the length of the paramenter in the slice
+/// Upon success, it returns a tuple with the length of the argument and the
+/// length of the parsed length.
 fn parse_int(input: &[u8], len: usize) -> Result<(usize, usize), ParseError> {
     let mut i = 0;
     let mut argc = 0;
@@ -150,6 +215,18 @@ fn parse_int(input: &[u8], len: usize) -> Result<(usize, usize), ParseError> {
     return Ok((argc, i + 1));
 }
 
+/// Creates a parser from a buffer.
+///
+/// # Examples
+///
+/// ```
+/// # use parser::parse;
+/// let s = b"*3\r\n$3\r\nSET\r\n$5\r\nmykey\r\n$2\r\n10\r\n";
+/// let parser = parse(s, 32).unwrap();
+/// assert_eq!(parser.get_str(0).unwrap(), "SET");
+/// assert_eq!(parser.get_str(1).unwrap(), "mykey");
+/// assert_eq!(parser.get_i64(2).unwrap(), 10);
+/// ```
 pub fn parse(input: &[u8], len: usize) -> Result<Parser, ParseError> {
     if input[0] as char != '*' {
         return Err(ParseError::BadProtocol);
