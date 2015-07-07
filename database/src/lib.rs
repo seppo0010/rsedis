@@ -274,12 +274,10 @@ impl Value {
     /// assert_eq!(val.get().unwrap(), b"6".to_vec());
     /// ```
     pub fn incr(&mut self, incr: i64) -> Result<i64, OperationError> {
-        let mut newval:i64;
         match *self {
             Value::Nil => {
-                newval = incr;
-                *self = Value::String(ValueString::Integer(newval.clone()));
-                return Ok(newval);
+                *self = Value::String(ValueString::Integer(incr.clone()));
+                return Ok(incr);
             },
             Value::String(ref mut value) => value.incr(incr),
             _ => return Err(OperationError::WrongTypeError),
