@@ -7,6 +7,21 @@ use std::path::Path;
 use std::sync::mpsc::{Sender, channel};
 use std::thread;
 
+/// Macro to log a message. Uses the `format!` syntax.
+/// See `std::fmt` for more information.
+///
+/// # Examples
+///
+/// ```
+/// # #[macro_use(log)]
+/// # extern crate logger;
+/// # use logger::{Logger, Level};
+/// #
+/// # fn main() {
+/// # let logger = Logger::new(Level::Warning);
+/// log!(logger, Debug, "hello {}", "world");
+/// # }
+/// ```
 #[macro_export]
 macro_rules! log {
     ($logger: expr, $level: ident, $($arg:tt)*) => ({
@@ -14,6 +29,26 @@ macro_rules! log {
     })
 }
 
+/// Macro to send a message to a `Sender<(Level, String)>`.
+/// Uses the `format!` syntax.
+/// See `std::fmt` for more information.
+///
+/// # Examples
+///
+/// ```
+/// # #[macro_use(sendlog)]
+/// # extern crate logger;
+/// # use logger::{Logger, Level};
+/// # use std::sync::mpsc::channel;
+/// #
+/// # fn main() {
+/// # let (tx, rx) = channel();
+/// # let logger = Logger::channel(Level::Debug, tx);
+/// # let sender = logger.sender();
+/// sendlog!(sender, Debug, "hello {}", "world");
+/// # assert_eq!(rx.recv().unwrap(), b"hello world\n");
+/// # }
+/// ```
 #[macro_export]
 macro_rules! sendlog {
     ($sender: expr, $level: ident, $($arg:tt)*) => ({
@@ -22,8 +57,11 @@ macro_rules! sendlog {
 }
 
 enum Output {
+    /// Sends logs to a channel
     Channel(Sender<Vec<u8>>),
+    /// Writes to the standard error
     Stderr,
+    /// Writes to a `File` in `String` path
     File(File, String),
 }
 
@@ -65,6 +103,8 @@ impl Clone for Output {
     }
 }
 
+/// A level that identifies a log message.
+/// A lower level includes all higher levels.
 #[derive(PartialEq, Clone, Debug)]
 pub enum Level {
     Debug,
@@ -74,7 +114,20 @@ pub enum Level {
 }
 
 impl Level {
-    fn contains(&self, other: Level) -> bool {
+    /// Whether the level is equal or lower than another level.
+    /// For example, `Debug` includes all other levels, while `Warning` only
+    /// includes itself.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use logger::Level;
+    /// #
+    /// assert!(Level::Debug.contains(Level::Debug));
+    /// assert!(!Level::Warning.contains(Level::Debug));
+    /// assert!(Level::Debug.contains(Level::Warning));
+    /// ```
+    pub fn contains(&self, other: Level) -> bool {
         match *self {
             Level::Debug => true,
             Level::Verbose => other != Level::Debug,
@@ -86,16 +139,16 @@ impl Level {
 
 #[derive(Clone)]
 pub struct Logger {
-    // this might be ugly...
-    // but here it goes
-    // to change the Output target, send (Some(Output), None, None)
-    // to change the Level target, send (None, Some(Level), None)
-    // to log a message send (None, Some(Level), Some(String)) where the level
-    // is the message level
+    // this might be ugly, but here it goes...
+    /// To change the Output target, send `(Some(Output), None, None)`
+    /// To change the Level target, send `(None, Some(Level), None)`
+    /// To log a message send `(None, Some(Level), Some(String))` where the
+    /// level is the message level
     tx: Sender<(Option<Output>, Option<Level>, Option<String>)>,
 }
 
 impl Logger {
+    /// Creates a new `Logger` for a given `Output` and severity `Level`.
     fn create(level: Level, output: Output) -> Logger {
         let (tx, rx) = channel::<(Option<Output>, Option<Level>, Option<String>)>();
         {
@@ -134,28 +187,54 @@ impl Logger {
             tx: tx,
         }
     }
+
+    /// Creates a new logger that writes in the standard output.
+    ///
+    /// # Examples
+    /// ```
+    /// # use logger::{Logger, Level};
+    /// #
+    /// let logger = Logger::new(Level::Warning);
+    /// logger.log(Level::Warning, "hello world".to_owned());
+    /// ```
     pub fn new(level: Level) -> Self {
         Self::create(level, Output::Stderr)
     }
 
+    /// Creates a new logger that writes in the standard output.
+    ///
+    /// # Examples
+    /// ```
+    /// # use logger::{Logger, Level};
+    /// # use std::sync::mpsc::channel;
+    /// #
+    /// let (tx, rx) = channel();
+    /// let logger = Logger::channel(Level::Debug, tx);
+    /// logger.log(Level::Debug, "hello world".to_owned());
+    /// assert_eq!(rx.recv().unwrap(), b"hello world\n".to_vec());
+    /// ```
     pub fn channel(level: Level, s: Sender<Vec<u8>>) -> Self {
         Self::create(level, Output::Channel(s))
     }
 
+    /// Creates a new logger that writes in a file.
     pub fn file(level: Level, path: &str) -> io::Result<Self> {
         Ok(Self::create(level, Output::File(try!(File::create(Path::new(path))), path.to_owned())))
     }
 
+    /// Changes the output to be a file in `path`.
     pub fn set_logfile(&mut self, path: &str) -> io::Result<()> {
         let file = Output::File(try!(File::create(Path::new(path))), path.to_owned());
         self.tx.send((Some(file), None, None)).unwrap();
         Ok(())
     }
 
+    /// Changes the log level.
     pub fn set_loglevel(&mut self, level: Level) {
         self.tx.send((None, Some(level), None)).unwrap();
     }
 
+    /// Creates a new sender to log messages.
     pub fn sender(&self) -> Sender<(Level, String)> {
         let (tx, rx) = channel();
         let tx2 = self.tx.clone();
@@ -174,6 +253,7 @@ impl Logger {
         tx
     }
 
+    /// Logs a message with a log level.
     pub fn log(&self, level: Level, msg: String) {
         self.tx.send((None, Some(level), Some(msg))).unwrap();
     }
