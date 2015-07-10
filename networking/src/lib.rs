@@ -39,11 +39,18 @@ use parser::ParseError;
 use response::{Response, ResponseError};
 
 /// A stream connection.
+#[cfg(unix)]
 enum Stream {
     Tcp(TcpStream),
     Unix(UnixStream),
 }
 
+#[cfg(not(unix))]
+enum Stream {
+    Tcp(TcpStream),
+}
+
+#[cfg(unix)]
 impl Stream {
     /// Creates a new independently owned handle to the underlying socket.
     fn try_clone(&self) -> io::Result<Stream> {
@@ -100,6 +107,55 @@ impl Stream {
     }
 }
 
+#[cfg(not(unix))]
+impl Stream {
+    /// Creates a new independently owned handle to the underlying socket.
+    fn try_clone(&self) -> io::Result<Stream> {
+        match *self {
+            Stream::Tcp(ref s) => Ok(Stream::Tcp(try!(s.try_clone()))),
+        }
+    }
+
+    /// Write a buffer into this object, returning how many bytes were written.
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        match *self {
+            Stream::Tcp(ref mut s) => s.write(buf),
+        }
+    }
+
+    /// Pull some bytes from this source into the specified buffer,
+    /// returning how many bytes were read.
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        match *self {
+            Stream::Tcp(ref mut s) => s.read(buf),
+        }
+    }
+
+    /// Sets the keepalive timeout to the timeout specified.
+    /// It fails silently for UNIX sockets.
+    fn set_keepalive(&self, seconds: Option<u32>) -> io::Result<()> {
+        match *self {
+            Stream::Tcp(ref s) => s.set_keepalive(seconds),
+        }
+    }
+
+    /// Sets the write timeout to the timeout specified.
+    /// It fails silently for UNIX sockets.
+    fn set_write_timeout(&self, dur: Option<Duration>) -> io::Result<()> {
+        match *self {
+            Stream::Tcp(ref s) => s.set_write_timeout(dur),
+        }
+    }
+
+    /// Sets the read timeout to the timeout specified.
+    /// It fails silently for UNIX sockets.
+    fn set_read_timeout(&self, dur: Option<Duration>) -> io::Result<()> {
+        match *self {
+            Stream::Tcp(ref s) => s.set_read_timeout(dur),
+        }
+    }
+}
+
 /// A client connection
 struct Client {
     /// The socket connection
@@ -128,6 +184,7 @@ impl Client {
     }
 
     /// Creates a new UNIX socket client
+    #[cfg(unix)]
     pub fn unix(stream: UnixStream, db: Arc<Mutex<Database>>) -> Client {
         return Client {
             stream: Stream::Unix(stream),
@@ -349,8 +406,11 @@ impl Server {
 
     #[cfg(not(unix))]
     pub fn run(&mut self) {
-        let db = self.db.lock().unwrap();
-        if db.config.daemonize {
+        let daemonize = {
+            let db = self.db.lock().unwrap();
+            db.config.daemonize
+        };
+        if daemonize {
             panic!("Cannot daemonize in non-unix");
         } else {
             self.start();
@@ -433,7 +493,7 @@ impl Server {
     }
 
     #[cfg(not(unix))]
-    fn handle_unixsocket() {
+    fn handle_unixsocket(&mut self) {
         let db = self.db.lock().unwrap();
         if db.config.unixsocket.is_some() {
             writeln!(&mut std::io::stderr(), "Ignoring unixsocket in non unix environment\n");

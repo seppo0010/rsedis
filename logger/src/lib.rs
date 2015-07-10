@@ -1,6 +1,6 @@
 #[cfg(unix)]extern crate syslog;
 
-use std::ascii::AsciiExt;
+#[cfg(unix)] use std::ascii::AsciiExt;
 use std::io;
 use std::io::{Write, stderr};
 use std::iter::FromIterator;
