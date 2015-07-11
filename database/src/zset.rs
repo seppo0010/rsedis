@@ -210,35 +210,60 @@ impl ValueSortedSet {
         count
     }
 
-    pub fn zrange(&self, _start: i64, _stop: i64, withscores: bool, rev: bool) -> Vec<Vec<u8>> {
+    fn normalize_range(&self, start: i64, stop: i64, rev: bool) -> (usize, usize) {
         let skiplist = match *self {
             ValueSortedSet::Data(ref skiplist, _) => skiplist,
         };
 
         let len = skiplist.len();
-        let (start, stop) = if rev {
-            (match normalize_position(- _stop - 1, len) {
+        if rev {
+            (match normalize_position(- stop - 1, len) {
                 Ok(i) => i,
-                Err(g) => if !g { 0 } else { return vec![]; },
+                Err(g) => if !g { 0 } else { return (1, 0); },
             },
-            match normalize_position(- _start - 1, len) {
+            match normalize_position(- start - 1, len) {
                 Ok(i) => i,
-                Err(g) => if !g { return vec![]; } else { len },
+                Err(g) => if !g { return (1, 0); } else { len },
             })
         } else {
-            (match normalize_position(_start, len) {
+            (match normalize_position(start, len) {
                 Ok(i) => i,
-                Err(g) => if !g { 0 } else { return vec![]; },
+                Err(g) => if !g { 0 } else { return (1, 0); },
             },
-            match normalize_position(_stop, len) {
+            match normalize_position(stop, len) {
                 Ok(i) => i,
-                Err(g) => if !g { return vec![]; } else { len },
+                Err(g) => if !g { return (1, 0); } else { len },
             })
+        }
+    }
+
+    pub fn zremrangebyrank(&mut self, _start: i64, _stop: i64) -> usize {
+        let (start, stop) = self.normalize_range(_start, _stop, false);
+        if stop < start {
+            return 0;
+        }
+
+        let (skiplist, hmap) = match *self {
+            ValueSortedSet::Data(ref mut skiplist, ref mut hmap) => (skiplist, hmap),
         };
 
+        for _ in 0..(stop - start + 1) {
+            let el = skiplist.remove_index(&start);
+            hmap.remove(&el.s);
+        };
+        stop - start + 1
+    }
+
+    pub fn zrange(&self, _start: i64, _stop: i64, withscores: bool, rev: bool) -> Vec<Vec<u8>> {
+        let skiplist = match *self {
+            ValueSortedSet::Data(ref skiplist, _) => skiplist,
+        };
+
+        let (start, stop) = self.normalize_range(_start, _stop, rev);
         if stop < start {
             return vec![];
         }
+
         let first = skiplist.get(&start).unwrap();
         let mut r = vec![];
         if rev {
@@ -386,4 +411,19 @@ fn zremrangebyscore() {
     assert_eq!(zset.zremrangebyscore(Bound::Unbounded, Bound::Unbounded), 2);
     assert_eq!(zset.zrank(b"a".to_vec()), None);
     assert_eq!(zset.zremrangebyscore(Bound::Unbounded, Bound::Unbounded), 0);
+}
+
+#[test]
+fn zremrangebyrank() {
+    let mut zset = ValueSortedSet::new();
+    zset.zadd(1.0, b"a".to_vec(), false, false, false, false);
+    zset.zadd(2.0, b"b".to_vec(), false, false, false, false);
+    zset.zadd(3.0, b"c".to_vec(), false, false, false, false);
+    zset.zadd(4.0, b"d".to_vec(), false, false, false, false);
+    assert_eq!(zset.zremrangebyrank(1, -2), 2);
+    assert_eq!(zset.zrank(b"a".to_vec()).unwrap(), 0);
+    assert_eq!(zset.zrank(b"c".to_vec()), None);
+    assert_eq!(zset.zremrangebyrank(0, -1), 2);
+    assert_eq!(zset.zrank(b"a".to_vec()), None);
+    assert_eq!(zset.zremrangebyrank(0, -1), 0);
 }

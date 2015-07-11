@@ -1122,6 +1122,21 @@ fn zremrangebyscore(parser: &Parser, db: &mut Database, dbindex: usize) -> Respo
     }
 }
 
+fn zremrangebyrank(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() == 4, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let start = try_validate!(parser.get_i64(2), "Invalid start");
+    let stop = try_validate!(parser.get_i64(3), "Invalid stop");
+    let el = match db.get_mut(dbindex, &key) {
+        Some(e) => e,
+        None => return Response::Integer(0),
+    };
+    match el.zremrangebyrank(start, stop) {
+        Ok(c) => Response::Integer(c as i64),
+        Err(err) => Response::Error(err.to_string()),
+    }
+}
+
 fn zcount(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 4, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
@@ -1433,6 +1448,7 @@ pub fn command(
         "zincrby" => zincrby(parser, db, dbindex),
         "zrem" => zrem(parser, db, dbindex),
         "zremrangebyscore" => zremrangebyscore(parser, db, dbindex),
+        "zremrangebyrank" => zremrangebyrank(parser, db, dbindex),
         "zcount" => zcount(parser, db, dbindex),
         "zrange" => zrange(parser, db, dbindex),
         "zrevrange" => zrevrange(parser, db, dbindex),
@@ -2346,6 +2362,16 @@ mod test_command {
         assert_eq!(command(&parser!(b"zremrangebyscore key 2 3"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(0));
         assert_eq!(command(&parser!(b"zremrangebyscore key (2 4"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(1));
         assert_eq!(command(&parser!(b"zremrangebyscore key -inf inf"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(1));
+    }
+
+    #[test]
+    fn zremrangebyrank_command() {
+        let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
+        assert_eq!(command(&parser!(b"zadd key 1 a 2 b 3 c 4 d"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(4));
+        assert_eq!(command(&parser!(b"zremrangebyrank key 1 2"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(2));
+        assert_eq!(command(&parser!(b"zremrangebyrank key 5 10"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(0));
+        assert_eq!(command(&parser!(b"zremrangebyrank key 1 -1"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(1));
+        assert_eq!(command(&parser!(b"zremrangebyrank key 0 -1"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(1));
     }
 
     #[test]

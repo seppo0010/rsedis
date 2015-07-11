@@ -1199,6 +1199,31 @@ impl Value {
         }
     }
 
+    /// Removes all elements within a rank range. Returns the number of removed elements
+    ///
+    /// # Examples
+    /// ```
+    /// #![feature(collections_bound)]
+    /// use database::Value;
+    /// use std::collections::Bound;
+    ///
+    /// let mut val = Value::Nil;
+    /// assert_eq!(val.zremrangebyrank(0, -1).unwrap(), 0);
+    /// val.zadd(1.0, vec![1], false, false, false, false).unwrap();
+    /// val.zadd(2.0, vec![2], false, false, false, false).unwrap();
+    /// val.zadd(3.0, vec![3], false, false, false, false).unwrap();
+    /// assert_eq!(val.zremrangebyrank(1, 1).unwrap(), 1);
+    /// assert_eq!(val.zremrangebyrank(1, 1).unwrap(), 1);
+    /// assert_eq!(val.zcard().unwrap(), 1);
+    /// ```
+    pub fn zremrangebyrank(&mut self, start: i64, stop: i64) -> Result<usize, OperationError> {
+        match *self {
+            Value::Nil => Ok(0),
+            Value::SortedSet(ref mut value) => Ok(value.zremrangebyrank(start, stop)),
+            _ => Err(OperationError::WrongTypeError),
+        }
+    }
+
     /// Serializes and writes into `writer` the object current value.
     /// The serialized version also includes the type, the version and a crc.
     ///

@@ -52,7 +52,7 @@
     - [x] zincrby
     - [x] zrem
     - [x] zremrangebyscore
-    - [ ] zremrangebyrank
+    - [x] zremrangebyrank
     - [ ] zremrangebylex
     - [ ] zunionstore
     - [ ] zinterstore
