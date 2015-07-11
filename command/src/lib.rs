@@ -1220,21 +1220,36 @@ fn zrevrangebyscore(parser: &Parser, db: &mut Database, dbindex: usize) -> Respo
     generic_zrangebyscore(parser, db, dbindex, true)
 }
 
+fn generic_zrank(db: &mut Database, dbindex: usize, key: &Vec<u8>, member: Vec<u8>, rev: bool) -> Response {
+    let el = match db.get(dbindex, key) {
+        Some(e) => e,
+        None => return Response::Nil,
+    };
+    let card = match el.zcard() {
+        Ok(card) => card,
+        Err(err) => return Response::Error(err.to_string()),
+    };
+    match el.zrank(member) {
+        Ok(r) => match r {
+            Some(v) => return Response::Integer(if rev { card - v - 1 } else { v } as i64),
+            None => return Response::Nil,
+        },
+        Err(err) => return Response::Error(err.to_string()),
+    }
+}
+
 fn zrank(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let member = try_validate!(parser.get_vec(2), "Invalid member");
-    let el = match db.get(dbindex, &key) {
-        Some(e) => e,
-        None => return Response::Nil,
-    };
-    match el.zrank(member) {
-        Ok(r) => match r {
-            Some(v) => Response::Integer(v as i64),
-            None => Response::Nil,
-        },
-        Err(err) => Response::Error(err.to_string()),
-    }
+    generic_zrank(db, dbindex, &key, member, false)
+}
+
+fn zrevrank(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() == 3, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let member = try_validate!(parser.get_vec(2), "Invalid member");
+    generic_zrank(db, dbindex, &key, member, true)
 }
 
 fn ping(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
@@ -1455,6 +1470,7 @@ pub fn command(
         "zrangebyscore" => zrangebyscore(parser, db, dbindex),
         "zrevrangebyscore" => zrevrangebyscore(parser, db, dbindex),
         "zrank" => zrank(parser, db, dbindex),
+        "zrevrank" => zrevrank(parser, db, dbindex),
         "dump" => dump(parser, db, dbindex),
         "subscribe" => return subscribe(parser, db, subscriptions.unwrap(), pattern_subscriptions.unwrap().len(), sender.unwrap()),
         "unsubscribe" => return unsubscribe(parser, db, subscriptions.unwrap(), pattern_subscriptions.unwrap().len(), sender.unwrap()),
@@ -2469,6 +2485,15 @@ mod test_command {
         assert_eq!(command(&parser!(b"zrank key a"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(0));
         assert_eq!(command(&parser!(b"zrank key b"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(1));
         assert_eq!(command(&parser!(b"zrank key e"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Nil);
+    }
+
+    #[test]
+    fn zrevrank_command() {
+        let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
+        assert_eq!(command(&parser!(b"zadd key 1 a 2 b 3 c 4 d"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(4));
+        assert_eq!(command(&parser!(b"zrevrank key a"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(3));
+        assert_eq!(command(&parser!(b"zrevrank key b"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(2));
+        assert_eq!(command(&parser!(b"zrevrank key e"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Nil);
     }
 
     #[test]

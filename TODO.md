@@ -67,7 +67,7 @@
     - [x] zcard
     - [x] zscore
     - [x] zrank
-    - [ ] zrevrank
+    - [x] zrevrank
     - [ ] zscan
     - [ ] hset
     - [ ] hsetnx
