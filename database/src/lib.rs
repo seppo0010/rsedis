@@ -1183,6 +1183,31 @@ impl Value {
         }
     }
 
+    /// Removes all elements within a score range. Returns the number of removed elements
+    ///
+    /// # Examples
+    /// ```
+    /// #![feature(collections_bound)]
+    /// use database::Value;
+    /// use std::collections::Bound;
+    ///
+    /// let mut val = Value::Nil;
+    /// assert_eq!(val.zremrangebyscore(Bound::Unbounded, Bound::Unbounded).unwrap(), 0);
+    /// val.zadd(1.0, vec![1], false, false, false, false).unwrap();
+    /// val.zadd(2.0, vec![2], false, false, false, false).unwrap();
+    /// val.zadd(3.0, vec![3], false, false, false, false).unwrap();
+    /// assert_eq!(val.zremrangebyscore(Bound::Included(2.0), Bound::Excluded(3.0)).unwrap(), 1);
+    /// assert_eq!(val.zremrangebyscore(Bound::Included(2.0), Bound::Excluded(3.0)).unwrap(), 0);
+    /// assert_eq!(val.zcard().unwrap(), 2);
+    /// ```
+    pub fn zremrangebyscore(&mut self, min: Bound<f64>, max: Bound<f64>) -> Result<usize, OperationError> {
+        match *self {
+            Value::Nil => Ok(0),
+            Value::SortedSet(ref mut value) => Ok(value.zremrangebyscore(min, max)),
+            _ => Err(OperationError::WrongTypeError),
+        }
+    }
+
     /// Serializes and writes into `writer` the object current value.
     /// The serialized version also includes the type, the version and a crc.
     ///

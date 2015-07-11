@@ -82,6 +82,7 @@ impl PartialOrd for SortedSetMember {
 
 #[derive(PartialEq, Debug)]
 pub enum ValueSortedSet {
+    // FIXME: Vec<u8> is repeated in memory
     Data(OrderedSkipList<SortedSetMember>, HashMap<Vec<u8>, f64>),
 }
 
@@ -154,7 +155,7 @@ impl ValueSortedSet {
         }
     }
 
-    pub fn zcount(&self, min: Bound<f64>, max: Bound<f64>) -> usize {
+    fn rangebyscore(&self, min: Bound<f64>, max: Bound<f64>) -> Vec<&SortedSetMember> {
         let skiplist = match *self {
             ValueSortedSet::Data(ref skiplist, _) => skiplist,
         };
@@ -172,7 +173,29 @@ impl ValueSortedSet {
             Bound::Unbounded => Bound::Unbounded,
         };
 
-        skiplist.range(m1, m2).collect::<Vec<_>>().len()
+        skiplist.range(m1, m2).collect::<Vec<_>>()
+    }
+
+    pub fn zcount(&self, min: Bound<f64>, max: Bound<f64>) -> usize {
+        self.rangebyscore(min, max).len()
+    }
+
+    pub fn zremrangebyscore(&mut self, min: Bound<f64>, max: Bound<f64>) -> usize {
+        let pos = match min {
+            Bound::Included(ref s) => self.zcount(Bound::Unbounded, Bound::Excluded(s.clone())),
+            Bound::Excluded(ref s) => self.zcount(Bound::Unbounded, Bound::Included(s.clone())),
+            Bound::Unbounded => 0,
+        };
+        let count = self.zcount(min, max);
+        let (skiplist, hmap) = match *self {
+            ValueSortedSet::Data(ref mut skiplist, ref mut hmap) => (skiplist, hmap),
+        };
+
+        for _ in 0..count {
+            let el = skiplist.remove_index(&pos);
+            hmap.remove(&el.s);
+        };
+        count
     }
 
     pub fn zrange(&self, _start: i64, _stop: i64, withscores: bool, rev: bool) -> Vec<Vec<u8>> {
@@ -336,4 +359,19 @@ fn dump_zset() {
     zset.dump(&mut v).unwrap();
     assert!(v == b"\x03\x02\x01b\x012\x01a\x011\x07\x00".to_vec() ||
             v == b"\x03\x02\x01a\x011\x01b\x012\x07\x00".to_vec());
+}
+
+#[test]
+fn zremrangebyscore() {
+    let mut zset = ValueSortedSet::new();
+    zset.zadd(1.0, b"a".to_vec(), false, false, false, false);
+    zset.zadd(2.0, b"b".to_vec(), false, false, false, false);
+    zset.zadd(3.0, b"c".to_vec(), false, false, false, false);
+    zset.zadd(4.0, b"d".to_vec(), false, false, false, false);
+    assert_eq!(zset.zremrangebyscore(Bound::Included(2.0), Bound::Excluded(4.0)), 2);
+    assert_eq!(zset.zrank(b"a".to_vec()).unwrap(), 0);
+    assert_eq!(zset.zrank(b"c".to_vec()), None);
+    assert_eq!(zset.zremrangebyscore(Bound::Unbounded, Bound::Unbounded), 2);
+    assert_eq!(zset.zrank(b"a".to_vec()), None);
+    assert_eq!(zset.zremrangebyscore(Bound::Unbounded, Bound::Unbounded), 0);
 }

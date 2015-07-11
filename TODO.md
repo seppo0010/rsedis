@@ -51,7 +51,7 @@
     - [x] zadd
     - [x] zincrby
     - [x] zrem
-    - [ ] zremrangebyscore
+    - [x] zremrangebyscore
     - [ ] zremrangebyrank
     - [ ] zremrangebylex
     - [ ] zunionstore
