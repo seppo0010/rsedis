@@ -38,7 +38,6 @@ use list::ValueList;
 use rdbutil::encode_u64_to_slice_u8;
 use set::ValueSet;
 use string::ValueString;
-use zset::SortedSetMember;
 use zset::ValueSortedSet;
 
 /// Any value storable in the database
@@ -910,19 +909,11 @@ impl Value {
     /// assert_eq!(val.zcard().unwrap(), 2);
     /// ```
     pub fn zrem(&mut self, member: Vec<u8>) -> Result<bool, OperationError> {
-        let (skiplist, hmap) = match *self {
-            Value::Nil => return Ok(false),
-            Value::SortedSet(ref mut value) => match *value {
-                ValueSortedSet::Data(ref mut skiplist, ref mut hmap) => (skiplist, hmap),
-            },
-            _ => return Err(OperationError::WrongTypeError),
-        };
-        let score = match hmap.remove(&member) {
-            Some(val) => val,
-            None => return Ok(false),
-        };
-        skiplist.remove(&SortedSetMember::new(score, member));
-        Ok(true)
+        match *self {
+            Value::Nil => Ok(false),
+            Value::SortedSet(ref mut value) => Ok(value.zrem(member)),
+            _ => Err(OperationError::WrongTypeError),
+        }
     }
 
     /// Adds an element to a sorted set.

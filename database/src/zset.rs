@@ -180,6 +180,18 @@ impl ValueSortedSet {
         self.rangebyscore(min, max).len()
     }
 
+    pub fn zrem(&mut self, member: Vec<u8>) -> bool {
+        let (skiplist, hmap) = match *self {
+            ValueSortedSet::Data(ref mut skiplist, ref mut hmap) => (skiplist, hmap),
+        };
+        let score = match hmap.remove(&member) {
+            Some(val) => val,
+            None => return false,
+        };
+        skiplist.remove(&SortedSetMember::new(score, member));
+        true
+    }
+
     pub fn zremrangebyscore(&mut self, min: Bound<f64>, max: Bound<f64>) -> usize {
         let pos = match min {
             Bound::Included(ref s) => self.zcount(Bound::Unbounded, Bound::Excluded(s.clone())),
