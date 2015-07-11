@@ -107,6 +107,36 @@ impl PubsubEvent {
     }
 }
 
+/// Gets all ValueSet references from a list of Value references.
+/// If a Value is nil, `default` is used.
+/// If any of the values is not a set, an error is returned instead.
+fn get_set_list<'a>(set_values: &Vec<&'a Value>, default: &'a ValueSet) -> Result<Vec<&'a ValueSet>, OperationError> {
+    let mut sets = Vec::with_capacity(set_values.len());
+    for value in set_values {
+        sets.push(match **value {
+            Value::Nil => default,
+            Value::Set(ref value) => value,
+            _ => return Err(OperationError::WrongTypeError),
+        });
+    }
+    Ok(sets)
+}
+
+/// Gets all ValueSortedSet references from a list of Value references.
+/// If a Value is nil, `default` is used.
+/// If any of the values is not a zset, an error is returned instead.
+fn get_zset_list<'a>(zset_values: &Vec<&'a Value>, default: &'a ValueSortedSet) -> Result<Vec<&'a ValueSortedSet>, OperationError> {
+    let mut zsets = Vec::with_capacity(zset_values.len());
+    for value in zset_values {
+        zsets.push(match **value {
+            Value::Nil => default,
+            Value::SortedSet(ref value) => value,
+            _ => return Err(OperationError::WrongTypeError),
+        });
+    }
+    Ok(zsets)
+}
+
 impl Value {
     /// Returns true if the value is uninitialized.
     ///
@@ -774,21 +804,6 @@ impl Value {
         }
     }
 
-    /// Gets all ValueSet references from a list of Value references.
-    /// If a Value is nil, `default` is used.
-    /// If any of the values is not a set, an error is returned instead.
-    fn get_set_list<'a>(&'a self, set_values: &Vec<&'a Value>, default: &'a ValueSet) -> Result<Vec<&ValueSet>, OperationError> {
-        let mut sets = Vec::with_capacity(set_values.len());
-        for value in set_values {
-            sets.push(match **value {
-                Value::Nil => default,
-                Value::Set(ref value) => value,
-                _ => return Err(OperationError::WrongTypeError),
-            });
-        }
-        Ok(sets)
-    }
-
     /// Returns the elements in one set that are not present in another sets.
     ///
     /// # Examples
@@ -809,7 +824,7 @@ impl Value {
     /// ```
     pub fn sdiff(&self, set_values: &Vec<&Value>) -> Result<HashSet<Vec<u8>>, OperationError> {
         let emptyset = ValueSet::new();
-        let sets = try!(self.get_set_list(set_values, &emptyset));
+        let sets = try!(get_set_list(set_values, &emptyset));
 
         match *self {
             Value::Nil => Ok(HashSet::new()),
@@ -840,7 +855,7 @@ impl Value {
     /// ```
     pub fn sinter(&self, set_values: &Vec<&Value>) -> Result<HashSet<Vec<u8>>, OperationError> {
         let emptyset = ValueSet::new();
-        let sets = try!(self.get_set_list(set_values, &emptyset));
+        let sets = try!(get_set_list(set_values, &emptyset));
 
         match *self {
             Value::Nil => Ok(HashSet::new()),
@@ -869,7 +884,7 @@ impl Value {
     /// ```
     pub fn sunion(&self, set_values: &Vec<&Value>) -> Result<HashSet<Vec<u8>>, OperationError> {
         let emptyset = ValueSet::new();
-        let sets = try!(self.get_set_list(set_values, &emptyset));
+        let sets = try!(get_set_list(set_values, &emptyset));
 
         match *self {
             Value::Nil => Ok(HashSet::new()),
@@ -1222,6 +1237,59 @@ impl Value {
             Value::SortedSet(ref mut value) => Ok(value.zremrangebyrank(start, stop)),
             _ => Err(OperationError::WrongTypeError),
         }
+    }
+
+    /// Add multiple sorted sets and store the resulting sorted set.
+    /// Returns the number of resulting items.
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    /// use database::zset;
+    ///
+    /// let mut val1 = Value::Nil;
+    /// val1.zadd(1.1, vec![1], false, false, false, false).unwrap();
+    /// let mut val2 = Value::Nil;
+    /// val2.zadd(1.2, vec![1], false, false, false, false).unwrap();
+    /// val2.zadd(2.2, vec![2], false, false, false, false).unwrap();
+    /// let mut val3 = Value::Nil;
+    /// val3.zadd(1.3, vec![1], false, false, false, false).unwrap();
+    /// val3.zadd(3.3, vec![3], false, false, false, false).unwrap();
+    /// let mut val4 = Value::Nil;
+    /// val4 = val4.zunion(&vec![&val1, &val2, &val3], None, zset::Aggregate::Sum).unwrap();
+    /// assert_eq!(val4.zcard().unwrap(), 3);
+    /// assert!(((val4.zscore(vec![1]).unwrap().unwrap() - 3.6)).abs() < 0.01);
+    /// assert!(((val4.zscore(vec![2]).unwrap().unwrap() - 2.2)).abs() < 0.01);
+    /// assert!(((val4.zscore(vec![3]).unwrap().unwrap() - 3.3)).abs() < 0.01);
+    /// ```
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    /// use database::zset;
+    ///
+    /// let mut val1 = Value::Nil;
+    /// val1.zadd(1.1, vec![1], false, false, false, false).unwrap();
+    /// let mut val2 = Value::Nil;
+    /// val2.zadd(1.2, vec![1], false, false, false, false).unwrap();
+    /// val2.zadd(2.2, vec![2], false, false, false, false).unwrap();
+    /// let mut val3 = Value::Nil;
+    /// val3.zadd(1.3, vec![1], false, false, false, false).unwrap();
+    /// val3.zadd(3.3, vec![3], false, false, false, false).unwrap();
+    /// let mut val4 = Value::Nil;
+    /// val4 = val4.zunion(&vec![&val1, &val2, &val3], Some(vec![1.0, 2.0, 3.0]), zset::Aggregate::Min).unwrap();
+    /// assert_eq!(val4.zcard().unwrap(), 3);
+    /// assert!(((val4.zscore(vec![1]).unwrap().unwrap() - 1.1)).abs() < 0.01);
+    /// assert!(((val4.zscore(vec![2]).unwrap().unwrap() - 4.4)).abs() < 0.01);
+    /// assert!(((val4.zscore(vec![3]).unwrap().unwrap() - 9.9)).abs() < 0.01);
+    /// ```
+    pub fn zunion(&self, zset_values: &Vec<&Value>, weights: Option<Vec<f64>>, aggregate: zset::Aggregate) -> Result<Value, OperationError> {
+        let emptyzset = ValueSortedSet::new();
+        let zsets = try!(get_zset_list(zset_values, &emptyzset));
+
+        let mut value = ValueSortedSet::new();
+        value.zunion(zsets, weights, aggregate);
+        Ok(Value::SortedSet(value))
     }
 
     /// Serializes and writes into `writer` the object current value.
@@ -1680,6 +1748,7 @@ mod test_command {
     use logger::{Logger, Level};
     use string::ValueString;
     use set::ValueSet;
+    use zset;
     use zset::ValueSortedSet;
 
     use super::{Database, Value, PubsubEvent};
@@ -2616,6 +2685,94 @@ mod test_command {
         assert_eq!(value.zincrby(s1.clone(), v1.clone()).unwrap(), s1);
         assert_eq!(value.zincrby(s2.clone(), v1.clone()).unwrap(), s1 + s2);
         assert_eq!(value.zincrby(- s1.clone(), v1.clone()).unwrap(), s2);
+    }
+
+    #[test]
+    fn zunionstore_sum() {
+        let mut value1 = Value::Nil;
+        let mut value2 = Value::Nil;
+        let mut value3 = Value::Nil;
+        let v1 = vec![1, 2, 3, 4];
+        let v2 = vec![5, 6, 7, 8];
+        let v3 = vec![0, 9, 1, 2];
+
+        assert_eq!(value1.zadd(1.1, v1.clone(), false, false, false, false).unwrap(), true);
+        assert_eq!(value1.zadd(2.1, v2.clone(), false, false, false, false).unwrap(), true);
+
+        assert_eq!(value2.zadd(1.2, v1.clone(), false, false, false, false).unwrap(), true);
+        assert_eq!(value2.zadd(3.2, v3.clone(), false, false, false, false).unwrap(), true);
+
+        value3 = value3.zunion(&vec![&value1, &value2], None, zset::Aggregate::Sum).unwrap();
+        assert_eq!(value3.zcard().unwrap(), 3);
+        assert!((value3.zscore(v1.clone()).unwrap().unwrap() - 2.3).abs() < 0.01);
+        assert!((value3.zscore(v2.clone()).unwrap().unwrap() - 2.1).abs() < 0.01);
+        assert!((value3.zscore(v3.clone()).unwrap().unwrap() - 3.2).abs() < 0.01);
+    }
+
+    #[test]
+    fn zunionstore_min() {
+        let mut value1 = Value::Nil;
+        let mut value2 = Value::Nil;
+        let mut value3 = Value::Nil;
+        let v1 = vec![1, 2, 3, 4];
+        let v2 = vec![5, 6, 7, 8];
+        let v3 = vec![0, 9, 1, 2];
+
+        assert_eq!(value1.zadd(1.1, v1.clone(), false, false, false, false).unwrap(), true);
+        assert_eq!(value1.zadd(2.1, v2.clone(), false, false, false, false).unwrap(), true);
+
+        assert_eq!(value2.zadd(1.2, v1.clone(), false, false, false, false).unwrap(), true);
+        assert_eq!(value2.zadd(3.2, v3.clone(), false, false, false, false).unwrap(), true);
+
+        value3 = value3.zunion(&vec![&value1, &value2], None, zset::Aggregate::Min).unwrap();
+        assert_eq!(value3.zcard().unwrap(), 3);
+        assert!((value3.zscore(v1.clone()).unwrap().unwrap() - 1.1).abs() < 0.01);
+        assert!((value3.zscore(v2.clone()).unwrap().unwrap() - 2.1).abs() < 0.01);
+        assert!((value3.zscore(v3.clone()).unwrap().unwrap() - 3.2).abs() < 0.01);
+    }
+
+    #[test]
+    fn zunionstore_max() {
+        let mut value1 = Value::Nil;
+        let mut value2 = Value::Nil;
+        let mut value3 = Value::Nil;
+        let v1 = vec![1, 2, 3, 4];
+        let v2 = vec![5, 6, 7, 8];
+        let v3 = vec![0, 9, 1, 2];
+
+        assert_eq!(value1.zadd(1.1, v1.clone(), false, false, false, false).unwrap(), true);
+        assert_eq!(value1.zadd(2.1, v2.clone(), false, false, false, false).unwrap(), true);
+
+        assert_eq!(value2.zadd(1.2, v1.clone(), false, false, false, false).unwrap(), true);
+        assert_eq!(value2.zadd(3.2, v3.clone(), false, false, false, false).unwrap(), true);
+
+        value3 = value3.zunion(&vec![&value1, &value2], None, zset::Aggregate::Max).unwrap();
+        assert_eq!(value3.zcard().unwrap(), 3);
+        assert!((value3.zscore(v1.clone()).unwrap().unwrap() - 1.2).abs() < 0.01);
+        assert!((value3.zscore(v2.clone()).unwrap().unwrap() - 2.1).abs() < 0.01);
+        assert!((value3.zscore(v3.clone()).unwrap().unwrap() - 3.2).abs() < 0.01);
+    }
+
+    #[test]
+    fn zunionstore_weights() {
+        let mut value1 = Value::Nil;
+        let mut value2 = Value::Nil;
+        let mut value3 = Value::Nil;
+        let v1 = vec![1, 2, 3, 4];
+        let v2 = vec![5, 6, 7, 8];
+        let v3 = vec![0, 9, 1, 2];
+
+        assert_eq!(value1.zadd(1.1, v1.clone(), false, false, false, false).unwrap(), true);
+        assert_eq!(value1.zadd(2.1, v2.clone(), false, false, false, false).unwrap(), true);
+
+        assert_eq!(value2.zadd(1.2, v1.clone(), false, false, false, false).unwrap(), true);
+        assert_eq!(value2.zadd(3.2, v3.clone(), false, false, false, false).unwrap(), true);
+
+        value3 = value3.zunion(&vec![&value1, &value2], Some(vec![100.0, 200.0]), zset::Aggregate::Max).unwrap();
+        assert_eq!(value3.zcard().unwrap(), 3);
+        assert!((value3.zscore(v1.clone()).unwrap().unwrap() - 240.0).abs() < 0.01);
+        assert!((value3.zscore(v2.clone()).unwrap().unwrap() - 210.0).abs() < 0.01);
+        assert!((value3.zscore(v3.clone()).unwrap().unwrap() - 640.0).abs() < 0.01);
     }
 
     #[test]

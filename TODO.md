@@ -54,7 +54,7 @@
     - [x] zremrangebyscore
     - [x] zremrangebyrank
     - [ ] zremrangebylex
-    - [ ] zunionstore
+    - [x] zunionstore
     - [ ] zinterstore
     - [x] zrange
     - [x] zrangebyscore

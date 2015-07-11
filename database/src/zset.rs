@@ -11,6 +11,12 @@ use dbutil::normalize_position;
 use rdbutil::constants::*;
 use rdbutil::{encode_slice_u8, encode_len};
 
+pub enum Aggregate {
+    Sum,
+    Min,
+    Max,
+}
+
 /**
  * SortedSetMember is a wrapper around f64 to implement ordering and equality.
  * f64 does not implement those traits because comparing floats has problems
@@ -353,6 +359,42 @@ impl ValueSortedSet {
 
         let member = SortedSetMember::new(score.clone(), el);
         return Some(skiplist.range(Bound::Unbounded, Bound::Included(&member)).collect::<Vec<_>>().len() - 1);
+    }
+
+    pub fn zunion(&mut self, zsets: Vec<&ValueSortedSet>, weights: Option<Vec<f64>>, aggregate: Aggregate) {
+        for i in 0..zsets.len() {
+            let zset = zsets[i];
+            let weight = match weights {
+                Some(ref ws) => ws[i],
+                None => 1.0,
+            };
+            let hm = match *zset {
+                ValueSortedSet::Data(_, ref hm) => hm,
+            };
+            for (k, v) in hm {
+                match aggregate {
+                    Aggregate::Sum => { self.zadd(weight * v.clone(), k.clone(), false, false, false, true); },
+                    Aggregate::Max => {
+                        let s = match self.zscore(&k) {
+                            Some(s) => s,
+                            None => NEG_INFINITY,
+                        };
+                        if s < v * weight {
+                            self.zadd(v * weight, k.clone(), false, false, false, false);
+                        }
+                    },
+                    Aggregate::Min => {
+                        let s = match self.zscore(&k) {
+                            Some(s) => s,
+                            None => INFINITY,
+                        };
+                        if s > v * weight {
+                            self.zadd(v * weight, k.clone(), false, false, false, false);
+                        }
+                    },
+                }
+            }
+        }
     }
 
     pub fn dump<T: Write>(&self, writer: &mut T) -> io::Result<usize> {

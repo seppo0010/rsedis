@@ -13,7 +13,7 @@ use std::sync::mpsc::channel;
 use std::thread;
 use std::usize;
 
-use database::{PubsubEvent, Database, Value};
+use database::{PubsubEvent, Database, Value, zset};
 use response::{Response, ResponseError};
 use parser::Parser;
 use util::mstime;
@@ -54,22 +54,18 @@ macro_rules! try_validate {
 }
 
 macro_rules! get_values {
-    ($start: expr, $parser: expr, $db: expr, $dbindex: expr) => ({
-        validate!($parser.argv.len() >= (1 + $start), "Wrong number of parameters");
-        let mut sets = Vec::with_capacity($parser.argv.len() - (1 + $start));
-        let key = try_validate!($parser.get_vec($start), "Invalid key");
-        let el = match $db.get($dbindex, &key) {
-            Some(e) => e,
-            None => return Response::Array(vec![]),
-        };
-        for i in ($start + 1)..$parser.argv.len() {
+    ($start: expr, $stop: expr, $parser: expr, $db: expr, $dbindex: expr) => ({
+        validate!($parser.argv.len() >= $start, "Wrong number of parameters");
+        validate!($parser.argv.len() >= $stop, "Wrong number of parameters");
+        let mut sets = Vec::with_capacity($parser.argv.len() - $start);
+        for i in $start..$stop {
             let key = try_validate!($parser.get_vec(i), "Invalid key");
             match $db.get($dbindex, &key) {
                 Some(e) => sets.push(e),
                 None => (),
             };
         }
-        (el, sets)
+        sets
     })
 }
 
@@ -912,7 +908,12 @@ fn scard(parser: &Parser, db: &Database, dbindex: usize) -> Response {
 }
 
 fn sdiff(parser: &Parser, db: &Database, dbindex: usize) -> Response {
-    let (el, sets) = get_values!(1, parser, db, dbindex);
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let el = match db.get(dbindex, &key) {
+        Some(e) => e,
+        None => return Response::Array(vec![]),
+    };
+    let sets = get_values!(2, parser.argv.len(), parser, db, dbindex);
 
     match el.sdiff(&sets) {
         Ok(set) => {
@@ -926,7 +927,12 @@ fn sdiffstore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() >= 3, "Wrong number of parameters");
     let destination_key = try_validate!(parser.get_vec(1), "Invalid destination");
     let set = {
-        let (el, sets) = get_values!(2, parser, db, dbindex);
+        let key = try_validate!(parser.get_vec(2), "Invalid key");
+        let el = match db.get(dbindex, &key) {
+            Some(e) => e,
+            None => return Response::Integer(0),
+        };
+        let sets = get_values!(3, parser.argv.len(), parser, db, dbindex);
         match el.sdiff(&sets) {
             Ok(set) => set,
             Err(err) => return Response::Error(err.to_string()),
@@ -940,7 +946,12 @@ fn sdiffstore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
 }
 
 fn sinter(parser: &Parser, db: &Database, dbindex: usize) -> Response {
-    let (el, sets) = get_values!(1, parser, db, dbindex);
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let el = match db.get(dbindex, &key) {
+        Some(e) => e,
+        None => return Response::Array(vec![]),
+    };
+    let sets = get_values!(2, parser.argv.len(), parser, db, dbindex);
     return match el.sinter(&sets) {
         Ok(set) => {
             Response::Array(set.iter().map(|x| Response::Data(x.clone())).collect::<Vec<_>>())
@@ -953,7 +964,12 @@ fn sinterstore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() >= 3, "Wrong number of parameters");
     let destination_key = try_validate!(parser.get_vec(1), "Invalid destination");
     let set = {
-        let (el, sets) = get_values!(2, parser, db, dbindex);
+        let key = try_validate!(parser.get_vec(2), "Invalid key");
+        let el = match db.get(dbindex, &key) {
+            Some(e) => e,
+            None => return Response::Integer(0),
+        };
+        let sets = get_values!(3, parser.argv.len(), parser, db, dbindex);
         match el.sinter(&sets) {
             Ok(set) => set,
             Err(err) => return Response::Error(err.to_string()),
@@ -967,7 +983,13 @@ fn sinterstore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
 }
 
 fn sunion(parser: &Parser, db: &Database, dbindex: usize) -> Response {
-    let (el, sets) = get_values!(1, parser, db, dbindex);
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let defaultel = Value::Nil;
+    let el = match db.get(dbindex, &key) {
+        Some(e) => e,
+        None => &defaultel,
+    };
+    let sets = get_values!(2, parser.argv.len(), parser, db, dbindex);
     return match el.sunion(&sets) {
         Ok(set) => {
             Response::Array(set.iter().map(|x| Response::Data(x.clone())).collect::<Vec<_>>())
@@ -980,7 +1002,13 @@ fn sunionstore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() >= 3, "Wrong number of parameters");
     let destination_key = try_validate!(parser.get_vec(1), "Invalid destination");
     let set = {
-        let (el, sets) = get_values!(2, parser, db, dbindex);
+        let key = try_validate!(parser.get_vec(2), "Invalid key");
+        let defaultel = Value::Nil;
+        let el = match db.get(dbindex, &key) {
+            Some(e) => e,
+            None => &defaultel,
+        };
+        let sets = get_values!(3, parser.argv.len(), parser, db, dbindex);
         match el.sunion(&sets) {
             Ok(set) => set,
             Err(err) => return Response::Error(err.to_string()),
@@ -1252,6 +1280,64 @@ fn zrevrank(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     generic_zrank(db, dbindex, &key, member, true)
 }
 
+fn zunionstore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() >= 4, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let value = {
+        let numkeys = {
+            let n = try_validate!(parser.get_i64(2), "Invalid number of keys");
+            if n <= 0 {
+                return Response::Error("at least 1 input key is needed for ZUNIONSTORE/ZINTERSTORE".to_string())
+            }
+            n as usize
+        };
+        let zsets = get_values!(3, 2 + numkeys, parser, db, dbindex);
+        let mut pos = 3 + numkeys;
+        let mut weights = None;
+        let mut aggregate = zset::Aggregate::Sum;
+        if pos < parser.argv.len() {
+            let arg = try_validate!(parser.get_str(pos), "Syntax error");
+            if arg.to_ascii_lowercase() == "weights" {
+                pos += 1;
+                validate!(parser.argv.len() >= pos + numkeys, "Wrong number of parameters");
+                let mut w = Vec::with_capacity(numkeys);
+                for i in 0..numkeys {
+                    w.push(try_validate!(parser.get_f64(pos + i), "Syntax error"));
+                }
+                weights = Some(w);
+                pos += numkeys;
+            }
+        };
+        if pos < parser.argv.len() {
+            let arg = try_validate!(parser.get_str(pos), "Syntax error");
+            if arg.to_ascii_lowercase() == "aggregate" {
+                pos += 1;
+                validate!(parser.argv.len() != pos, "Wrong number of parameters");
+                aggregate = match &*try_validate!(parser.get_str(pos), "Syntax error").to_ascii_lowercase() {
+                    "sum" => zset::Aggregate::Sum,
+                    "max" => zset::Aggregate::Max,
+                    "min" => zset::Aggregate::Min,
+                    _ => return Response::Error("Syntax error".to_string()),
+                };
+                pos += 1;
+            }
+        };
+        validate!(pos == parser.argv.len(), "Syntax error");
+        let n = Value::Nil;
+        match n.zunion(&zsets, weights, aggregate) {
+            Ok(v) => v,
+            Err(err) => return Response::Error(err.to_string()),
+        }
+    };
+    let r = match value.zcard() {
+        Ok(count) => Response::Integer(count as i64),
+        Err(err) => Response::Error(err.to_string()),
+    };
+    *db.get_or_create(dbindex, &key) = value;
+    db.key_publish(dbindex, &key);
+    r
+}
+
 fn ping(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     #![allow(unused_variables)]
     validate!(parser.argv.len() <= 2, "Wrong number of parameters");
@@ -1471,6 +1557,7 @@ pub fn command(
         "zrevrangebyscore" => zrevrangebyscore(parser, db, dbindex),
         "zrank" => zrank(parser, db, dbindex),
         "zrevrank" => zrevrank(parser, db, dbindex),
+        "zunionstore" => zunionstore(parser, db, dbindex),
         "dump" => dump(parser, db, dbindex),
         "subscribe" => return subscribe(parser, db, subscriptions.unwrap(), pattern_subscriptions.unwrap().len(), sender.unwrap()),
         "unsubscribe" => return unsubscribe(parser, db, subscriptions.unwrap(), pattern_subscriptions.unwrap().len(), sender.unwrap()),
@@ -2502,6 +2589,43 @@ mod test_command {
         assert_eq!(command(&parser!(b"zadd key 1 a 2 b 3 c"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(3));
         assert_eq!(command(&parser!(b"zrem key a b d e"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(2));
         assert_eq!(command(&parser!(b"zrem key c"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(1));
+    }
+
+    #[test]
+    fn zunionstore_command_short() {
+        let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
+        assert_eq!(command(&parser!(b"zadd key1 1 a 2 b 3 c"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(3));
+        assert_eq!(command(&parser!(b"zadd key2 4 d 5 e"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(2));
+        assert_eq!(command(&parser!(b"zunionstore key 3 key1 key2 key3"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(5));
+    }
+
+    #[test]
+    fn zunionstore_command_weights() {
+        let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
+        assert_eq!(command(&parser!(b"zadd key1 1 a 2 b 3 c"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(3));
+        assert_eq!(command(&parser!(b"zadd key2 4 d 5 e"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(2));
+        assert_eq!(command(&parser!(b"zunionstore key 3 key1 key2 key3 Weights 1 2 3"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(5));
+        assert_eq!(command(&parser!(b"zscore key d"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Data(b"8".to_vec()));
+    }
+
+    #[test]
+    fn zunionstore_command_aggregate() {
+        let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
+        assert_eq!(command(&parser!(b"zadd key1 1 a 2 b 3 c"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(3));
+        assert_eq!(command(&parser!(b"zadd key2 9 c 4 d 5 e"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(3));
+        assert_eq!(command(&parser!(b"zunionstore key 3 key1 key2 key3 aggregate max"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(5));
+        assert_eq!(command(&parser!(b"zscore key c"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Data(b"9".to_vec()));
+        assert_eq!(command(&parser!(b"zunionstore key 3 key1 key2 key3 aggregate min"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(5));
+        assert_eq!(command(&parser!(b"zscore key c"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Data(b"3".to_vec()));
+    }
+
+    #[test]
+    fn zunionstore_command_weights_aggregate() {
+        let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
+        assert_eq!(command(&parser!(b"zadd key1 1 a 2 b 3 c"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(3));
+        assert_eq!(command(&parser!(b"zadd key2 3 c 4 d 5 e"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(3));
+        assert_eq!(command(&parser!(b"zunionstore key 3 key1 key2 key3 weights 1 2 3 aggregate max"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(5));
+        assert_eq!(command(&parser!(b"zscore key c"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Data(b"6".to_vec()));
     }
 
     #[test]
