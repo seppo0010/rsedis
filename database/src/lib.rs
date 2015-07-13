@@ -1239,8 +1239,7 @@ impl Value {
         }
     }
 
-    /// Add multiple sorted sets and store the resulting sorted set.
-    /// Returns the number of resulting items.
+    /// Creates a sorted set by merging existing sorted sets.
     ///
     /// # Examples
     /// ```
@@ -1289,6 +1288,54 @@ impl Value {
 
         let mut value = ValueSortedSet::new();
         value.zunion(zsets, weights, aggregate);
+        Ok(Value::SortedSet(value))
+    }
+
+    /// Creates a new sorted set with the intersection of existing sorted sets.
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    /// use database::zset;
+    ///
+    /// let mut val1 = Value::Nil;
+    /// val1.zadd(1.1, vec![1], false, false, false, false).unwrap();
+    /// let mut val2 = Value::Nil;
+    /// val2.zadd(1.2, vec![1], false, false, false, false).unwrap();
+    /// val2.zadd(2.2, vec![2], false, false, false, false).unwrap();
+    /// let mut val3 = Value::Nil;
+    /// val3.zadd(1.3, vec![1], false, false, false, false).unwrap();
+    /// val3.zadd(3.3, vec![3], false, false, false, false).unwrap();
+    /// let mut val4 = Value::Nil;
+    /// val4 = val4.zinter(&vec![&val1, &val2, &val3], None, zset::Aggregate::Sum).unwrap();
+    /// assert_eq!(val4.zcard().unwrap(), 1);
+    /// assert!(((val4.zscore(vec![1]).unwrap().unwrap() - 3.6)).abs() < 0.01);
+    /// ```
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    /// use database::zset;
+    ///
+    /// let mut val1 = Value::Nil;
+    /// val1.zadd(1.1, vec![1], false, false, false, false).unwrap();
+    /// let mut val2 = Value::Nil;
+    /// val2.zadd(1.2, vec![1], false, false, false, false).unwrap();
+    /// val2.zadd(2.2, vec![2], false, false, false, false).unwrap();
+    /// let mut val3 = Value::Nil;
+    /// val3.zadd(1.3, vec![1], false, false, false, false).unwrap();
+    /// val3.zadd(3.3, vec![3], false, false, false, false).unwrap();
+    /// let mut val4 = Value::Nil;
+    /// val4 = val4.zinter(&vec![&val1, &val2, &val3], Some(vec![1.0, 2.0, 3.0]), zset::Aggregate::Min).unwrap();
+    /// assert_eq!(val4.zcard().unwrap(), 1);
+    /// assert!(((val4.zscore(vec![1]).unwrap().unwrap() - 1.1)).abs() < 0.01);
+    /// ```
+    pub fn zinter(&self, zset_values: &Vec<&Value>, weights: Option<Vec<f64>>, aggregate: zset::Aggregate) -> Result<Value, OperationError> {
+        let emptyzset = ValueSortedSet::new();
+        let zsets = try!(get_zset_list(zset_values, &emptyzset));
+
+        let mut value = ValueSortedSet::new();
+        value.zinter(zsets, weights, aggregate);
         Ok(Value::SortedSet(value))
     }
 
@@ -2773,6 +2820,86 @@ mod test_command {
         assert!((value3.zscore(v1.clone()).unwrap().unwrap() - 240.0).abs() < 0.01);
         assert!((value3.zscore(v2.clone()).unwrap().unwrap() - 210.0).abs() < 0.01);
         assert!((value3.zscore(v3.clone()).unwrap().unwrap() - 640.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn zinterstore_sum() {
+        let mut value1 = Value::Nil;
+        let mut value2 = Value::Nil;
+        let mut value3 = Value::Nil;
+        let v1 = vec![1, 2, 3, 4];
+        let v2 = vec![5, 6, 7, 8];
+        let v3 = vec![0, 9, 1, 2];
+
+        assert_eq!(value1.zadd(1.1, v1.clone(), false, false, false, false).unwrap(), true);
+        assert_eq!(value1.zadd(2.1, v2.clone(), false, false, false, false).unwrap(), true);
+
+        assert_eq!(value2.zadd(1.2, v1.clone(), false, false, false, false).unwrap(), true);
+        assert_eq!(value2.zadd(3.2, v3.clone(), false, false, false, false).unwrap(), true);
+
+        value3 = value3.zinter(&vec![&value1, &value2], None, zset::Aggregate::Sum).unwrap();
+        assert_eq!(value3.zcard().unwrap(), 1);
+        assert!((value3.zscore(v1.clone()).unwrap().unwrap() - 2.3).abs() < 0.01);
+    }
+
+    #[test]
+    fn zinterstore_min() {
+        let mut value1 = Value::Nil;
+        let mut value2 = Value::Nil;
+        let mut value3 = Value::Nil;
+        let v1 = vec![1, 2, 3, 4];
+        let v2 = vec![5, 6, 7, 8];
+        let v3 = vec![0, 9, 1, 2];
+
+        assert_eq!(value1.zadd(1.1, v1.clone(), false, false, false, false).unwrap(), true);
+        assert_eq!(value1.zadd(2.1, v2.clone(), false, false, false, false).unwrap(), true);
+
+        assert_eq!(value2.zadd(1.2, v1.clone(), false, false, false, false).unwrap(), true);
+        assert_eq!(value2.zadd(3.2, v3.clone(), false, false, false, false).unwrap(), true);
+
+        value3 = value3.zinter(&vec![&value1, &value2], None, zset::Aggregate::Min).unwrap();
+        assert_eq!(value3.zcard().unwrap(), 1);
+        assert!((value3.zscore(v1.clone()).unwrap().unwrap() - 1.1).abs() < 0.01);
+    }
+
+    #[test]
+    fn zinterstore_max() {
+        let mut value1 = Value::Nil;
+        let mut value2 = Value::Nil;
+        let mut value3 = Value::Nil;
+        let v1 = vec![1, 2, 3, 4];
+        let v2 = vec![5, 6, 7, 8];
+        let v3 = vec![0, 9, 1, 2];
+
+        assert_eq!(value1.zadd(1.1, v1.clone(), false, false, false, false).unwrap(), true);
+        assert_eq!(value1.zadd(2.1, v2.clone(), false, false, false, false).unwrap(), true);
+
+        assert_eq!(value2.zadd(1.2, v1.clone(), false, false, false, false).unwrap(), true);
+        assert_eq!(value2.zadd(3.2, v3.clone(), false, false, false, false).unwrap(), true);
+
+        value3 = value3.zinter(&vec![&value1, &value2], None, zset::Aggregate::Max).unwrap();
+        assert_eq!(value3.zcard().unwrap(), 1);
+        assert!((value3.zscore(v1.clone()).unwrap().unwrap() - 1.2).abs() < 0.01);
+    }
+
+    #[test]
+    fn zinterstore_weights() {
+        let mut value1 = Value::Nil;
+        let mut value2 = Value::Nil;
+        let mut value3 = Value::Nil;
+        let v1 = vec![1, 2, 3, 4];
+        let v2 = vec![5, 6, 7, 8];
+        let v3 = vec![0, 9, 1, 2];
+
+        assert_eq!(value1.zadd(1.1, v1.clone(), false, false, false, false).unwrap(), true);
+        assert_eq!(value1.zadd(2.1, v2.clone(), false, false, false, false).unwrap(), true);
+
+        assert_eq!(value2.zadd(1.2, v1.clone(), false, false, false, false).unwrap(), true);
+        assert_eq!(value2.zadd(3.2, v3.clone(), false, false, false, false).unwrap(), true);
+
+        value3 = value3.zinter(&vec![&value1, &value2], Some(vec![100.0, 200.0]), zset::Aggregate::Max).unwrap();
+        assert_eq!(value3.zcard().unwrap(), 1);
+        assert!((value3.zscore(v1.clone()).unwrap().unwrap() - 240.0).abs() < 0.01);
     }
 
     #[test]

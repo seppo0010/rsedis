@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
 use std::collections::Bound;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::io;
 use std::io::Write;
 use std::f64::{INFINITY, NEG_INFINITY, NAN};
@@ -394,6 +395,51 @@ impl ValueSortedSet {
                     },
                 }
             }
+        }
+    }
+
+    pub fn zinter(&mut self, zsets: Vec<&ValueSortedSet>, weights: Option<Vec<f64>>, aggregate: Aggregate) {
+        if zsets.len() == 0 {
+            return;
+        }
+        let mut intersected_keys = {
+            match *zsets[0] {
+                ValueSortedSet::Data(_, ref hm) => hm.keys().collect::<HashSet<_>>(),
+            }
+        };
+
+        for i in 1..zsets.len() {
+            let zset = zsets[i];
+            let keys = match *zset {
+                ValueSortedSet::Data(_, ref hm) => hm.keys().collect::<HashSet<_>>(),
+            };
+            intersected_keys = intersected_keys.intersection(&keys).cloned().collect::<HashSet<_>>();
+        }
+
+        for k in intersected_keys {
+            let hm = match *zsets[0] {
+                ValueSortedSet::Data(_, ref hm) => hm,
+            };
+            let mut score = hm.get(k).unwrap() * (match weights {
+                Some(ref ws) => ws[0],
+                None => 1.0,
+            });
+            for i in 1..zsets.len() {
+                let hm = match *zsets[i] {
+                    ValueSortedSet::Data(_, ref hm) => hm,
+                };
+                let s2 = hm.get(k).unwrap() * (match weights {
+                    Some(ref ws) => ws[i],
+                    None => 1.0,
+                });
+                match aggregate {
+                    Aggregate::Sum => score += s2,
+                    Aggregate::Min => if score > s2 { score = s2; },
+                    Aggregate::Max => if score < s2 { score = s2; },
+                }
+            }
+
+            self.zadd(score, k.clone(), false, false, false, false);
         }
     }
 

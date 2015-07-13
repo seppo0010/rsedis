@@ -1280,7 +1280,7 @@ fn zrevrank(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     generic_zrank(db, dbindex, &key, member, true)
 }
 
-fn zunionstore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn zinter_union_store(parser: &Parser, db: &mut Database, dbindex: usize, union: bool) -> Response {
     validate!(parser.argv.len() >= 4, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let value = {
@@ -1324,7 +1324,7 @@ fn zunionstore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
         };
         validate!(pos == parser.argv.len(), "Syntax error");
         let n = Value::Nil;
-        match n.zunion(&zsets, weights, aggregate) {
+        match if union { n.zunion(&zsets, weights, aggregate) } else { n.zinter(&zsets, weights, aggregate) } {
             Ok(v) => v,
             Err(err) => return Response::Error(err.to_string()),
         }
@@ -1336,6 +1336,14 @@ fn zunionstore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     *db.get_or_create(dbindex, &key) = value;
     db.key_publish(dbindex, &key);
     r
+}
+
+fn zunionstore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    zinter_union_store(parser, db, dbindex, true)
+}
+
+fn zinterstore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    zinter_union_store(parser, db, dbindex, false)
 }
 
 fn ping(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
@@ -1558,6 +1566,7 @@ pub fn command(
         "zrank" => zrank(parser, db, dbindex),
         "zrevrank" => zrevrank(parser, db, dbindex),
         "zunionstore" => zunionstore(parser, db, dbindex),
+        "zinterstore" => zinterstore(parser, db, dbindex),
         "dump" => dump(parser, db, dbindex),
         "subscribe" => return subscribe(parser, db, subscriptions.unwrap(), pattern_subscriptions.unwrap().len(), sender.unwrap()),
         "unsubscribe" => return unsubscribe(parser, db, subscriptions.unwrap(), pattern_subscriptions.unwrap().len(), sender.unwrap()),
@@ -2627,6 +2636,45 @@ mod test_command {
         assert_eq!(command(&parser!(b"zunionstore key 3 key1 key2 key3 weights 1 2 3 aggregate max"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(5));
         assert_eq!(command(&parser!(b"zscore key c"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Data(b"6".to_vec()));
     }
+
+    #[test]
+    fn zinterstore_command_short() {
+        let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
+        assert_eq!(command(&parser!(b"zadd key1 1 a 2 b 3 c"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(3));
+        assert_eq!(command(&parser!(b"zadd key2 3 c 4 d 5 e"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(3));
+        assert_eq!(command(&parser!(b"zinterstore key 3 key1 key2 key3"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(1));
+    }
+
+    #[test]
+    fn zinterstore_command_weights() {
+        let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
+        assert_eq!(command(&parser!(b"zadd key1 1 a 2 b 3 c 4 d"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(4));
+        assert_eq!(command(&parser!(b"zadd key2 4 d 5 e"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(2));
+        assert_eq!(command(&parser!(b"zadd key3 0 d"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(1));
+        assert_eq!(command(&parser!(b"zinterstore key 3 key1 key2 key3 Weights 1 2 3"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(1));
+        assert_eq!(command(&parser!(b"zscore key d"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Data(b"12".to_vec()));
+    }
+
+    #[test]
+    fn zinterstore_command_aggregate() {
+        let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
+        assert_eq!(command(&parser!(b"zadd key1 1 a 2 b 3 c"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(3));
+        assert_eq!(command(&parser!(b"zadd key2 9 c 4 d 5 e"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(3));
+        assert_eq!(command(&parser!(b"zinterstore key 3 key1 key2 key3 aggregate max"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(1));
+        assert_eq!(command(&parser!(b"zscore key c"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Data(b"9".to_vec()));
+        assert_eq!(command(&parser!(b"zinterstore key 3 key1 key2 key3 aggregate min"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(1));
+        assert_eq!(command(&parser!(b"zscore key c"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Data(b"3".to_vec()));
+    }
+
+    #[test]
+    fn zinterstore_command_weights_aggregate() {
+        let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
+        assert_eq!(command(&parser!(b"zadd key1 1 a 2 b 3 c"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(3));
+        assert_eq!(command(&parser!(b"zadd key2 3 c 4 d 5 e"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(3));
+        assert_eq!(command(&parser!(b"zinterstore key 3 key1 key2 key3 weights 1 2 3 aggregate max"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(1));
+        assert_eq!(command(&parser!(b"zscore key c"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Data(b"6".to_vec()));
+    }
+
 
     #[test]
     fn select_command() {
