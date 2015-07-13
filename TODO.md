@@ -59,8 +59,8 @@
     - [x] zrange
     - [x] zrangebyscore
     - [x] zrevrangebyscore
-    - [ ] zrangebylex
-    - [ ] zrevrangebylex
+    - [x] zrangebylex
+    - [x] zrevrangebylex
     - [x] zcount
     - [ ] zlexcount
     - [x] zrevrange

@@ -292,11 +292,37 @@ impl ValueSortedSet {
         r
     }
 
-    pub fn zrangebyscore(&self, _min: Bound<f64>, _max: Bound<f64>, withscores: bool, offset: usize, count: usize, rev: bool) -> Vec<Vec<u8>> {
+    fn range(&self, m1: Bound<&SortedSetMember>, m2: Bound<&SortedSetMember>, withscores: bool, offset: usize, count: usize, rev: bool) -> Vec<Vec<u8>> {
         let skiplist = match *self {
             ValueSortedSet::Data(ref skiplist, _) => skiplist,
         };
 
+        let mut r = vec![];
+        if rev {
+            let len = skiplist.len();
+            let mut c = count;
+            if c + offset > len {
+                c = len - offset;
+            }
+            for member in skiplist.range(m1, m2).rev().skip(offset).take(c) {
+                r.push(member.get_vec().clone());
+                if withscores {
+                    r.push(format!("{}", member.get_f64()).into_bytes());
+                }
+            }
+            r.iter().cloned().collect::<Vec<_>>()
+        } else {
+            for member in skiplist.range(m1, m2).skip(offset).take(count) {
+                r.push(member.get_vec().clone());
+                if withscores {
+                    r.push(format!("{}", member.get_f64()).into_bytes());
+                }
+            }
+            r
+        }
+    }
+
+    pub fn zrangebyscore(&self, _min: Bound<f64>, _max: Bound<f64>, withscores: bool, offset: usize, count: usize, rev: bool) -> Vec<Vec<u8>> {
         // FIXME: duplicated code from ZCOUNT. Trying to create a factory
         // function for this, but I failed because allocation was going
         // out of scope.
@@ -323,29 +349,43 @@ impl ValueSortedSet {
             Bound::Unbounded => Bound::Unbounded,
         };
 
-        let mut r = vec![];
-        if rev {
-            let len = skiplist.len();
-            let mut c = count;
-            if c + offset > len {
-                c = len - offset;
-            }
-            for member in skiplist.range(m1, m2).rev().skip(offset).take(c) {
-                r.push(member.get_vec().clone());
-                if withscores {
-                    r.push(format!("{}", member.get_f64()).into_bytes());
-                }
-            }
-            r.iter().cloned().collect::<Vec<_>>()
+        self.range(m1, m2, withscores, offset, count, rev)
+    }
+
+    pub fn zrangebylex(&self, _min: Bound<Vec<u8>>, _max: Bound<Vec<u8>>, offset: usize, count: usize, rev: bool) -> Vec<Vec<u8>> {
+        let skiplist = match *self {
+            ValueSortedSet::Data(ref skiplist, _) => skiplist,
+        };
+
+        let f = skiplist.front().unwrap().get_f64();
+
+        // FIXME: duplicated code from ZCOUNT. Trying to create a factory
+        // function for this, but I failed because allocation was going
+        // out of scope.
+        // Probably more function will copy this until I can figure out
+        // a better way.
+        let mut f1 = SortedSetMember::new(f.clone(), vec![]);
+        let mut f2 = SortedSetMember::new(f.clone(), vec![]);
+
+        let (min, max) = if rev {
+            (_max, _min)
         } else {
-            for member in skiplist.range(m1, m2).skip(offset).take(count) {
-                r.push(member.get_vec().clone());
-                if withscores {
-                    r.push(format!("{}", member.get_f64()).into_bytes());
-                }
-            }
-            r
-        }
+            (_min, _max)
+        };
+
+        let m1 = match min {
+            Bound::Included(f) => { f1.set_vec(f); Bound::Included(&f1) },
+            Bound::Excluded(f) => { f1.set_vec(f); Bound::Excluded(&f1) },
+            Bound::Unbounded => Bound::Unbounded,
+        };
+
+        let m2 = match max {
+            Bound::Included(f) => { f2.set_vec(f); Bound::Included(&f2) },
+            Bound::Excluded(f) => { f2.set_vec(f); Bound::Excluded(&f2) },
+            Bound::Unbounded => Bound::Unbounded,
+        };
+
+        self.range(m1, m2, false, offset, count, rev)
     }
 
     pub fn zrank(&self, el: Vec<u8>) -> Option<usize> {

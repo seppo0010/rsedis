@@ -1,3 +1,4 @@
+#![feature(collections_bound)]
 extern crate config;
 extern crate database;
 extern crate logger;
@@ -6,6 +7,7 @@ extern crate response;
 extern crate util;
 
 use std::ascii::AsciiExt;
+use std::collections::Bound;
 use std::collections::HashMap;
 use std::fmt::Error;
 use std::sync::mpsc::Sender;
@@ -1248,6 +1250,63 @@ fn zrevrangebyscore(parser: &Parser, db: &mut Database, dbindex: usize) -> Respo
     generic_zrangebyscore(parser, db, dbindex, true)
 }
 
+fn generic_zrangebylex(parser: &Parser, db: &mut Database, dbindex: usize, rev: bool) -> Response {
+    let len = parser.argv.len();
+    validate!(len == 4 || len == 7, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let min = {
+        let mut m = try_validate!(parser.get_vec(2), "Invalid min");
+        if m.len() == 0 { return Response::Error("Syntax error".to_string()); }
+        // FIXME: unnecessary memory move?
+        match m.remove(0) as char {
+            '(' => Bound::Excluded(m),
+            '[' => Bound::Included(m),
+            '-' => Bound::Unbounded,
+            '+' => Bound::Unbounded,
+            _ => return Response::Error("Syntax error".to_string()),
+        }
+    };
+    let max = {
+        let mut m = try_validate!(parser.get_vec(3), "Invalid max");
+        if m.len() == 0 { return Response::Error("Syntax error".to_string()); }
+        // FIXME: unnecessary memory move?
+        match m.remove(0) as char {
+            '(' => Bound::Excluded(m),
+            '[' => Bound::Included(m),
+            '-' => Bound::Unbounded,
+            '+' => Bound::Unbounded,
+            _ => return Response::Error("Syntax error".to_string()),
+        }
+    };
+
+    let mut offset = 0;
+    let mut count = usize::MAX;
+    let limit = len >= 7;
+    if limit {
+        let p = try_validate!(parser.get_str(len - 3), "Syntax error");
+        validate!(p.to_ascii_lowercase() == "limit", "Syntax error");
+        offset = try_validate!(parser.get_i64(len - 2), "Syntax error") as usize;
+        count = try_validate!(parser.get_i64(len - 1), "Syntax error") as usize;
+    }
+
+    let el = match db.get(dbindex, &key) {
+        Some(e) => e,
+        None => return Response::Array(Vec::new()),
+    };
+    match el.zrangebylex(min, max, offset, count, rev) {
+        Ok(r) => Response::Array(r.iter().map(|x| Response::Data(x.clone())).collect::<Vec<_>>()),
+        Err(err) => Response::Error(err.to_string()),
+    }
+}
+
+fn zrangebylex(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    generic_zrangebylex(parser, db, dbindex, false)
+}
+
+fn zrevrangebylex(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    generic_zrangebylex(parser, db, dbindex, true)
+}
+
 fn generic_zrank(db: &mut Database, dbindex: usize, key: &Vec<u8>, member: Vec<u8>, rev: bool) -> Response {
     let el = match db.get(dbindex, key) {
         Some(e) => e,
@@ -1563,6 +1622,8 @@ pub fn command(
         "zrevrange" => zrevrange(parser, db, dbindex),
         "zrangebyscore" => zrangebyscore(parser, db, dbindex),
         "zrevrangebyscore" => zrevrangebyscore(parser, db, dbindex),
+        "zrangebylex" => zrangebylex(parser, db, dbindex),
+        "zrevrangebylex" => zrevrangebylex(parser, db, dbindex),
         "zrank" => zrank(parser, db, dbindex),
         "zrevrank" => zrevrank(parser, db, dbindex),
         "zunionstore" => zunionstore(parser, db, dbindex),
@@ -2571,6 +2632,40 @@ mod test_command {
                     Response::Data(b"2".to_vec()),
                     Response::Data(b"a".to_vec()),
                     Response::Data(b"1".to_vec()),
+                    ]));
+    }
+
+    #[test]
+    fn zrangebylex_command() {
+        let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
+        assert_eq!(command(&parser!(b"zadd key 0 a 0 b 0 c 0 d"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(4));
+        assert_eq!(command(&parser!(b"zrangebylex key [a (b"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Array(vec![
+                    Response::Data(b"a".to_vec()),
+                    ]));
+        assert_eq!(command(&parser!(b"zrangebylex key (b +"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Array(vec![
+                    Response::Data(b"c".to_vec()),
+                    Response::Data(b"d".to_vec()),
+                    ]));
+        assert_eq!(command(&parser!(b"zrangebylex key - + LIMIT 2 10"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Array(vec![
+                    Response::Data(b"c".to_vec()),
+                    Response::Data(b"d".to_vec()),
+                    ]));
+    }
+
+    #[test]
+    fn zrevrangebylex_command() {
+        let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
+        assert_eq!(command(&parser!(b"zadd key 0 a 0 b 0 c 0 d"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(4));
+        assert_eq!(command(&parser!(b"zrevrangebylex key (b [a"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Array(vec![
+                    Response::Data(b"a".to_vec()),
+                    ]));
+        assert_eq!(command(&parser!(b"zrevrangebylex key + (b"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Array(vec![
+                    Response::Data(b"d".to_vec()),
+                    Response::Data(b"c".to_vec()),
+                    ]));
+        assert_eq!(command(&parser!(b"zrevrangebylex key + - LIMIT 2 10"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Array(vec![
+                    Response::Data(b"b".to_vec()),
+                    Response::Data(b"a".to_vec()),
                     ]));
     }
 

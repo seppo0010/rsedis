@@ -1166,6 +1166,39 @@ impl Value {
         }
     }
 
+    /// Returns the elements in a lex range. If `withscores` is true, it will also
+    /// include their scores' ASCII representation.
+    /// It will skip the first `offset` elements and return up to `count`.
+    /// If `rev` is true, it will reverse the result order and offsets, and
+    /// reverse the `min` and `max` parameters.
+    ///
+    /// # Examples
+    /// ```
+    /// #![feature(collections_bound)]
+    /// use database::Value;
+    /// use std::collections::Bound;
+    ///
+    /// let mut val = Value::Nil;
+    /// val.zadd(0.0, vec![1], false, false, false, false).unwrap();
+    /// val.zadd(0.0, vec![2], false, false, false, false).unwrap();
+    /// val.zadd(0.0, vec![3], false, false, false, false).unwrap();
+    /// assert_eq!(val.zrangebylex(Bound::Included(vec![2]), Bound::Unbounded, 0, 100, false).unwrap(), vec![
+    ///     vec![2],
+    ///     vec![3],
+    /// ]);
+    ///
+    /// assert_eq!(val.zrangebylex(Bound::Unbounded, Bound::Included(vec![2]), 0, 1, true).unwrap(), vec![
+    ///     vec![3],
+    /// ]);
+    /// ```
+    pub fn zrangebylex(&self, min: Bound<Vec<u8>>, max: Bound<Vec<u8>>, offset: usize, count: usize, rev: bool) -> Result<Vec<Vec<u8>>, OperationError> {
+        match *self {
+            Value::Nil => Ok(vec![]),
+            Value::SortedSet(ref value) => Ok(value.zrangebylex(min, max, offset, count, rev)),
+            _ => Err(OperationError::WrongTypeError),
+        }
+    }
+
     /// Returns the position in the set for a given element.
     ///
     /// # Examples
