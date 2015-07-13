@@ -1,6 +1,7 @@
 # rsedis
 
 [![Build Status](https://travis-ci.org/seppo0010/rsedis.svg?branch=master)](https://travis-ci.org/seppo0010/rsedis)
+[![Build status](https://ci.appveyor.com/api/projects/status/m9qeoc83m18q4656?svg=true)](https://ci.appveyor.com/project/seppo0011/rsedis)
 
 Redis re-implemented in Rust.
 
