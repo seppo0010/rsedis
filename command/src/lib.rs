@@ -1152,6 +1152,33 @@ fn zremrangebyscore(parser: &Parser, db: &mut Database, dbindex: usize) -> Respo
     }
 }
 
+fn zremrangebylex(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() == 4, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let min = {
+        let m = try_validate!(parser.get_vec(2), "Invalid min");
+        match get_vec_bound(m) {
+            Ok(v) => v,
+            Err(e) => return e,
+        }
+    };
+    let max = {
+        let m = try_validate!(parser.get_vec(3), "Invalid max");
+        match get_vec_bound(m) {
+            Ok(v) => v,
+            Err(e) => return e,
+        }
+    };
+    let el = match db.get_mut(dbindex, &key) {
+        Some(e) => e,
+        None => return Response::Integer(0),
+    };
+    match el.zremrangebylex(min, max) {
+        Ok(c) => Response::Integer(c as i64),
+        Err(err) => Response::Error(err.to_string()),
+    }
+}
+
 fn zremrangebyrank(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 4, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
@@ -1645,6 +1672,7 @@ pub fn command(
         "zscore" => zscore(parser, db, dbindex),
         "zincrby" => zincrby(parser, db, dbindex),
         "zrem" => zrem(parser, db, dbindex),
+        "zremrangebylex" => zremrangebylex(parser, db, dbindex),
         "zremrangebyscore" => zremrangebyscore(parser, db, dbindex),
         "zremrangebyrank" => zremrangebyrank(parser, db, dbindex),
         "zcount" => zcount(parser, db, dbindex),
@@ -2576,6 +2604,16 @@ mod test_command {
         assert_eq!(command(&parser!(b"zremrangebyscore key 2 3"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(0));
         assert_eq!(command(&parser!(b"zremrangebyscore key (2 4"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(1));
         assert_eq!(command(&parser!(b"zremrangebyscore key -inf inf"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(1));
+    }
+
+    #[test]
+    fn zremrangebylex_command() {
+        let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
+        assert_eq!(command(&parser!(b"zadd key 0 a 0 b 0 c 0 d"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(4));
+        assert_eq!(command(&parser!(b"zremrangebylex key [b (d"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(2));
+        assert_eq!(command(&parser!(b"zremrangebylex key [b (d"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(0));
+        assert_eq!(command(&parser!(b"zremrangebylex key (b [d"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(1));
+        assert_eq!(command(&parser!(b"zremrangebylex key - +"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(1));
     }
 
     #[test]

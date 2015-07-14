@@ -192,6 +192,10 @@ impl ValueSortedSet {
             ValueSortedSet::Data(ref skiplist, _) => skiplist,
         };
 
+        if skiplist.len() == 0 {
+            return vec![];
+        }
+
         let f = skiplist.front().unwrap().get_f64();
         let mut f1 = SortedSetMember::new(f.clone(), vec![]);
         let mut f2 = SortedSetMember::new(f.clone(), vec![]);
@@ -233,6 +237,24 @@ impl ValueSortedSet {
             Bound::Unbounded => 0,
         };
         let count = self.zcount(min, max);
+        let (skiplist, hmap) = match *self {
+            ValueSortedSet::Data(ref mut skiplist, ref mut hmap) => (skiplist, hmap),
+        };
+
+        for _ in 0..count {
+            let el = skiplist.remove_index(&pos);
+            hmap.remove(&el.s);
+        };
+        count
+    }
+
+    pub fn zremrangebylex(&mut self, min: Bound<Vec<u8>>, max: Bound<Vec<u8>>) -> usize {
+        let pos = match min {
+            Bound::Included(ref s) => self.zlexcount(Bound::Unbounded, Bound::Excluded(s.clone())),
+            Bound::Excluded(ref s) => self.zlexcount(Bound::Unbounded, Bound::Included(s.clone())),
+            Bound::Unbounded => 0,
+        };
+        let count = self.zlexcount(min, max);
         let (skiplist, hmap) = match *self {
             ValueSortedSet::Data(ref mut skiplist, ref mut hmap) => (skiplist, hmap),
         };
@@ -566,6 +588,21 @@ fn zremrangebyscore() {
     assert_eq!(zset.zremrangebyscore(Bound::Unbounded, Bound::Unbounded), 2);
     assert_eq!(zset.zrank(b"a".to_vec()), None);
     assert_eq!(zset.zremrangebyscore(Bound::Unbounded, Bound::Unbounded), 0);
+}
+
+#[test]
+fn zremrangebylex() {
+    let mut zset = ValueSortedSet::new();
+    zset.zadd(0.0, vec![1], false, false, false, false);
+    zset.zadd(0.0, vec![2], false, false, false, false);
+    zset.zadd(0.0, vec![3], false, false, false, false);
+    zset.zadd(0.0, vec![4], false, false, false, false);
+    assert_eq!(zset.zremrangebylex(Bound::Included(vec![2]), Bound::Excluded(vec![4])), 2);
+    assert_eq!(zset.zrank(vec![1]).unwrap(), 0);
+    assert_eq!(zset.zrank(vec![2]), None);
+    assert_eq!(zset.zremrangebylex(Bound::Unbounded, Bound::Unbounded), 2);
+    assert_eq!(zset.zrank(vec![1]), None);
+    assert_eq!(zset.zremrangebylex(Bound::Unbounded, Bound::Unbounded), 0);
 }
 
 #[test]

@@ -1271,6 +1271,31 @@ impl Value {
         }
     }
 
+    /// Removes all elements within a lex range. Returns the number of removed elements
+    ///
+    /// # Examples
+    /// ```
+    /// #![feature(collections_bound)]
+    /// use database::Value;
+    /// use std::collections::Bound;
+    ///
+    /// let mut val = Value::Nil;
+    /// assert_eq!(val.zremrangebylex(Bound::Unbounded, Bound::Unbounded).unwrap(), 0);
+    /// val.zadd(0.0, vec![1], false, false, false, false).unwrap();
+    /// val.zadd(0.0, vec![2], false, false, false, false).unwrap();
+    /// val.zadd(0.0, vec![3], false, false, false, false).unwrap();
+    /// assert_eq!(val.zremrangebylex(Bound::Included(vec![2]), Bound::Excluded(vec![3])).unwrap(), 1);
+    /// assert_eq!(val.zremrangebylex(Bound::Included(vec![2]), Bound::Excluded(vec![3])).unwrap(), 0);
+    /// assert_eq!(val.zcard().unwrap(), 2);
+    /// ```
+    pub fn zremrangebylex(&mut self, min: Bound<Vec<u8>>, max: Bound<Vec<u8>>) -> Result<usize, OperationError> {
+        match *self {
+            Value::Nil => Ok(0),
+            Value::SortedSet(ref mut value) => Ok(value.zremrangebylex(min, max)),
+            _ => Err(OperationError::WrongTypeError),
+        }
+    }
+
     /// Removes all elements within a rank range. Returns the number of removed elements
     ///
     /// # Examples

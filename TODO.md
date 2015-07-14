@@ -53,7 +53,7 @@
     - [x] zrem
     - [x] zremrangebyscore
     - [x] zremrangebyrank
-    - [ ] zremrangebylex
+    - [x] zremrangebylex
     - [x] zunionstore
     - [x] zinterstore
     - [x] zrange
