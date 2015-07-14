@@ -1250,32 +1250,35 @@ fn zrevrangebyscore(parser: &Parser, db: &mut Database, dbindex: usize) -> Respo
     generic_zrangebyscore(parser, db, dbindex, true)
 }
 
+fn get_vec_bound(_m: Vec<u8>) -> Result<Bound<Vec<u8>>, Response> {
+    let mut m = _m;
+    if m.len() == 0 { return Err(Response::Error("Syntax error".to_string())); }
+    // FIXME: unnecessary memory move?
+    Ok(match m.remove(0) as char {
+        '(' => Bound::Excluded(m),
+        '[' => Bound::Included(m),
+        '-' => Bound::Unbounded,
+        '+' => Bound::Unbounded,
+        _ => return Err(Response::Error("Syntax error".to_string())),
+    })
+}
+
 fn generic_zrangebylex(parser: &Parser, db: &mut Database, dbindex: usize, rev: bool) -> Response {
     let len = parser.argv.len();
     validate!(len == 4 || len == 7, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let min = {
-        let mut m = try_validate!(parser.get_vec(2), "Invalid min");
-        if m.len() == 0 { return Response::Error("Syntax error".to_string()); }
-        // FIXME: unnecessary memory move?
-        match m.remove(0) as char {
-            '(' => Bound::Excluded(m),
-            '[' => Bound::Included(m),
-            '-' => Bound::Unbounded,
-            '+' => Bound::Unbounded,
-            _ => return Response::Error("Syntax error".to_string()),
+        let m = try_validate!(parser.get_vec(2), "Invalid min");
+        match get_vec_bound(m) {
+            Ok(v) => v,
+            Err(e) => return e,
         }
     };
     let max = {
-        let mut m = try_validate!(parser.get_vec(3), "Invalid max");
-        if m.len() == 0 { return Response::Error("Syntax error".to_string()); }
-        // FIXME: unnecessary memory move?
-        match m.remove(0) as char {
-            '(' => Bound::Excluded(m),
-            '[' => Bound::Included(m),
-            '-' => Bound::Unbounded,
-            '+' => Bound::Unbounded,
-            _ => return Response::Error("Syntax error".to_string()),
+        let m = try_validate!(parser.get_vec(3), "Invalid max");
+        match get_vec_bound(m) {
+            Ok(v) => v,
+            Err(e) => return e,
         }
     };
 
@@ -1305,6 +1308,33 @@ fn zrangebylex(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
 
 fn zrevrangebylex(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     generic_zrangebylex(parser, db, dbindex, true)
+}
+
+fn zlexcount(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() == 4, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let min = {
+        let m = try_validate!(parser.get_vec(2), "Invalid min");
+        match get_vec_bound(m) {
+            Ok(v) => v,
+            Err(e) => return e,
+        }
+    };
+    let max = {
+        let m = try_validate!(parser.get_vec(3), "Invalid max");
+        match get_vec_bound(m) {
+            Ok(v) => v,
+            Err(e) => return e,
+        }
+    };
+    let el = match db.get(dbindex, &key) {
+        Some(e) => e,
+        None => return Response::Integer(0),
+    };
+    match el.zlexcount(min, max) {
+        Ok(c) => Response::Integer(c as i64),
+        Err(err) => Response::Error(err.to_string()),
+    }
 }
 
 fn generic_zrank(db: &mut Database, dbindex: usize, key: &Vec<u8>, member: Vec<u8>, rev: bool) -> Response {
@@ -1618,6 +1648,7 @@ pub fn command(
         "zremrangebyscore" => zremrangebyscore(parser, db, dbindex),
         "zremrangebyrank" => zremrangebyrank(parser, db, dbindex),
         "zcount" => zcount(parser, db, dbindex),
+        "zlexcount" => zlexcount(parser, db, dbindex),
         "zrange" => zrange(parser, db, dbindex),
         "zrevrange" => zrevrange(parser, db, dbindex),
         "zrangebyscore" => zrangebyscore(parser, db, dbindex),
@@ -2525,6 +2556,16 @@ mod test_command {
         assert_eq!(command(&parser!(b"zcount key 2 3"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(2));
         assert_eq!(command(&parser!(b"zcount key (2 3"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(1));
         assert_eq!(command(&parser!(b"zcount key -inf inf"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(4));
+    }
+
+    #[test]
+    fn zlexcount_command() {
+        let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
+        assert_eq!(command(&parser!(b"zadd key 0 a 0 b 0 c 0 d"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(4));
+        assert_eq!(command(&parser!(b"zlexcount key [a [b"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(2));
+        assert_eq!(command(&parser!(b"zlexcount key [a [b"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(2));
+        assert_eq!(command(&parser!(b"zlexcount key (b [c"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(1));
+        assert_eq!(command(&parser!(b"zlexcount key - +"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(4));
     }
 
     #[test]

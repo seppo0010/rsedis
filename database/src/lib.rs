@@ -1090,6 +1090,30 @@ impl Value {
         }
     }
 
+    /// Counts the number of elements in a sorted set within a lex range
+    ///
+    /// # Examples
+    /// ```
+    /// #![feature(collections_bound)]
+    /// use database::Value;
+    /// use std::collections::Bound;
+    ///
+    /// let mut val = Value::Nil;
+    /// assert_eq!(val.zlexcount(Bound::Unbounded, Bound::Unbounded).unwrap(), 0);
+    /// val.zadd(0.0, vec![1], false, false, false, false).unwrap();
+    /// val.zadd(0.0, vec![2], false, false, false, false).unwrap();
+    /// val.zadd(0.0, vec![3], false, false, false, false).unwrap();
+    /// assert_eq!(val.zlexcount(Bound::Included(vec![2]), Bound::Excluded(vec![3])).unwrap(), 1);
+    /// assert_eq!(val.zlexcount(Bound::Unbounded, Bound::Unbounded).unwrap(), 3);
+    /// ```
+    pub fn zlexcount(&self, min: Bound<Vec<u8>>, max: Bound<Vec<u8>>) -> Result<usize, OperationError> {
+        match *self {
+            Value::Nil => Ok(0),
+            Value::SortedSet(ref value) => Ok(value.zlexcount(min, max)),
+            _ => Err(OperationError::WrongTypeError),
+        }
+    }
+
     /// Returns the elements in a position range. If `withscores` is true, it will also
     /// include their scores' ASCII representation. If `rev` is true, it counts
     /// the positions from the end.
@@ -2548,6 +2572,21 @@ mod test_command {
         assert_eq!(value.zcount(Bound::Excluded(1.0), Bound::Excluded(2.0)).unwrap(), 0);
         assert_eq!(value.zcount(Bound::Included(1.5), Bound::Included(2.0)).unwrap(), 1);
         assert_eq!(value.zcount(Bound::Included(5.0), Bound::Included(10.0)).unwrap(), 0);
+    }
+
+    #[test]
+    fn zlexcount() {
+        let mut value = Value::Nil;
+        let v1 = vec![1];
+        let v2 = vec![2];
+
+        assert_eq!(zadd!(value, 0.0, v1), true);
+        assert_eq!(zadd!(value, 0.0, v2), true);
+        assert_eq!(value.zlexcount(Bound::Included(vec![0]), Bound::Included(vec![5])).unwrap(), 2);
+        assert_eq!(value.zlexcount(Bound::Included(vec![1]), Bound::Included(vec![2])).unwrap(), 2);
+        assert_eq!(value.zlexcount(Bound::Excluded(vec![1]), Bound::Excluded(vec![2])).unwrap(), 0);
+        assert_eq!(value.zlexcount(Bound::Included(vec![1, 5]), Bound::Included(vec![2])).unwrap(), 1);
+        assert_eq!(value.zlexcount(Bound::Included(vec![5]), Bound::Included(vec![10])).unwrap(), 0);
     }
 
     #[test]

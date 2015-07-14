@@ -187,6 +187,33 @@ impl ValueSortedSet {
         self.rangebyscore(min, max).len()
     }
 
+    fn rangebylex(&self, min: Bound<Vec<u8>>, max: Bound<Vec<u8>>) -> Vec<&SortedSetMember> {
+        let skiplist = match *self {
+            ValueSortedSet::Data(ref skiplist, _) => skiplist,
+        };
+
+        let f = skiplist.front().unwrap().get_f64();
+        let mut f1 = SortedSetMember::new(f.clone(), vec![]);
+        let mut f2 = SortedSetMember::new(f.clone(), vec![]);
+        let m1 = match min {
+            Bound::Included(f) => { f1.set_vec(f); Bound::Included(&f1) },
+            Bound::Excluded(f) => { f1.set_vec(f); Bound::Excluded(&f1) },
+            Bound::Unbounded => Bound::Unbounded,
+        };
+
+        let m2 = match max {
+            Bound::Included(f) => { f2.set_vec(f); Bound::Included(&f2) },
+            Bound::Excluded(f) => { f2.set_vec(f); Bound::Excluded(&f2) },
+            Bound::Unbounded => Bound::Unbounded,
+        };
+
+        skiplist.range(m1, m2).collect::<Vec<_>>()
+    }
+
+    pub fn zlexcount(&self, min: Bound<Vec<u8>>, max: Bound<Vec<u8>>) -> usize {
+        self.rangebylex(min, max).len()
+    }
+
     pub fn zrem(&mut self, member: Vec<u8>) -> bool {
         let (skiplist, hmap) = match *self {
             ValueSortedSet::Data(ref mut skiplist, ref mut hmap) => (skiplist, hmap),

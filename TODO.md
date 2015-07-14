@@ -62,7 +62,7 @@
     - [x] zrangebylex
     - [x] zrevrangebylex
     - [x] zcount
-    - [ ] zlexcount
+    - [x] zlexcount
     - [x] zrevrange
     - [x] zcard
     - [x] zscore
