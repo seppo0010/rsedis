@@ -1531,6 +1531,23 @@ impl Database {
         }
     }
 
+    /// Gets the number of items in a database.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use database::{Database, Value};
+    ///
+    /// let mut db = Database::mock();
+    ///
+    /// assert_eq!(db.dbsize(0), 0);
+    /// db.get_or_create(0, &vec![1]).set(vec![1]);
+    /// assert_eq!(db.dbsize(0), 1);
+    /// ```
+    pub fn dbsize(&self, index: usize) -> usize {
+        self.data[index].len()
+    }
+
     /// Gets a value from the database if exists and it is not expired.
     ///
     /// # Examples

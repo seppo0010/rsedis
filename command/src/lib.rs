@@ -187,6 +187,11 @@ fn del(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     return Response::Integer(c);
 }
 
+fn dbsize(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() == 1, "Wrong number of parameters");
+    Response::Integer(db.dbsize(dbindex) as i64)
+}
+
 fn dump(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 2, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
@@ -1631,6 +1636,7 @@ pub fn command(
         "setex" => setex(parser, db, dbindex),
         "psetex" => psetex(parser, db, dbindex),
         "del" => del(parser, db, dbindex),
+        "dbsize" => dbsize(parser, db, dbindex),
         "append" => append(parser, db, dbindex),
         "get" => get(parser, db, dbindex),
         "getrange" => getrange(parser, db, dbindex),
@@ -1883,6 +1889,16 @@ mod test_command {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
         assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
         assert_eq!(command(&parser!(b"del key key2"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(1));
+    }
+
+    #[test]
+    fn dbsize_command() {
+        let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
+        assert_eq!(command(&parser!(b"dbsize"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(0));
+        assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
+        assert_eq!(command(&parser!(b"dbsize"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(1));
+        assert!(db.get_or_create(0, &b"key2".to_vec()).set(b"value".to_vec()).is_ok());
+        assert_eq!(command(&parser!(b"dbsize"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(2));
     }
 
     #[test]

@@ -101,7 +101,7 @@
     - [x] pexpireat
     - [ ] keys
     - [ ] scan
-    - [ ] dbsize
+    - [x] dbsize
     - [x] auth
     - [x] ping
     - [ ] echo
