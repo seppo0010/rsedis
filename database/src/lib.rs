@@ -313,6 +313,29 @@ impl Value {
         }
     }
 
+    /// Increments the ASCII float value in the string. Creates a new one if
+    /// it didn't exist. Fails if it is not a string.
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// assert_eq!(val.incrbyfloat(3.3).unwrap(), 3.3);
+    /// assert_eq!(val.incrbyfloat(3.3).unwrap(), 6.6);
+    /// assert_eq!(val.get().unwrap(), b"6.6".to_vec());
+    /// ```
+    pub fn incrbyfloat(&mut self, incr: f64) -> Result<f64, OperationError> {
+        match *self {
+            Value::Nil => {
+                *self = Value::String(ValueString::Data(format!("{}", incr).into_bytes()));
+                return Ok(incr);
+            },
+            Value::String(ref mut value) => value.incrbyfloat(incr),
+            _ => return Err(OperationError::WrongTypeError),
+        }
+    }
+
     /// Gets the bytes in a range in the string.
     /// Negative positions starts from the end.
     /// If the stop index is lower than the start index, it returns and empty vec.
@@ -2404,6 +2427,31 @@ mod test_command {
     fn incr_overflow() {
         let mut value = Value::String(ValueString::Integer(i64::MAX));
         assert!(value.incr(1).is_err());
+    }
+
+    #[test]
+    fn incrbyfloat_i() {
+        let mut value = Value::String(ValueString::Integer(123));
+        assert!((value.incrbyfloat(1.2).unwrap() - 124.2) < 0.01);
+        assert_eq!(value, Value::String(ValueString::Data(b"124.2".to_vec())));
+        let v = value.get().unwrap();
+        assert_eq!(v[0], '1' as u8);
+        assert_eq!(v[1], '2' as u8);
+        assert_eq!(v[2], '4' as u8);
+        assert_eq!(v[3], '.' as u8);
+        assert!(v[4] == '2' as u8 || v[4] == '1' as u8);
+    }
+
+    #[test]
+    fn incrbyfloat_s() {
+        let mut value = Value::String(ValueString::Data(b"123.4".to_vec()));
+        assert!((value.incrbyfloat(1.2).unwrap() - 124.6) < 0.01);
+        let v = value.get().unwrap();
+        assert_eq!(v[0], '1' as u8);
+        assert_eq!(v[1], '2' as u8);
+        assert_eq!(v[2], '4' as u8);
+        assert_eq!(v[3], '.' as u8);
+        assert!(v[4] == '6' as u8 || v[4] == '5' as u8);
     }
 
     #[test]

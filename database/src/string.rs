@@ -65,6 +65,22 @@ impl ValueString {
         Ok(newval)
     }
 
+    pub fn incrbyfloat(&mut self, incr: f64) -> Result<f64, OperationError> {
+        let val = match *self {
+            ValueString::Integer(i) => i as f64,
+            ValueString::Data(ref data) => {
+                if data.len() > 32 {
+                    return Err(OperationError::OverflowError);
+                }
+                let res = try!(from_utf8(&data));
+                try!(res.parse::<f64>())
+            },
+        };
+        let newval = val + incr;
+        *self = ValueString::Data(format!("{}", newval).into_bytes());
+        Ok(newval)
+    }
+
     pub fn getrange(&self, _start: i64, _stop: i64) -> Vec<u8> {
         let s = match *self {
             ValueString::Integer(ref i) => format!("{}", i).into_bytes(),

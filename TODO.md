@@ -86,7 +86,7 @@
     - [ ] hscan
     - [x] incrby
     - [x] decrby
-    - [ ] incrbyfloat
+    - [x] incrbyfloat
     - [ ] getset
     - [ ] mset
     - [ ] msetnx

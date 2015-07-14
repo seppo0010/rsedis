@@ -442,6 +442,18 @@ fn decrby(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     }
 }
 
+fn incrbyfloat(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() == 3, "Wrong number of parameters");
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let increment = try_validate!(parser.get_f64(2), "Invalid increment");
+    let r = match db.get_or_create(dbindex, &key).incrbyfloat(increment) {
+        Ok(val) => Response::Data(format!("{}", val).into_bytes()),
+        Err(err) =>  Response::Error(err.to_string()),
+    };
+    db.key_publish(dbindex, &key);
+    r
+}
+
 fn generic_push(parser: &Parser, db: &mut Database, dbindex: usize, right: bool, create: bool) -> Response {
     // TODO variadic
     validate!(parser.argv.len() == 3, "Wrong number of parameters");
@@ -1632,6 +1644,7 @@ pub fn command(
         "decr" => decr(parser, db, dbindex),
         "incrby" => incrby(parser, db, dbindex),
         "decrby" => decrby(parser, db, dbindex),
+        "incrbyfloat" => incrbyfloat(parser, db, dbindex),
         "exists" => exists(parser, db, dbindex),
         "ping" => ping(parser, db, dbindex),
         "flushdb" => flushdb(parser, db, dbindex),
@@ -2044,6 +2057,27 @@ mod test_command {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
         assert_eq!(command(&parser!(b"incrby key 5"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(5));
         assert_eq!(command(&parser!(b"incrby key 5"), &mut db, &mut 0, &mut true, None, None, None).unwrap(), Response::Integer(10));
+    }
+
+    #[test]
+    fn incrbyfloat_command() {
+        let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
+        match command(&parser!(b"incrbyfloat key 2.1"), &mut db, &mut 0, &mut true, None, None, None).unwrap() {
+            Response::Data(ref v) => {
+                assert_eq!(v[0], '2' as u8);
+                assert_eq!(v[1], '.' as u8);
+                assert!(v[2] == '1' as u8 || v[2] == '0' as u8);
+            },
+            _ => panic!("Unexpected response"),
+        }
+        match command(&parser!(b"incrbyfloat key 4.1"), &mut db, &mut 0, &mut true, None, None, None).unwrap() {
+            Response::Data(ref v) => {
+                assert_eq!(v[0], '6' as u8);
+                assert_eq!(v[1], '.' as u8);
+                assert!(v[2] == '1' as u8 || v[2] == '2' as u8);
+            },
+            _ => panic!("Unexpected response"),
+        }
     }
 
     #[test]

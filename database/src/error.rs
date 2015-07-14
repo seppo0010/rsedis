@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::fmt;
 use std::io;
-use std::num::ParseIntError;
+use std::num::{ParseIntError, ParseFloatError};
 use std::str::Utf8Error;
 
 #[derive(Debug)]
@@ -32,6 +32,10 @@ impl From<Utf8Error> for OperationError {
 
 impl From<ParseIntError> for OperationError {
     fn from(_: ParseIntError) -> OperationError { OperationError::ValueError }
+}
+
+impl From<ParseFloatError> for OperationError {
+    fn from(_: ParseFloatError) -> OperationError { OperationError::ValueError }
 }
 
 impl From<io::Error> for OperationError {
