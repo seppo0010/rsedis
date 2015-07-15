@@ -12,7 +12,6 @@ extern crate database;
 extern crate command;
 extern crate net2;
 
-use std::collections::HashMap;
 use std::time::Duration;
 use std::io;
 use std::io::{Read, Write};
@@ -30,7 +29,6 @@ use std::thread;
 use net2::TcpBuilder;
 #[cfg(unix)] use unix_socket::{UnixStream, UnixListener};
 
-use command::command;
 use config::Config;
 use database::{Database, PubsubEvent};
 use logger::Level;
@@ -238,15 +236,9 @@ impl Client {
         let (pubsub_tx, pubsub_rx) = channel::<Option<PubsubEvent>>();
         self.create_pubsub_thread(stream_tx.clone(), pubsub_rx);
 
-        let mut auth = false;
+        let mut client = command::Client::new(pubsub_tx);
         // TODO: dynamic buffer
         let mut buffer = [0u8; 512];
-        // selected database
-        let mut dbindex = 0;
-        // channel subscriptions
-        let mut subscriptions = HashMap::new();
-        // pattern subscriptions
-        let mut psubscriptions = HashMap::new();
         loop {
             // read socket
             let len = match self.stream.read(&mut buffer) {
@@ -289,7 +281,7 @@ impl Client {
                 };
 
                 // execute the command
-                match command(&parser, &mut *db, &mut dbindex, &mut auth, Some(&mut subscriptions), Some(&mut psubscriptions), Some(&pubsub_tx)) {
+                match command::command(&parser, &mut *db, &mut client) {
                     // received a response, send it to the client
                     Ok(response) => {
                         match stream_tx.send(Some(response)) {
@@ -323,7 +315,7 @@ impl Client {
             if error {
                 // kill threads
                 stream_tx.send(None);
-                pubsub_tx.send(None);
+                client.pubsub_sender.send(None);
                 break;
             }
         };
