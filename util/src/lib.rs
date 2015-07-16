@@ -42,11 +42,13 @@ pub fn match_char(e1: &u8, e2: &u8, ignore_case: bool) -> bool {
 pub fn glob_match(pattern: &Vec<u8>, element: &Vec<u8>, ignore_case: bool) -> bool {
     let mut patternpos = 0;
     let mut elementpos = 0;
-    let star = 42u8; /* '*' */
-    let question_mark = 63u8; /* '?' */
-    let backslash = 92u8; /* '\\' */
-    let open_bracket = 91u8; /* '[' */
-    let close_bracket = 93u8; /* '[' */
+
+    let star          = '*' as u8;
+    let question_mark = '?' as u8;
+    let backslash     = '\\' as u8;
+    let open_bracket  = '[' as u8;
+    let close_bracket = ']' as u8;
+
     while patternpos < pattern.len() {
         match pattern[patternpos] {
             x if x == star => {

@@ -1496,6 +1496,17 @@ pub struct Database {
     subscriber_id: usize,
 }
 
+pub struct Iter<'a> {
+    inner: rehashinghashmap::Iter<'a, Vec<u8>, Value>
+}
+
+impl<'a> Iterator for Iter<'a> {
+    type Item = (&'a Vec<u8>, &'a Value);
+
+    #[inline] fn next(&mut self) -> Option<(&'a Vec<u8>, &'a Value)> { self.inner.next() }
+    #[inline] fn size_hint(&self) -> (usize, Option<usize>) { self.inner.size_hint()  }
+}
+
 impl Database {
     /// Creates a new empty `Database` with a mock config.
     pub fn mock() -> Self {
@@ -1899,6 +1910,25 @@ impl Database {
             },
             None => Some(command.clone()),
         }
+    }
+
+    /// Iterate over the keys in one database
+    pub fn iter_db(&self, dbindex: usize) -> Iter {
+        Iter {
+            inner: self.data[dbindex].iter()
+        }
+    }
+
+    /// Collect all keys from a database matching a pattern.
+    pub fn keys(&self, dbindex: usize, pattern: &Vec<u8>) ->Vec<Vec<u8>> {
+        let iter = self.iter_db(dbindex);
+        let mut responses = Vec::with_capacity(iter.size_hint().1.unwrap_or(1));
+        for (k, _) in iter {
+            if glob_match(pattern, k, false) {
+                responses.push(k.clone())
+            }
+        }
+        responses
     }
 }
 
