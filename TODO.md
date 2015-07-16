@@ -99,7 +99,7 @@
     - [x] expireat
     - [x] pexpire
     - [x] pexpireat
-    - [ ] keys
+    - [x] keys
     - [ ] scan
     - [x] dbsize
     - [x] auth

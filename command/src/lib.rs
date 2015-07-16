@@ -1607,6 +1607,16 @@ impl Client {
     }
 }
 
+fn keys(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() == 2, "Wrong number of parameters");
+    let pattern = try_validate!(parser.get_vec(1), "Invalid pattern");
+
+    // FIXME: This might be a bit suboptimal, as db.keys already allocates a vector.
+    // Instead we should collect only once.
+    let responses = db.keys(dbindex, &pattern);
+    Response::Array(responses.into_iter().map(|i| Response::Data(i)).collect())
+}
+
 pub fn command(
         parser: &Parser,
         db: &mut Database,
@@ -1728,6 +1738,7 @@ pub fn command(
         "zunionstore" => zunionstore(parser, db, dbindex),
         "zinterstore" => zinterstore(parser, db, dbindex),
         "dump" => dump(parser, db, dbindex),
+        "keys" => keys(parser, db, dbindex),
         "subscribe"    => return subscribe(   parser, db, &mut client.subscriptions, client.pattern_subscriptions.len(), &client.pubsub_sender),
         "unsubscribe"  => return unsubscribe( parser, db, &mut client.subscriptions, client.pattern_subscriptions.len(), &client.pubsub_sender),
         "psubscribe"   => return psubscribe(  parser, db, client.subscriptions.len(), &mut client.pattern_subscriptions, &client.pubsub_sender),
@@ -3010,5 +3021,26 @@ mod test_command {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
         assert!(db.get_or_create(0, &b"key".to_vec()).set(b"1".to_vec()).is_ok());
         assert_eq!(command(&parser!(b"dump key"), &mut db, &mut Client::mock()).unwrap(), Response::Data(b"\x00\xc0\x01\x07\x00\xd9J2E\xd9\xcb\xc4\xe6".to_vec()));
+    }
+
+    #[test]
+    fn keys_command() {
+        let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
+        let mut client = Client::mock();
+        assert!(db.get_or_create(0, &b"key1".to_vec()).set(b"value".to_vec()).is_ok());
+        assert!(db.get_or_create(0, &b"key2".to_vec()).set(b"value".to_vec()).is_ok());
+        assert!(db.get_or_create(0, &b"key3".to_vec()).set(b"value".to_vec()).is_ok());
+
+        match command(&parser!(b"KEYS *"), &mut db, &mut client).unwrap() {
+            Response::Array(resp) => assert_eq!(3, resp.len()),
+            _ => panic!("Keys failed")
+        };
+
+        assert_eq!(command(&parser!(b"KEYS key1"), &mut db, &mut client).unwrap(),
+                    Response::Array(vec![Response::Data(b"key1".to_vec())]));
+        assert_eq!(command(&parser!(b"KEYS key[^23]"), &mut db, &mut client).unwrap(),
+                    Response::Array(vec![Response::Data(b"key1".to_vec())]));
+        assert_eq!(command(&parser!(b"KEYS key[1]"), &mut db, &mut client).unwrap(),
+                    Response::Array(vec![Response::Data(b"key1".to_vec())]));
     }
 }
