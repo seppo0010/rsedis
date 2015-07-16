@@ -2133,6 +2133,22 @@ mod test_command {
     }
 
     #[test]
+    fn ltrim_regression() {
+        let mut value = Value::List(ValueList::new());
+        value.push(vec![1], true).unwrap();
+        value.push(vec![2], true).unwrap();
+        value.push(vec![3], true).unwrap();
+        value.push(vec![4], true).unwrap();
+
+        assert_eq!(value.ltrim(-1000, 1000).unwrap(), ());
+        assert_eq!(value.llen().unwrap(), 4);
+        assert_eq!(value.ltrim(2, 100).unwrap(), ());
+        assert_eq!(value.llen().unwrap(), 2);
+        assert_eq!(value.ltrim(0, -1000).unwrap(), ());
+        assert_eq!(value.llen().unwrap(), 0);
+    }
+
+    #[test]
     fn sadd() {
         let mut value = Value::Nil;
         let v1 = vec![1, 2, 3, 4];

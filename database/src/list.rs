@@ -160,16 +160,16 @@ impl ValueList {
                 let start = match normalize_position(_start, len) {
                     Ok(i) => i,
                     Err(g) => if !g { 0 } else {
-                        list.split_off(len);
-                        len
+                        list.clear();
+                        return Ok(())
                     },
                 };
                 let stop = match normalize_position(_stop, len) {
                     Ok(i) => i,
                     Err(g) => if !g {
-                        list.split_off(len);
-                        0
-                    } else { len },
+                        list.clear();
+                        return Ok(())
+                    } else { len - 1 },
                 };
                 list.split_off(stop + 1);
                 list.split_off(start)
