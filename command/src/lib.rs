@@ -17,7 +17,7 @@ use std::usize;
 
 use database::{PubsubEvent, Database, Value, zset};
 use response::{Response, ResponseError};
-use parser::Parser;
+use parser::ParsedCommand;
 use util::mstime;
 
 
@@ -93,7 +93,7 @@ fn generic_set(db: &mut Database, dbindex: usize, key: Vec<u8>, val: Vec<u8>, nx
     }
 }
 
-fn set(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn set(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() >= 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let val = try_validate!(parser.get_vec(2), "Invalid value");
@@ -130,7 +130,7 @@ fn set(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     }
 }
 
-fn setnx(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn setnx(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let val = try_validate!(parser.get_vec(2), "Invalid value");
@@ -140,7 +140,7 @@ fn setnx(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     }
 }
 
-fn setex(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn setex(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 4, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let exp = try_validate!(parser.get_i64(2), "Invalid expiration");
@@ -151,7 +151,7 @@ fn setex(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     }
 }
 
-fn psetex(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn psetex(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 4, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let exp = try_validate!(parser.get_i64(2), "Invalid value");
@@ -162,7 +162,7 @@ fn psetex(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     }
 }
 
-fn exists(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn exists(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 2, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     Response::Integer(match db.get(dbindex, &key) {
@@ -171,7 +171,7 @@ fn exists(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     })
 }
 
-fn del(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn del(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() >= 2, "Wrong number of parameters");
     let mut c = 0;
     for i in 1..parser.argv.len() {
@@ -187,12 +187,12 @@ fn del(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     return Response::Integer(c);
 }
 
-fn dbsize(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn dbsize(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 1, "Wrong number of parameters");
     Response::Integer(db.dbsize(dbindex) as i64)
 }
 
-fn dump(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn dump(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 2, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let mut data = vec![];
@@ -217,35 +217,35 @@ fn generic_expire(db: &mut Database, dbindex: usize, key: Vec<u8>, msexpiration:
     })
 }
 
-fn expire(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn expire(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let expiration = try_validate!(parser.get_i64(2), "Invalid expiration");
     generic_expire(db, dbindex, key, mstime() + expiration * 1000)
 }
 
-fn expireat(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn expireat(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let expiration = try_validate!(parser.get_i64(2), "Invalid expiration");
     generic_expire(db, dbindex, key, expiration * 1000)
 }
 
-fn pexpire(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn pexpire(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let expiration = try_validate!(parser.get_i64(2), "Invalid expiration");
     generic_expire(db, dbindex, key, mstime() + expiration)
 }
 
-fn pexpireat(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn pexpireat(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let expiration = try_validate!(parser.get_i64(2), "Invalid expiration");
     generic_expire(db, dbindex, key, expiration)
 }
 
-fn flushdb(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn flushdb(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 1, "Wrong number of parameters");
     db.clear(dbindex);
     return Response::Status("OK".to_owned());
@@ -263,19 +263,19 @@ fn generic_ttl(db: &mut Database, dbindex: usize, key: &Vec<u8>, divisor: i64) -
     })
 }
 
-fn ttl(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn ttl(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 2, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     generic_ttl(db, dbindex, &key, 1000)
 }
 
-fn pttl(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn pttl(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 2, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     generic_ttl(db, dbindex, &key, 1)
 }
 
-fn persist(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn persist(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 2, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     Response::Integer(match db.remove_msexpiration(dbindex, &key) {
@@ -284,7 +284,7 @@ fn persist(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     })
 }
 
-fn dbtype(parser: &Parser, db: &Database, dbindex: usize) -> Response {
+fn dbtype(parser: &ParsedCommand, db: &Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 2, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     match db.get(dbindex, &key) {
@@ -301,13 +301,13 @@ fn dbtype(parser: &Parser, db: &Database, dbindex: usize) -> Response {
     }
 }
 
-fn flushall(parser: &Parser, db: &mut Database, _: usize) -> Response {
+fn flushall(parser: &ParsedCommand, db: &mut Database, _: usize) -> Response {
     validate!(parser.argv.len() == 1, "Wrong number of parameters");
     db.clearall();
     return Response::Status("OK".to_owned());
 }
 
-fn append(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn append(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let val = try_validate!(parser.get_vec(2), "Invalid value");
@@ -330,13 +330,13 @@ fn generic_get(db: &Database, dbindex: usize, key: Vec<u8>) -> Response {
     }
 }
 
-fn get(parser: &Parser, db: &Database, dbindex: usize) -> Response {
+fn get(parser: &ParsedCommand, db: &Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 2, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     generic_get(db, dbindex, key)
 }
 
-fn mget(parser: &Parser, db: &Database, dbindex: usize) -> Response {
+fn mget(parser: &ParsedCommand, db: &Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() >= 2, "Wrong number of parameters");
     let mut responses = Vec::with_capacity(parser.argv.len() - 1);
     for i in 1..parser.argv.len() {
@@ -346,7 +346,7 @@ fn mget(parser: &Parser, db: &Database, dbindex: usize) -> Response {
     Response::Array(responses)
 }
 
-fn getrange(parser: &Parser, db: &Database, dbindex: usize) -> Response {
+fn getrange(parser: &ParsedCommand, db: &Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 4, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let start = try_validate!(parser.get_i64(2), "Invalid range");
@@ -361,7 +361,7 @@ fn getrange(parser: &Parser, db: &Database, dbindex: usize) -> Response {
     }
 }
 
-fn setrange(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn setrange(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 4, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let index = try_validate!(parser.get_i64(2), "Invalid index");
@@ -372,7 +372,7 @@ fn setrange(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     }
 }
 
-fn setbit(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn setbit(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 4, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let index = try_validate!(parser.get_i64(2), "Invalid index");
@@ -385,7 +385,7 @@ fn setbit(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     }
 }
 
-fn getbit(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn getbit(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let index = try_validate!(parser.get_i64(2), "Invalid index");
@@ -396,7 +396,7 @@ fn getbit(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     }
 }
 
-fn strlen(parser: &Parser, db: &Database, dbindex: usize) -> Response {
+fn strlen(parser: &ParsedCommand, db: &Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 2, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let obj = db.get(dbindex, &key);
@@ -411,7 +411,7 @@ fn strlen(parser: &Parser, db: &Database, dbindex: usize) -> Response {
     }
 }
 
-fn generic_incr(parser: &Parser, db: &mut Database, dbindex: usize, increment: i64) -> Response {
+fn generic_incr(parser: &ParsedCommand, db: &mut Database, dbindex: usize, increment: i64) -> Response {
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let r = match db.get_or_create(dbindex, &key).incr(increment) {
         Ok(val) => Response::Integer(val),
@@ -421,17 +421,17 @@ fn generic_incr(parser: &Parser, db: &mut Database, dbindex: usize, increment: i
     r
 }
 
-fn incr(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn incr(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 2, "Wrong number of parameters");
     return generic_incr(parser, db, dbindex, 1);
 }
 
-fn decr(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn decr(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 2, "Wrong number of parameters");
     return generic_incr(parser, db, dbindex, -1);
 }
 
-fn incrby(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn incrby(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 3, "Wrong number of parameters");
     match parser.get_i64(2) {
         Ok(increment) => generic_incr(parser, db, dbindex, increment),
@@ -439,7 +439,7 @@ fn incrby(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     }
 }
 
-fn decrby(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn decrby(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 3, "Wrong number of parameters");
     match parser.get_i64(2) {
         Ok(decrement) => generic_incr(parser, db, dbindex, -decrement),
@@ -447,7 +447,7 @@ fn decrby(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     }
 }
 
-fn incrbyfloat(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn incrbyfloat(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let increment = try_validate!(parser.get_f64(2), "Invalid increment");
@@ -459,7 +459,7 @@ fn incrbyfloat(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     r
 }
 
-fn generic_push(parser: &Parser, db: &mut Database, dbindex: usize, right: bool, create: bool) -> Response {
+fn generic_push(parser: &ParsedCommand, db: &mut Database, dbindex: usize, right: bool, create: bool) -> Response {
     // TODO variadic
     validate!(parser.argv.len() == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
@@ -483,23 +483,23 @@ fn generic_push(parser: &Parser, db: &mut Database, dbindex: usize, right: bool,
     r
 }
 
-fn lpush(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn lpush(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     return generic_push(parser, db, dbindex, false, true);
 }
 
-fn rpush(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn rpush(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     return generic_push(parser, db, dbindex, true, true);
 }
 
-fn lpushx(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn lpushx(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     return generic_push(parser, db, dbindex, false, false);
 }
 
-fn rpushx(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn rpushx(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     return generic_push(parser, db, dbindex, true, false);
 }
 
-fn generic_pop(parser: &Parser, db: &mut Database, dbindex: usize, right: bool) -> Response {
+fn generic_pop(parser: &ParsedCommand, db: &mut Database, dbindex: usize, right: bool) -> Response {
     validate!(parser.argv.len() == 2, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let r = {
@@ -520,11 +520,11 @@ fn generic_pop(parser: &Parser, db: &mut Database, dbindex: usize, right: bool) 
     r
 }
 
-fn lpop(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn lpop(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     return generic_pop(parser, db, dbindex, false);
 }
 
-fn rpop(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn rpop(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     return generic_pop(parser, db, dbindex, true);
 }
 
@@ -568,14 +568,14 @@ fn generic_rpoplpush(db: &mut Database, dbindex: usize, source: &Vec<u8>, destin
     resp
 }
 
-fn rpoplpush(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn rpoplpush(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 3, "Wrong number of parameters");
     let source = try_validate!(parser.get_vec(1), "Invalid source");
     let destination = try_validate!(parser.get_vec(2), "Invalid destination");
     generic_rpoplpush(db, dbindex, &source, &destination)
 }
 
-fn brpoplpush(parser: &Parser, db: &mut Database, dbindex: usize) -> Result<Response, ResponseError> {
+fn brpoplpush(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Result<Response, ResponseError> {
     #![allow(unused_must_use)]
     opt_validate!(parser.argv.len() == 4, "Wrong number of parameters");
 
@@ -600,7 +600,7 @@ fn brpoplpush(parser: &Parser, db: &mut Database, dbindex: usize) -> Result<Resp
     return Err(ResponseError::Wait(rx));
 }
 
-fn generic_bpop(parser: &Parser, db: &mut Database, dbindex: usize, right: bool) -> Result<Response, ResponseError> {
+fn generic_bpop(parser: &ParsedCommand, db: &mut Database, dbindex: usize, right: bool) -> Result<Response, ResponseError> {
     #![allow(unused_must_use)]
     opt_validate!(parser.argv.len() >= 3, "Wrong number of parameters");
 
@@ -640,15 +640,15 @@ fn generic_bpop(parser: &Parser, db: &mut Database, dbindex: usize, right: bool)
     return Err(ResponseError::Wait(rx));
 }
 
-fn brpop(parser: &Parser, db: &mut Database, dbindex: usize) -> Result<Response, ResponseError> {
+fn brpop(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Result<Response, ResponseError> {
     generic_bpop(parser, db, dbindex, true)
 }
 
-fn blpop(parser: &Parser, db: &mut Database, dbindex: usize) -> Result<Response, ResponseError> {
+fn blpop(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Result<Response, ResponseError> {
     generic_bpop(parser, db, dbindex, false)
 }
 
-fn lindex(parser: &Parser, db: &Database, dbindex: usize) -> Response {
+fn lindex(parser: &ParsedCommand, db: &Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let index = try_validate!(parser.get_i64(2), "Invalid index");
@@ -666,7 +666,7 @@ fn lindex(parser: &Parser, db: &Database, dbindex: usize) -> Response {
     }
 }
 
-fn linsert(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn linsert(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 5, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let before_str = try_validate!(parser.get_str(2), "Syntax error");
@@ -694,7 +694,7 @@ fn linsert(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     r
 }
 
-fn llen(parser: &Parser, db: &Database, dbindex: usize) -> Response {
+fn llen(parser: &ParsedCommand, db: &Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 2, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     return match db.get(dbindex, &key) {
@@ -706,7 +706,7 @@ fn llen(parser: &Parser, db: &Database, dbindex: usize) -> Response {
     }
 }
 
-fn lrange(parser: &Parser, db: &Database, dbindex: usize) -> Response {
+fn lrange(parser: &ParsedCommand, db: &Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 4, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let start = try_validate!(parser.get_i64(2), "Invalid range");
@@ -720,7 +720,7 @@ fn lrange(parser: &Parser, db: &Database, dbindex: usize) -> Response {
     }
 }
 
-fn lrem(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn lrem(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 4, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let count = try_validate!(parser.get_i64(2), "Invalid count");
@@ -736,7 +736,7 @@ fn lrem(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     r
 }
 
-fn lset(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn lset(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 4, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let index = try_validate!(parser.get_i64(2), "Invalid index");
@@ -752,7 +752,7 @@ fn lset(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     r
 }
 
-fn ltrim(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn ltrim(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 4, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let start = try_validate!(parser.get_i64(2), "Invalid start");
@@ -768,7 +768,7 @@ fn ltrim(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     r
 }
 
-fn sadd(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn sadd(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() > 2, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let mut count = 0;
@@ -787,7 +787,7 @@ fn sadd(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     return Response::Integer(count);
 }
 
-fn srem(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn srem(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() > 2, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let mut count = 0;
@@ -805,7 +805,7 @@ fn srem(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     return Response::Integer(count);
 }
 
-fn sismember(parser: &Parser, db: &Database, dbindex: usize) -> Response {
+fn sismember(parser: &ParsedCommand, db: &Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let member = try_validate!(parser.get_vec(2), "Invalid key");
@@ -818,7 +818,7 @@ fn sismember(parser: &Parser, db: &Database, dbindex: usize) -> Response {
     })
 }
 
-fn srandmember(parser: &Parser, db: &Database, dbindex: usize) -> Response {
+fn srandmember(parser: &ParsedCommand, db: &Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 2 || parser.argv.len() == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let value = match db.get(dbindex, &key) {
@@ -841,7 +841,7 @@ fn srandmember(parser: &Parser, db: &Database, dbindex: usize) -> Response {
     }
 }
 
-fn smembers(parser: &Parser, db: &Database, dbindex: usize) -> Response {
+fn smembers(parser: &ParsedCommand, db: &Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 2, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let value = match db.get(dbindex, &key) {
@@ -854,7 +854,7 @@ fn smembers(parser: &Parser, db: &Database, dbindex: usize) -> Response {
     }
 }
 
-fn spop(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn spop(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 2 || parser.argv.len() == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let mut value = match db.get_mut(dbindex, &key) {
@@ -875,7 +875,7 @@ fn spop(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     }
 }
 
-fn smove(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn smove(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 4, "Wrong number of parameters");
     let source_key = try_validate!(parser.get_vec(1), "Invalid key");
     let destination_key = try_validate!(parser.get_vec(2), "Invalid destination");
@@ -913,7 +913,7 @@ fn smove(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     return Response::Integer(1);
 }
 
-fn scard(parser: &Parser, db: &Database, dbindex: usize) -> Response {
+fn scard(parser: &ParsedCommand, db: &Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 2, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let el = match db.get(dbindex, &key) {
@@ -926,7 +926,7 @@ fn scard(parser: &Parser, db: &Database, dbindex: usize) -> Response {
     }
 }
 
-fn sdiff(parser: &Parser, db: &Database, dbindex: usize) -> Response {
+fn sdiff(parser: &ParsedCommand, db: &Database, dbindex: usize) -> Response {
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let el = match db.get(dbindex, &key) {
         Some(e) => e,
@@ -942,7 +942,7 @@ fn sdiff(parser: &Parser, db: &Database, dbindex: usize) -> Response {
     }
 }
 
-fn sdiffstore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn sdiffstore(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() >= 3, "Wrong number of parameters");
     let destination_key = try_validate!(parser.get_vec(1), "Invalid destination");
     let set = {
@@ -964,7 +964,7 @@ fn sdiffstore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     Response::Integer(r)
 }
 
-fn sinter(parser: &Parser, db: &Database, dbindex: usize) -> Response {
+fn sinter(parser: &ParsedCommand, db: &Database, dbindex: usize) -> Response {
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let el = match db.get(dbindex, &key) {
         Some(e) => e,
@@ -979,7 +979,7 @@ fn sinter(parser: &Parser, db: &Database, dbindex: usize) -> Response {
     }
 }
 
-fn sinterstore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn sinterstore(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() >= 3, "Wrong number of parameters");
     let destination_key = try_validate!(parser.get_vec(1), "Invalid destination");
     let set = {
@@ -1001,7 +1001,7 @@ fn sinterstore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     Response::Integer(r)
 }
 
-fn sunion(parser: &Parser, db: &Database, dbindex: usize) -> Response {
+fn sunion(parser: &ParsedCommand, db: &Database, dbindex: usize) -> Response {
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let defaultel = Value::Nil;
     let el = match db.get(dbindex, &key) {
@@ -1017,7 +1017,7 @@ fn sunion(parser: &Parser, db: &Database, dbindex: usize) -> Response {
     }
 }
 
-fn sunionstore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn sunionstore(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() >= 3, "Wrong number of parameters");
     let destination_key = try_validate!(parser.get_vec(1), "Invalid destination");
     let set = {
@@ -1040,7 +1040,7 @@ fn sunionstore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     Response::Integer(r)
 }
 
-fn zadd(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn zadd(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     let len = parser.argv.len();
     validate!(len >= 4, "Wrong number of parameters");
     let mut nx = false;
@@ -1085,7 +1085,7 @@ fn zadd(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     return Response::Integer(count);
 }
 
-fn zcard(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn zcard(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 2, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let el = match db.get(dbindex, &key) {
@@ -1098,7 +1098,7 @@ fn zcard(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     }
 }
 
-fn zscore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn zscore(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let element = try_validate!(parser.get_vec(2), "Invalid element");
@@ -1115,7 +1115,7 @@ fn zscore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     }
 }
 
-fn zincrby(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn zincrby(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 4, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let newscore = {
@@ -1131,7 +1131,7 @@ fn zincrby(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     return Response::Data(format!("{}", newscore).into_bytes());
 }
 
-fn zrem(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn zrem(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() >= 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let mut count = 0;
@@ -1154,7 +1154,7 @@ fn zrem(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     return Response::Integer(count);
 }
 
-fn zremrangebyscore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn zremrangebyscore(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 4, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let min = try_validate!(parser.get_f64_bound(2), "Invalid min");
@@ -1169,7 +1169,7 @@ fn zremrangebyscore(parser: &Parser, db: &mut Database, dbindex: usize) -> Respo
     }
 }
 
-fn zremrangebylex(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn zremrangebylex(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 4, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let min = {
@@ -1196,7 +1196,7 @@ fn zremrangebylex(parser: &Parser, db: &mut Database, dbindex: usize) -> Respons
     }
 }
 
-fn zremrangebyrank(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn zremrangebyrank(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 4, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let start = try_validate!(parser.get_i64(2), "Invalid start");
@@ -1211,7 +1211,7 @@ fn zremrangebyrank(parser: &Parser, db: &mut Database, dbindex: usize) -> Respon
     }
 }
 
-fn zcount(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn zcount(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 4, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let min = try_validate!(parser.get_f64_bound(2), "Invalid min");
@@ -1226,7 +1226,7 @@ fn zcount(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
     }
 }
 
-fn generic_zrange(parser: &Parser, db: &mut Database, dbindex: usize, rev: bool) -> Response {
+fn generic_zrange(parser: &ParsedCommand, db: &mut Database, dbindex: usize, rev: bool) -> Response {
     validate!(parser.argv.len() == 4 || parser.argv.len() == 5, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let start = try_validate!(parser.get_i64(2), "Invalid start");
@@ -1246,15 +1246,15 @@ fn generic_zrange(parser: &Parser, db: &mut Database, dbindex: usize, rev: bool)
     }
 }
 
-fn zrange(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn zrange(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     generic_zrange(parser, db, dbindex, false)
 }
 
-fn zrevrange(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn zrevrange(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     generic_zrange(parser, db, dbindex, true)
 }
 
-fn generic_zrangebyscore(parser: &Parser, db: &mut Database, dbindex: usize, rev: bool) -> Response {
+fn generic_zrangebyscore(parser: &ParsedCommand, db: &mut Database, dbindex: usize, rev: bool) -> Response {
     let len = parser.argv.len();
     validate!(len == 4 || len == 5 || len == 7 || len == 8, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
@@ -1286,11 +1286,11 @@ fn generic_zrangebyscore(parser: &Parser, db: &mut Database, dbindex: usize, rev
     }
 }
 
-fn zrangebyscore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn zrangebyscore(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     generic_zrangebyscore(parser, db, dbindex, false)
 }
 
-fn zrevrangebyscore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn zrevrangebyscore(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     generic_zrangebyscore(parser, db, dbindex, true)
 }
 
@@ -1307,7 +1307,7 @@ fn get_vec_bound(_m: Vec<u8>) -> Result<Bound<Vec<u8>>, Response> {
     })
 }
 
-fn generic_zrangebylex(parser: &Parser, db: &mut Database, dbindex: usize, rev: bool) -> Response {
+fn generic_zrangebylex(parser: &ParsedCommand, db: &mut Database, dbindex: usize, rev: bool) -> Response {
     let len = parser.argv.len();
     validate!(len == 4 || len == 7, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
@@ -1346,15 +1346,15 @@ fn generic_zrangebylex(parser: &Parser, db: &mut Database, dbindex: usize, rev: 
     }
 }
 
-fn zrangebylex(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn zrangebylex(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     generic_zrangebylex(parser, db, dbindex, false)
 }
 
-fn zrevrangebylex(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn zrevrangebylex(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     generic_zrangebylex(parser, db, dbindex, true)
 }
 
-fn zlexcount(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn zlexcount(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 4, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let min = {
@@ -1399,21 +1399,21 @@ fn generic_zrank(db: &mut Database, dbindex: usize, key: &Vec<u8>, member: Vec<u
     }
 }
 
-fn zrank(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn zrank(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let member = try_validate!(parser.get_vec(2), "Invalid member");
     generic_zrank(db, dbindex, &key, member, false)
 }
 
-fn zrevrank(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn zrevrank(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let member = try_validate!(parser.get_vec(2), "Invalid member");
     generic_zrank(db, dbindex, &key, member, true)
 }
 
-fn zinter_union_store(parser: &Parser, db: &mut Database, dbindex: usize, union: bool) -> Response {
+fn zinter_union_store(parser: &ParsedCommand, db: &mut Database, dbindex: usize, union: bool) -> Response {
     validate!(parser.argv.len() >= 4, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let value = {
@@ -1471,15 +1471,15 @@ fn zinter_union_store(parser: &Parser, db: &mut Database, dbindex: usize, union:
     r
 }
 
-fn zunionstore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn zunionstore(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     zinter_union_store(parser, db, dbindex, true)
 }
 
-fn zinterstore(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn zinterstore(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     zinter_union_store(parser, db, dbindex, false)
 }
 
-fn ping(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn ping(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     #![allow(unused_variables)]
     validate!(parser.argv.len() <= 2, "Wrong number of parameters");
     if parser.argv.len() == 2 {
@@ -1493,7 +1493,7 @@ fn ping(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
 }
 
 fn subscribe(
-        parser: &Parser,
+        parser: &ParsedCommand,
         db: &mut Database,
         subscriptions: &mut HashMap<Vec<u8>, usize>,
         pattern_subscriptions_len: usize,
@@ -1513,7 +1513,7 @@ fn subscribe(
 }
 
 fn unsubscribe(
-        parser: &Parser,
+        parser: &ParsedCommand,
         db: &mut Database,
         subscriptions: &mut HashMap<Vec<u8>, usize>,
         pattern_subscriptions_len: usize,
@@ -1535,7 +1535,7 @@ fn unsubscribe(
 }
 
 fn psubscribe(
-        parser: &Parser,
+        parser: &ParsedCommand,
         db: &mut Database,
         subscriptions_len: usize,
         pattern_subscriptions: &mut HashMap<Vec<u8>, usize>,
@@ -1555,7 +1555,7 @@ fn psubscribe(
 }
 
 fn punsubscribe(
-        parser: &Parser,
+        parser: &ParsedCommand,
         db: &mut Database,
         subscriptions_len: usize,
         pattern_subscriptions: &mut HashMap<Vec<u8>, usize>,
@@ -1575,7 +1575,7 @@ fn punsubscribe(
     }
     Err(ResponseError::NoReply)}
 
-fn publish(parser: &Parser, db: &mut Database) -> Response {
+fn publish(parser: &ParsedCommand, db: &mut Database) -> Response {
     validate!(parser.argv.len() == 3, "Wrong number of parameters");
     let channel_name = try_validate!(parser.get_vec(1), "Invalid channel");
     let message = try_validate!(parser.get_vec(2), "Invalid channel");
@@ -1607,7 +1607,7 @@ impl Client {
     }
 }
 
-fn keys(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
+fn keys(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 2, "Wrong number of parameters");
     let pattern = try_validate!(parser.get_vec(1), "Invalid pattern");
 
@@ -1618,7 +1618,7 @@ fn keys(parser: &Parser, db: &mut Database, dbindex: usize) -> Response {
 }
 
 pub fn command(
-        parser: &Parser,
+        parser: &ParsedCommand,
         db: &mut Database,
         client: &mut Client,
         ) -> Result<Response, ResponseError> {
@@ -1756,7 +1756,7 @@ macro_rules! parser {
             _args.push(Argument { pos: pos, len: segment.len() });
             pos += segment.len() + 1;
         }
-        Parser::new($str, _args)
+        ParsedCommand::new($str, _args)
     })
 }
 
@@ -1771,7 +1771,7 @@ mod test_command {
     use config::Config;
     use database::{Database, Value};
     use logger::{Logger, Level};
-    use parser::{Parser, Argument};
+    use parser::{ParsedCommand, Argument};
     use response::{Response, ResponseError};
     use util::mstime;
 
@@ -1787,7 +1787,7 @@ mod test_command {
     #[test]
     fn nocommand() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        let parser = Parser::new(b"", Vec::new());
+        let parser = ParsedCommand::new(b"", Vec::new());
         let response = command(&parser, &mut db, &mut Client::mock()).unwrap();
         match response {
             Response::Error(_) => {},

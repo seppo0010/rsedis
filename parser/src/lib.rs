@@ -1,12 +1,10 @@
 #![feature(collections_bound)]
 
 use std::collections::Bound;
-use std::str::from_utf8;
-use std::str::Utf8Error;
-use std::num::ParseIntError;
-use std::num::ParseFloatError;
 use std::error::Error;
 use std::fmt;
+use std::num::{ParseIntError,ParseFloatError};
+use std::str::{from_utf8,Utf8Error};
 
 /// A command argument
 #[derive(Debug)]
@@ -19,7 +17,7 @@ pub struct Argument {
 
 /// A protocol parser
 #[derive(Debug)]
-pub struct Parser<'a> {
+pub struct ParsedCommand<'a> {
     /// The data itself
     data: &'a[u8],
     /// The arguments location and length
@@ -27,7 +25,7 @@ pub struct Parser<'a> {
 }
 
 /// Error parsing
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum ParseError {
     /// The received buffer is valid but needs more data
     Incomplete,
@@ -67,10 +65,10 @@ impl From<ParseFloatError> for ParseError {
     fn from(_: ParseFloatError) -> ParseError { ParseError::InvalidArgument }
 }
 
-impl<'a> Parser<'a> {
+impl<'a> ParsedCommand<'a> {
     /// Creates a new parser with the data and arguments provided
-    pub fn new(data: &[u8], argv: Vec<Argument>) -> Parser {
-        return Parser {
+    pub fn new(data: &[u8], argv: Vec<Argument>) -> ParsedCommand {
+        return ParsedCommand {
             data: data,
             argv: argv,
         };
@@ -83,24 +81,24 @@ impl<'a> Parser<'a> {
     /// ```
     /// # #![feature(collections_bound)]
     /// # use std::collections::Bound;
-    /// # use parser::{Parser, Argument};
-    /// let parser = Parser::new(b"+inf", vec![Argument { pos: 0, len: 4 }]);
+    /// # use parser::{ParsedCommand, Argument};
+    /// let parser = ParsedCommand::new(b"+inf", vec![Argument { pos: 0, len: 4 }]);
     /// assert_eq!(parser.get_f64_bound(0).unwrap(), Bound::Unbounded);
     /// ```
     ///
     /// ```
     /// # #![feature(collections_bound)]
     /// # use std::collections::Bound;
-    /// # use parser::{Parser, Argument};
-    /// let parser = Parser::new(b"1.23", vec![Argument { pos: 0, len: 4 }]);
+    /// # use parser::{ParsedCommand, Argument};
+    /// let parser = ParsedCommand::new(b"1.23", vec![Argument { pos: 0, len: 4 }]);
     /// assert_eq!(parser.get_f64_bound(0).unwrap(), Bound::Included(1.23));
     /// ```
     ///
     /// ```
     /// # #![feature(collections_bound)]
     /// # use std::collections::Bound;
-    /// # use parser::{Parser, Argument};
-    /// let parser = Parser::new(b"(1.23", vec![Argument { pos: 0, len: 5 }]);
+    /// # use parser::{ParsedCommand, Argument};
+    /// let parser = ParsedCommand::new(b"(1.23", vec![Argument { pos: 0, len: 5 }]);
     /// assert_eq!(parser.get_f64_bound(0).unwrap(), Bound::Excluded(1.23));
     /// ```
     pub fn get_f64_bound(&self, pos: usize) -> Result<Bound<f64>, ParseError> {
@@ -121,8 +119,8 @@ impl<'a> Parser<'a> {
     /// # Examples
     ///
     /// ```
-    /// # use parser::{Parser, Argument};
-    /// let parser = Parser::new(b"1.23", vec![Argument { pos: 0, len: 4 }]);
+    /// # use parser::{ParsedCommand, Argument};
+    /// let parser = ParsedCommand::new(b"1.23", vec![Argument { pos: 0, len: 4 }]);
     /// assert_eq!(parser.get_f64(0).unwrap(), 1.23);
     /// ```
     pub fn get_f64(&self, pos: usize) -> Result<f64, ParseError> {
@@ -135,8 +133,8 @@ impl<'a> Parser<'a> {
     /// # Examples
     ///
     /// ```
-    /// # use parser::{Parser, Argument};
-    /// let parser = Parser::new(b"-123", vec![Argument { pos: 0, len: 4 }]);
+    /// # use parser::{ParsedCommand, Argument};
+    /// let parser = ParsedCommand::new(b"-123", vec![Argument { pos: 0, len: 4 }]);
     /// assert_eq!(parser.get_i64(0).unwrap(), -123);
     /// ```
     pub fn get_i64(&self, pos: usize) -> Result<i64, ParseError> {
@@ -149,8 +147,8 @@ impl<'a> Parser<'a> {
     /// # Examples
     ///
     /// ```
-    /// # use parser::{Parser, Argument};
-    /// let parser = Parser::new(b"foo", vec![Argument { pos: 0, len: 3 }]);
+    /// # use parser::{ParsedCommand, Argument};
+    /// let parser = ParsedCommand::new(b"foo", vec![Argument { pos: 0, len: 3 }]);
     /// assert_eq!(parser.get_str(0).unwrap(), "foo");
     /// ```
     pub fn get_str(&self, pos: usize) -> Result<&str, ParseError> {
@@ -163,8 +161,8 @@ impl<'a> Parser<'a> {
     /// # Examples
     ///
     /// ```
-    /// # use parser::{Parser, Argument};
-    /// let parser = Parser::new(b"foo", vec![Argument { pos: 0, len: 3 }]);
+    /// # use parser::{ParsedCommand, Argument};
+    /// let parser = ParsedCommand::new(b"foo", vec![Argument { pos: 0, len: 3 }]);
     /// assert_eq!(parser.get_vec(0).unwrap(), b"foo".to_vec());
     /// ```
     pub fn get_vec(&self, pos: usize) -> Result<Vec<u8>, ParseError> {
@@ -177,8 +175,8 @@ impl<'a> Parser<'a> {
     /// # Examples
     ///
     /// ```
-    /// # use parser::{Parser, Argument};
-    /// let parser = Parser::new(b"foo", vec![Argument { pos: 0, len: 3 }]);
+    /// # use parser::{ParsedCommand, Argument};
+    /// let parser = ParsedCommand::new(b"foo", vec![Argument { pos: 0, len: 3 }]);
     /// assert_eq!(parser.get_slice(0).unwrap(), b"foo");
     /// ```
     pub fn get_slice(&self, pos: usize) -> Result<&[u8], ParseError> {
@@ -209,6 +207,9 @@ fn parse_int(input: &[u8], len: usize) -> Result<(usize, usize), ParseError> {
         }
     }
     i += 1;
+    if i == len {
+        return Err(ParseError::Incomplete);
+    }
     if input[i] as char != '\n' {
         return Err(ParseError::BadProtocol);
     }
@@ -222,16 +223,21 @@ fn parse_int(input: &[u8], len: usize) -> Result<(usize, usize), ParseError> {
 /// ```
 /// # use parser::parse;
 /// let s = b"*3\r\n$3\r\nSET\r\n$5\r\nmykey\r\n$2\r\n10\r\n";
-/// let parser = parse(s, 32).unwrap();
+/// let (parser, len) = parse(s).unwrap();
+/// assert_eq!(len, 32);
 /// assert_eq!(parser.get_str(0).unwrap(), "SET");
 /// assert_eq!(parser.get_str(1).unwrap(), "mykey");
 /// assert_eq!(parser.get_i64(2).unwrap(), 10);
 /// ```
-pub fn parse(input: &[u8], len: usize) -> Result<Parser, ParseError> {
+pub fn parse(input: &[u8]) -> Result<(ParsedCommand, usize), ParseError> {
+    if input.len() == 0 {
+        return Err(ParseError::Incomplete);
+    }
     if input[0] as char != '*' {
         return Err(ParseError::BadProtocol);
     } else {
         let mut pos = 1;
+        let len = input.len();
         let (argc, intlen) = try!(parse_int(&input[pos..len], len - pos));
         pos += intlen;
         let mut argv = Vec::new();
@@ -252,29 +258,61 @@ pub fn parse(input: &[u8], len: usize) -> Result<Parser, ParseError> {
                 return Err(ParseError::Incomplete);
             }
         }
-        Ok(Parser::new(input, argv))
+        Ok((ParsedCommand::new(input, argv), pos))
+    }
+}
+
+
+/// A stream parser
+pub struct Parser {
+    data: Vec<u8>,
+    position: usize,
+}
+
+impl Parser {
+    pub fn new() -> Parser {
+        Parser {
+            data: vec![],
+            position: 0,
+        }
+    }
+
+    pub fn get_mut(&mut self) -> &mut Vec<u8> {
+        if self.data.len() == self.position {
+            self.position = 0;
+            self.data.truncate(0);
+        }
+        &mut self.data
+    }
+
+    pub fn next(&mut self) -> Result<ParsedCommand, ParseError> {
+        let data = &(&*self.data)[self.position..];
+        let (r, len) = try!(parse(data));
+        self.position += len;
+        Ok(r)
     }
 }
 
 #[cfg(test)]
 mod test_parser {
-    use super::{parse, ParseError};
+    use super::{parse, ParseError, Parser};
 
     #[test]
     fn parse_valid() {
         let message = b"*2\r\n$3\r\nfoo\r\n$4\r\nbarz\r\n";
-        let r = parse(message, message.len());
+        let r = parse(message);
         assert!(r.is_ok());
-        let parser = r.unwrap();
-        assert_eq!(parser.argv.len(), 2);
-        assert_eq!(parser.get_str(0).unwrap(), "foo");
-        assert_eq!(parser.get_str(1).unwrap(), "barz");
+        let (command, len) = r.unwrap();
+        assert_eq!(len, message.len());
+        assert_eq!(command.argv.len(), 2);
+        assert_eq!(command.get_str(0).unwrap(), "foo");
+        assert_eq!(command.get_str(1).unwrap(), "barz");
     }
 
     #[test]
     fn parse_incomplete() {
         let message = b"*2\r\n$3\r\nfoo";
-        let r = parse(message, message.len());
+        let r = parse(message);
         assert!(r.is_err());
         match r.unwrap_err() {
             ParseError::Incomplete => {},
@@ -285,11 +323,69 @@ mod test_parser {
     #[test]
     fn parse_invalid() {
         let message = b"-2\r\n$3\r\nfoo";
-        let r = parse(message, message.len());
+        let r = parse(message);
         assert!(r.is_err());
         match r.unwrap_err() {
             ParseError::BadProtocol => {},
             _ => assert!(false)
         }
+    }
+
+    #[test]
+    fn parser_basic() {
+        let mut parser = Parser::new();
+        {
+            let mut v = parser.get_mut();
+            let message = b"*2\r\n$3\r\nfoo\r\n$4\r\nbarz\r\n";
+            v.extend(&*message.to_vec());
+        }
+        {
+            let command = parser.next().unwrap();
+            assert_eq!(command.argv.len(), 2);
+            assert_eq!(command.get_str(0).unwrap(), "foo");
+            assert_eq!(command.get_str(1).unwrap(), "barz");
+        }
+        assert_eq!(parser.next().unwrap_err(), ParseError::Incomplete);
+    }
+
+    #[test]
+    fn parser_incomplete() {
+        let mut parser = Parser::new();
+        assert_eq!(parser.next().unwrap_err(), ParseError::Incomplete);
+        parser.get_mut().extend(&*b"*2".to_vec());
+        assert_eq!(parser.next().unwrap_err(), ParseError::Incomplete);
+        parser.get_mut().extend(&*b"\r\n$3\r\nfoo\r\n$4\r\nbarz\r\n".to_vec());
+        parser.next().unwrap();
+    }
+
+    #[test]
+    fn parser_multiple() {
+        let mut parser = Parser::new();
+        {
+            let mut v = parser.get_mut();
+            let message = b"*2\r\n$3\r\nfoo\r\n$4\r\nbarz\r\n";
+            v.extend(&*message.to_vec());
+            v.extend(&*message.to_vec());
+        }
+        parser.next().unwrap();
+        parser.next().unwrap();
+        assert_eq!(parser.next().unwrap_err(), ParseError::Incomplete);
+    }
+
+    #[test]
+    fn parser_multiple2() {
+        let mut parser = Parser::new();
+        let message = b"*2\r\n$3\r\nfoo\r\n$4\r\nbarz\r\n";
+        {
+            let mut v = parser.get_mut();
+            v.extend(&*message.to_vec());
+        }
+        parser.next().unwrap();
+        {
+            let mut v = parser.get_mut();
+            v.extend(&*message.to_vec());
+        }
+        parser.next().unwrap();
+        assert_eq!(parser.next().unwrap_err(), ParseError::Incomplete);
     }
 }
