@@ -280,7 +280,7 @@ impl Client {
 
             loop {
                 // try to parse received command
-                let parser = match parser.next() {
+                let parsed_command = match parser.next() {
                     Ok(p) => p,
                     Err(err) => match err {
                         // if it's incomplete, keep adding to the buffer
@@ -303,7 +303,7 @@ impl Client {
                     };
 
                     // execute the command
-                    match command::command(&parser, &mut *db, &mut client) {
+                    match command::command(parsed_command, &mut *db, &mut client) {
                         // received a response, send it to the client
                         Ok(response) => {
                             match stream_tx.send(Some(response)) {

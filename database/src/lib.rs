@@ -1,5 +1,6 @@
 #![feature(collections_bound)]
 #![feature(drain)]
+#![feature(fnbox)]
 #![feature(vecmap)]
 
 extern crate config;
@@ -19,6 +20,7 @@ pub mod set;
 pub mod string;
 pub mod zset;
 
+use std::boxed::FnBox;
 use std::collections::Bound;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -1491,7 +1493,7 @@ pub struct Database {
     /// Maps a pattern to a list of key listeners. When a key is modified a message
     /// with `true` is published.
     /// The `usize` key is used as a client identifier.
-    key_subscribers: Vec<RehashingHashMap<Vec<u8>, HashMap<usize, Sender<bool>>>>,
+    key_subscribers: Vec<RehashingHashMap<Vec<u8>, HashMap<usize, Box<FnBox()>>>>,
     /// A unique identifier counter to assign to clients
     subscriber_id: usize,
 }
@@ -1692,9 +1694,9 @@ impl Database {
         }
     }
 
-    /// Subscribes a Sender to a key. Every time the key is modified a `true` is
-    /// sent.
-    pub fn key_subscribe(&mut self, index: usize, key: &Vec<u8>, sender: Sender<bool>) -> usize {
+    /// Subscribes a callback to a key. When the key is modified the callback
+    /// is called and automatically unsubscribe.
+    pub fn key_subscribe(&mut self, index: usize, key: &Vec<u8>, sender: Box<FnBox()>) -> usize {
         self.ensure_key_subscribers(index, key);
         let mut key_subscribers = self.key_subscribers[index].get_mut(key).unwrap();
         let subscriber_id = self.subscriber_id;
@@ -1711,17 +1713,10 @@ impl Database {
             self.key_subscribers[index].rehash();
         }
 
-        let mut torem = Vec::new();
-        match self.key_subscribers[index].get_mut(key) {
-            Some(mut channels) => {
-                for (subscriber_id, channel) in channels.iter() {
-                    match channel.send(true) {
-                        Ok(_) => (),
-                        Err(_) => { torem.push(subscriber_id.clone()); () },
-                    }
-                }
-                for subscriber_id in torem {
-                    channels.remove(&subscriber_id);
+        match self.key_subscribers[index].remove(key) {
+            Some(callbacks) => {
+                for (_, callback) in callbacks.into_iter() {
+                    callback();
                 }
             }
             None => (),
