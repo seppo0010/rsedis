@@ -1,6 +1,5 @@
 #![feature(collections_bound)]
 #![feature(drain)]
-#![feature(fnbox)]
 #![feature(vecmap)]
 
 extern crate config;
@@ -20,7 +19,6 @@ pub mod set;
 pub mod string;
 pub mod zset;
 
-use std::boxed::FnBox;
 use std::collections::Bound;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -1493,7 +1491,7 @@ pub struct Database {
     /// Maps a pattern to a list of key listeners. When a key is modified a message
     /// with `true` is published.
     /// The `usize` key is used as a client identifier.
-    key_subscribers: Vec<RehashingHashMap<Vec<u8>, HashMap<usize, Box<FnBox()>>>>,
+    key_subscribers: Vec<RehashingHashMap<Vec<u8>, HashMap<usize, Sender<bool>>>>,
     /// A unique identifier counter to assign to clients
     subscriber_id: usize,
 }
@@ -1696,7 +1694,7 @@ impl Database {
 
     /// Subscribes a callback to a key. When the key is modified the callback
     /// is called and automatically unsubscribe.
-    pub fn key_subscribe(&mut self, index: usize, key: &Vec<u8>, sender: Box<FnBox()>) -> usize {
+    pub fn key_subscribe(&mut self, index: usize, key: &Vec<u8>, sender: Sender<bool>) -> usize {
         self.ensure_key_subscribers(index, key);
         let mut key_subscribers = self.key_subscribers[index].get_mut(key).unwrap();
         let subscriber_id = self.subscriber_id;
@@ -1715,8 +1713,8 @@ impl Database {
 
         match self.key_subscribers[index].remove(key) {
             Some(callbacks) => {
-                for (_, callback) in callbacks.into_iter() {
-                    callback();
+                for (_, sender) in callbacks.into_iter() {
+                    let _ = sender.send(true);
                 }
             }
             None => (),

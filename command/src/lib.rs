@@ -17,7 +17,7 @@ use std::usize;
 
 use database::{PubsubEvent, Database, Value, zset};
 use response::{Response, ResponseError};
-use parser::ParsedCommand;
+use parser::{OwnedParsedCommand, ParsedCommand, Argument};
 use util::mstime;
 
 
@@ -582,29 +582,57 @@ fn brpoplpush(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Resul
     let source = try_opt_validate!(parser.get_vec(1), "Invalid source");
     let destination = try_opt_validate!(parser.get_vec(2), "Invalid destination");
     let timeout = try_opt_validate!(parser.get_i64(3), "Invalid timeout");
+    let time = mstime();
 
     let r = generic_rpoplpush(db, dbindex, &source, &destination);
     if r != Response::Nil {
         return Ok(r);
     }
 
-    let (tx, rx) = channel();
+    let (txkey, rxkey) = channel();
+    let (txcommand, rxcommand) = channel();
     if timeout > 0 {
-        let txc = tx.clone();
+        let tx = txcommand.clone();
         thread::spawn(move || {
             thread::sleep_ms(timeout as u32 * 1000);
-            txc.send(false);
+            tx.send(None);
         });
     }
-    db.key_subscribe(dbindex, &source, Box::new(move || {
-        tx.send(true);
-    }));
-    return Err(ResponseError::Wait(rx));
+    let command_name = try_opt_validate!(parser.get_vec(0), "Invalid command");
+    db.key_subscribe(dbindex, &source, txkey);
+    thread::spawn(move || {
+        let _ = rxkey.recv();
+        let newtimeout = if timeout == 0 {
+            0
+        } else {
+            let mut t = timeout as i64 * 1000 - mstime() + time;
+            if t <= 0 {
+                t = 1;
+            }
+            t
+        };
+        // This code is ugly. I was stuck for a week trying to figure out how
+        // to do this and this is the best I got. I'm sorry.
+        let mut data = vec![];
+        let mut arguments = vec![];
+        data.extend(command_name);
+        arguments.push(Argument { pos: 0, len: data.len() });
+        arguments.push(Argument { pos: data.len(), len: source.len() });
+        data.extend(source);
+        arguments.push(Argument { pos: data.len(), len: destination.len() });
+        data.extend(destination);
+        let timeout_formatted = format!("{}", newtimeout);
+        arguments.push(Argument { pos: data.len(), len: timeout_formatted.len() });
+        data.extend(timeout_formatted.to_owned().into_bytes());
+        txcommand.send(Some(OwnedParsedCommand::new(data, arguments)));
+    });
+    return Err(ResponseError::Wait(rxcommand));
 }
 
 fn generic_bpop(parser: ParsedCommand, db: &mut Database, dbindex: usize, right: bool) -> Result<Response, ResponseError> {
     #![allow(unused_must_use)]
     opt_validate!(parser.argv.len() >= 3, "Wrong number of parameters");
+    let time = mstime();
 
     let mut keys = vec![];
     for i in 1..parser.argv.len() - 1 {
@@ -628,21 +656,46 @@ fn generic_bpop(parser: ParsedCommand, db: &mut Database, dbindex: usize, right:
     }
     let timeout = try_opt_validate!(parser.get_i64(parser.argv.len() - 1), "Invalid timeout");
 
-    let (tx, rx) = channel();
+    let (txkey, rxkey) = channel();
+    let (txcommand, rxcommand) = channel();
     if timeout > 0 {
-        let txc = tx.clone();
+        let tx = txcommand.clone();
         thread::spawn(move || {
             thread::sleep_ms(timeout as u32 * 1000);
-            txc.send(false);
+            tx.send(None);
         });
     }
-    for key in keys {
-        let txc = tx.clone();
-        db.key_subscribe(dbindex, &key, Box::new(move || {
-            txc.send(true);
-        }));
+    let command_name = try_opt_validate!(parser.get_vec(0), "Invalid command");
+    for key in keys.iter() {
+        db.key_subscribe(dbindex, key, txkey.clone());
     }
-    return Err(ResponseError::Wait(rx));
+    thread::spawn(move || {
+        let _ = rxkey.recv();
+        let newtimeout = if timeout == 0 {
+            0
+        } else {
+            let mut t = timeout as i64 * 1000 - mstime() + time;
+            if t <= 0 {
+                t = 1;
+            }
+            t
+        };
+        // This code is ugly. I was stuck for a week trying to figure out how
+        // to do this and this is the best I got. I'm sorry.
+        let mut data = vec![];
+        let mut arguments = vec![];
+        data.extend(command_name);
+        arguments.push(Argument { pos: 0, len: data.len() });
+        for k in keys {
+            arguments.push(Argument { pos: data.len(), len: k.len() });
+            data.extend(k);
+        }
+        let timeout_formatted = format!("{}", newtimeout);
+        arguments.push(Argument { pos: data.len(), len: timeout_formatted.len() });
+        data.extend(timeout_formatted.to_owned().into_bytes());
+        txcommand.send(Some(OwnedParsedCommand::new(data, arguments)));
+    });
+    return Err(ResponseError::Wait(rxcommand));
 }
 
 fn brpop(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Result<Response, ResponseError> {
@@ -2309,7 +2362,7 @@ mod test_command {
         };
         assert!(receiver.try_recv().is_err());
         thread::sleep_ms(1400);
-        assert_eq!(receiver.try_recv().unwrap(), false);
+        assert_eq!(receiver.try_recv().unwrap().is_some(), false);
     }
 
 
@@ -2365,7 +2418,7 @@ mod test_command {
         };
         assert!(receiver.try_recv().is_err());
         thread::sleep_ms(1400);
-        assert_eq!(receiver.try_recv().unwrap(), false);
+        assert_eq!(receiver.try_recv().unwrap().is_some(), false);
     }
 
     #[test]

@@ -1,5 +1,9 @@
+extern crate parser;
+
 use std::sync::mpsc::Receiver;
 use std::fmt::{Debug, Formatter, Error};
+
+use parser::OwnedParsedCommand;
 
 /// A command response to send to a client
 #[derive(PartialEq, Debug)]
@@ -22,9 +26,10 @@ pub enum Response {
 pub enum ResponseError {
     /// The command generated no response
     NoReply,
-    /// The command generated no response yet, but if the receiver reads a `true`,
-    /// the command can be retried.
-    Wait(Receiver<bool>),
+    /// The command generated no response yet. At a later time, a new command
+    /// should be executed, or give up if a None is received.
+    /// Only one message will be sent.
+    Wait(Receiver<Option<OwnedParsedCommand>>),
 }
 
 impl Debug for ResponseError {

@@ -15,7 +15,6 @@ extern crate net2;
 use std::time::Duration;
 use std::io;
 use std::io::{Read, Write};
-use std::iter;
 use std::net::{SocketAddr, ToSocketAddrs, TcpStream};
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{Receiver, Sender, channel};
@@ -33,7 +32,7 @@ use net2::TcpBuilder;
 use config::Config;
 use database::{Database, PubsubEvent};
 use logger::Level;
-use parser::{Parser, ParseError};
+use parser::{OwnedParsedCommand, Parser, ParseError};
 use response::{Response, ResponseError};
 
 /// A stream connection.
@@ -244,29 +243,26 @@ impl Client {
 
         let mut client = command::Client::new(pubsub_tx);
         let mut parser = Parser::new();
+
+        let mut this_command:Option<OwnedParsedCommand>;
+        let mut next_command:Option<OwnedParsedCommand> = None;
         loop {
             {
-                let mut buffer = parser.get_mut();
-                let len = buffer.len();
-                let capacity = buffer.capacity();
-                let add =  if capacity == 0 {
-                    16
-                } else if capacity > 0 && len > 0 && 2 * len > capacity{
-                    2 * len - capacity
-                } else {
-                    0
+                parser.allocate();
+                let len = {
+                    let pos = parser.written;
+                    let mut buffer = parser.get_mut();
+
+                    // read socket
+                    match self.stream.read(&mut buffer[pos..]) {
+                        Ok(r) => r,
+                        Err(err) => {
+                            sendlog!(sender, Verbose, "Reading from client: {:?}", err);
+                            break;
+                        },
+                    }
                 };
-                if add > 0 {
-                    buffer.extend(iter::repeat(0).take(add));
-                }
-                // read socket
-                let len = match self.stream.read(&mut buffer[len..]) {
-                    Ok(r) => r,
-                    Err(err) => {
-                        sendlog!(sender, Verbose, "Reading from client: {:?}", err);
-                        break;
-                    },
-                };
+                parser.written += len;
 
                 // client closed connection
                 if len == 0 {
@@ -278,60 +274,59 @@ impl Client {
             // was there an error during the execution?
             let mut error = false;
 
-            loop {
-                // try to parse received command
-                let parsed_command = match parser.next() {
+            this_command = next_command;
+            next_command = None;
+
+            // try to parse received command
+            let parsed_command = match this_command {
+                Some(ref c) => c.get_command(),
+                None => match parser.next() {
                     Ok(p) => p,
                     Err(err) => match err {
                         // if it's incomplete, keep adding to the buffer
-                        ParseError::Incomplete => { break; }
+                        ParseError::Incomplete => { continue; }
                         // otherwise there was an error, probably a protocol error
                         _ =>  {
-                            error = true;
                             sendlog!(sender, Verbose, "Protocol error from client: {:?}", err);
                             break;
                         }
                     },
-                };
+                }
+            };
 
-                // this loop is to retry commands if needed
-                // most times, it will break; immediately
-                loop {
-                    let mut db = match self.db.lock() {
-                        Ok(db) => db,
-                        Err(_) => break,
+            let mut db = match self.db.lock() {
+                Ok(db) => db,
+                Err(_) => break,
+            };
+
+            // execute the command
+            match command::command(parsed_command, &mut *db, &mut client) {
+                // received a response, send it to the client
+                Ok(response) => {
+                    match stream_tx.send(Some(response)) {
+                        Ok(_) => (),
+                        Err(_) => error = true,
                     };
-
-                    // execute the command
-                    match command::command(parsed_command, &mut *db, &mut client) {
-                        // received a response, send it to the client
-                        Ok(response) => {
-                            match stream_tx.send(Some(response)) {
+                },
+                // no response
+                Err(err) => match err {
+                    // There is no reply to send, that's ok
+                    ResponseError::NoReply => (),
+                    // We have to wait until a sender signals us back and then retry
+                    // (Repeating the same command is actually wrong because of the timeout)
+                    ResponseError::Wait(ref receiver) => {
+                        // unlock the db
+                        drop(db);
+                        // if we receive a None, send a nil, otherwise execute the command
+                        match receiver.recv().unwrap() {
+                            Some(cmd) => next_command = Some(cmd),
+                            None => match stream_tx.send(Some(Response::Nil)) {
                                 Ok(_) => (),
                                 Err(_) => error = true,
-                            };
-                            break;
-                        },
-                        // no response
-                        Err(err) => match err {
-                            // There is no reply to send, that's ok
-                            ResponseError::NoReply => (),
-                            // We have to wait until a sender signals us back and then retry
-                            // (Repeating the same command is actually wrong because of the timeout)
-                            ResponseError::Wait(ref receiver) => {
-                                // unlock the db
-                                drop(db);
-                                // if we receive a false, send a nil, otherwise retry the command
-                                if !receiver.recv().unwrap() {
-                                    match stream_tx.send(Some(Response::Nil)) {
-                                        Ok(_) => (),
-                                        Err(_) => error = true,
-                                    };
-                                }
-                            }
-                        },
+                            },
+                        }
                     }
-                }
+                },
             }
 
             // if something failed, let's shut down the client
@@ -341,7 +336,7 @@ impl Client {
                 client.pubsub_sender.send(None);
                 break;
             }
-        };
+        }
     }
 }
 

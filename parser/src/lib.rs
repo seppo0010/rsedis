@@ -3,11 +3,12 @@
 use std::collections::Bound;
 use std::error::Error;
 use std::fmt;
+use std::iter;
 use std::num::{ParseIntError,ParseFloatError};
 use std::str::{from_utf8,Utf8Error};
 
 /// A command argument
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Argument {
     /// The position in the array
     pub pos: usize,
@@ -21,6 +22,12 @@ pub struct ParsedCommand<'a> {
     /// The data itself
     data: &'a[u8],
     /// The arguments location and length
+    pub argv: Vec<Argument>
+}
+
+#[derive(Debug)]
+pub struct OwnedParsedCommand {
+    data: Vec<u8>,
     pub argv: Vec<Argument>
 }
 
@@ -63,6 +70,19 @@ impl From<ParseIntError> for ParseError {
 
 impl From<ParseFloatError> for ParseError {
     fn from(_: ParseFloatError) -> ParseError { ParseError::InvalidArgument }
+}
+
+impl OwnedParsedCommand {
+    pub fn new(data: Vec<u8>, argv: Vec<Argument>) -> Self {
+        OwnedParsedCommand {
+            data: data,
+            argv: argv,
+        }
+    }
+
+    pub fn get_command(&self) -> ParsedCommand {
+        ParsedCommand::new(&*self.data, self.argv.clone())
+    }
 }
 
 impl<'a> ParsedCommand<'a> {
@@ -266,7 +286,8 @@ pub fn parse(input: &[u8]) -> Result<(ParsedCommand, usize), ParseError> {
 /// A stream parser
 pub struct Parser {
     data: Vec<u8>,
-    position: usize,
+    pub position: usize,
+    pub written: usize,
 }
 
 impl Parser {
@@ -274,19 +295,36 @@ impl Parser {
         Parser {
             data: vec![],
             position: 0,
+            written: 0,
+        }
+    }
+
+    pub fn allocate(&mut self) {
+        if self.position > 0 && self.written == self.position {
+            self.written = 0;
+            self.position = 0;
+        }
+
+        let len = self.data.len();
+        let add =  if len == 0 {
+            16
+        } else if self.written * 2 > len {
+            len
+        } else {
+            0
+        };
+
+        if add > 0 {
+            self.data.extend(iter::repeat(0).take(add));
         }
     }
 
     pub fn get_mut(&mut self) -> &mut Vec<u8> {
-        if self.data.len() == self.position {
-            self.position = 0;
-            self.data.truncate(0);
-        }
         &mut self.data
     }
 
     pub fn next(&mut self) -> Result<ParsedCommand, ParseError> {
-        let data = &(&*self.data)[self.position..];
+        let data = &(&*self.data)[self.position..self.written];
         let (r, len) = try!(parse(data));
         self.position += len;
         Ok(r)
@@ -335,8 +373,9 @@ mod test_parser {
     fn parser_basic() {
         let mut parser = Parser::new();
         {
-            let mut v = parser.get_mut();
             let message = b"*2\r\n$3\r\nfoo\r\n$4\r\nbarz\r\n";
+            parser.written += message.len();
+            let mut v = parser.get_mut();
             v.extend(&*message.to_vec());
         }
         {
@@ -352,9 +391,12 @@ mod test_parser {
     fn parser_incomplete() {
         let mut parser = Parser::new();
         assert_eq!(parser.next().unwrap_err(), ParseError::Incomplete);
+        parser.written += 2;
         parser.get_mut().extend(&*b"*2".to_vec());
         assert_eq!(parser.next().unwrap_err(), ParseError::Incomplete);
-        parser.get_mut().extend(&*b"\r\n$3\r\nfoo\r\n$4\r\nbarz\r\n".to_vec());
+        let message = b"\r\n$3\r\nfoo\r\n$4\r\nbarz\r\n";
+        parser.written += message.len();
+        parser.get_mut().extend(&*message.to_vec());
         parser.next().unwrap();
     }
 
@@ -362,8 +404,10 @@ mod test_parser {
     fn parser_multiple() {
         let mut parser = Parser::new();
         {
-            let mut v = parser.get_mut();
             let message = b"*2\r\n$3\r\nfoo\r\n$4\r\nbarz\r\n";
+            parser.written += message.len();
+            parser.written += message.len();
+            let mut v = parser.get_mut();
             v.extend(&*message.to_vec());
             v.extend(&*message.to_vec());
         }
@@ -377,11 +421,13 @@ mod test_parser {
         let mut parser = Parser::new();
         let message = b"*2\r\n$3\r\nfoo\r\n$4\r\nbarz\r\n";
         {
+            parser.written += message.len();
             let mut v = parser.get_mut();
             v.extend(&*message.to_vec());
         }
         parser.next().unwrap();
         {
+            parser.written += message.len();
             let mut v = parser.get_mut();
             v.extend(&*message.to_vec());
         }
