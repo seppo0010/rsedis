@@ -10,6 +10,7 @@ use std::ascii::AsciiExt;
 use std::collections::Bound;
 use std::collections::HashMap;
 use std::fmt::Error;
+use std::mem::replace;
 use std::sync::mpsc::Sender;
 use std::sync::mpsc::channel;
 use std::thread;
@@ -1647,6 +1648,8 @@ pub struct Client {
     pub subscriptions: HashMap<Vec<u8>, usize>,
     pub pattern_subscriptions: HashMap<Vec<u8>, usize>,
     pub pubsub_sender: Sender<Option<PubsubEvent>>,
+    pub multi: bool,
+    pub multi_commands: Vec<OwnedParsedCommand>,
 }
 
 impl Client {
@@ -1661,6 +1664,8 @@ impl Client {
             subscriptions: HashMap::new(),
             pattern_subscriptions: HashMap::new(),
             pubsub_sender: sender,
+            multi: false,
+            multi_commands: Vec::new(),
         }
     }
 }
@@ -1681,14 +1686,14 @@ pub fn command(
         client: &mut Client,
         ) -> Result<Response, ResponseError> {
     opt_validate!(parser.argv.len() > 0, "Not enough arguments");
-    let command = &*match db.mapped_command(&try_opt_validate!(parser.get_str(0), "Invalid command").to_ascii_lowercase()) {
+    let command_name = &*match db.mapped_command(&try_opt_validate!(parser.get_str(0), "Invalid command").to_ascii_lowercase()) {
         Some(c) => c,
         None => return Ok(Response::Error("unknown command".to_owned())),
     };
     if db.config.requirepass.is_none() {
         client.auth = true;
     }
-    if command == "auth" {
+    if command_name == "auth" {
         opt_validate!(parser.argv.len() == 2, "Wrong number of parameters");
         let password = try_opt_validate!(parser.get_str(1), "Invalid password");
         if Some(password.to_owned()) == db.config.requirepass {
@@ -1701,7 +1706,35 @@ pub fn command(
     if !client.auth {
         return Ok(Response::Error("require pass".to_owned()))
     }
-    if command == "select" {
+    if command_name == "multi" {
+        if client.multi {
+            return Ok(Response::Error("ERR MULTI calls can not be nested".to_owned()))
+        }
+        client.multi = true;
+        return Ok(Response::Status("OK".to_owned()));
+    }
+    if command_name == "exec" {
+        if !client.multi {
+            return Ok(Response::Error("ERR EXEC without MULTI".to_owned()))
+        }
+        client.multi = false;
+        let c = replace(&mut client.multi_commands, vec![]);
+        let r = Response::Array(c.iter().map(|c| command(c.get_command(), db, client).unwrap()).collect());
+        return Ok(r);
+    }
+    if command_name == "discard" {
+        if !client.multi {
+            return Ok(Response::Error("ERR DISCARD without MULTI".to_owned()))
+        }
+        client.multi = false;
+        client.multi_commands = vec![];
+        return Ok(Response::Status("OK".to_owned()));
+    }
+    if client.multi {
+        client.multi_commands.push(parser.into_owned());
+        return Ok(Response::Status("QUEUED".to_owned()));
+    }
+    if command_name == "select" {
         opt_validate!(parser.argv.len() == 2, "Wrong number of parameters");
         let dbindex = try_opt_validate!(parser.get_i64(1), "Invalid dbindex") as usize;
         if dbindex > db.config.databases as usize {
@@ -1711,7 +1744,7 @@ pub fn command(
         return Ok(Response::Status("OK".to_owned()));
     }
     let dbindex = client.dbindex.clone();
-    return Ok(match command {
+    return Ok(match command_name {
         "pexpireat" => pexpireat(parser, db, dbindex),
         "pexpire" => pexpire(parser, db, dbindex),
         "expireat" => expireat(parser, db, dbindex),
@@ -3100,5 +3133,52 @@ mod test_command {
                     Response::Array(vec![Response::Data(b"key1".to_vec())]));
         assert_eq!(command(parser!(b"KEYS key[1]"), &mut db, &mut client).unwrap(),
                     Response::Array(vec![Response::Data(b"key1".to_vec())]));
+    }
+
+    #[test]
+    fn multi_exec_command() {
+        let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
+        let mut client = Client::mock();
+        assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
+
+        assert_eq!(command(parser!(b"multi"), &mut db, &mut client).unwrap(), Response::Status("OK".to_owned()));
+        assert_eq!(command(parser!(b"append key 1"), &mut db, &mut client).unwrap(), Response::Status("QUEUED".to_owned()));
+        assert_eq!(command(parser!(b"get key"), &mut db, &mut client).unwrap(), Response::Status("QUEUED".to_owned()));
+
+        // still has the old value
+        assert_eq!(db.get_or_create(0, &b"key".to_vec()).get().unwrap(), b"value".to_vec());
+
+        assert_eq!(command(parser!(b"EXEC"), &mut db, &mut client).unwrap(), Response::Array(vec![
+                    Response::Integer(6),
+                    Response::Data(b"value1".to_vec()),
+                    ]));
+
+        // value is updated
+        assert_eq!(db.get_or_create(0, &b"key".to_vec()).get().unwrap(), b"value1".to_vec());
+
+        // multi status back to normal
+        assert_eq!(command(parser!(b"get key"), &mut db, &mut client).unwrap(), Response::Data(b"value1".to_vec()));
+    }
+
+    #[test]
+    fn multi_discard_command() {
+        let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
+        let mut client = Client::mock();
+        assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
+
+        assert_eq!(command(parser!(b"multi"), &mut db, &mut client).unwrap(), Response::Status("OK".to_owned()));
+        assert_eq!(command(parser!(b"append key 1"), &mut db, &mut client).unwrap(), Response::Status("QUEUED".to_owned()));
+        assert_eq!(command(parser!(b"get key"), &mut db, &mut client).unwrap(), Response::Status("QUEUED".to_owned()));
+
+        // still has the old value
+        assert_eq!(db.get_or_create(0, &b"key".to_vec()).get().unwrap(), b"value".to_vec());
+
+        assert_eq!(command(parser!(b"DISCARD"), &mut db, &mut client).unwrap(), Response::Status("OK".to_owned()));
+
+        // still has the old value
+        assert_eq!(db.get_or_create(0, &b"key".to_vec()).get().unwrap(), b"value".to_vec());
+
+        // multi status back to normal
+        assert_eq!(command(parser!(b"get key"), &mut db, &mut client).unwrap(), Response::Data(b"value".to_vec()));
     }
 }

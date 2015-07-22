@@ -206,6 +206,10 @@ impl<'a> ParsedCommand<'a> {
         let arg = &self.argv[pos];
         return Ok(&self.data[arg.pos..arg.pos+arg.len]);
     }
+
+    pub fn into_owned(self) -> OwnedParsedCommand {
+        OwnedParsedCommand::new(Vec::from(self.data), self.argv)
+    }
 }
 
 /// Parses the length of the paramenter in the slice

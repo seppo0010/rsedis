@@ -111,9 +111,9 @@
     - [ ] shutdown
     - [ ] lastsave
     - [x] type
-    - [ ] multi
-    - [ ] exec
-    - [ ] discard
+    - [x] multi
+    - [x] exec
+    - [x] discard
     - [ ] sync
     - [ ] psync
     - [ ] replconf
