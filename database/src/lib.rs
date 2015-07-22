@@ -23,6 +23,7 @@ use std::collections::Bound;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::io::Write;
+use std::iter::FromIterator;
 use std::sync::mpsc::{Sender, channel};
 
 use config::Config;
@@ -1482,6 +1483,11 @@ pub struct Database {
     // - Use a reference
     // - Move expiration to `data`
     data_expiration_ms: Vec<RehashingHashMap<Vec<u8>, i64>>,
+    /// Maps a key to a collection of client identifiers.
+    /// Every time a key is modified, the watched key client is flushed.
+    /// The clients who are subscribed to a key should check whether their id
+    /// is still present
+    watched_keys: Vec<HashMap<Vec<u8>, HashSet<usize>>>,
     /// Maps a channel to a list of pubsub events listeners.
     /// The `usize` key is used as a client identifier.
     subscribers: HashMap<Vec<u8>, HashMap<usize, Sender<Option<PubsubEvent>>>>,
@@ -1519,10 +1525,12 @@ impl Database {
         let mut data = Vec::with_capacity(size);
         let mut data_expiration_ms = Vec::with_capacity(size);
         let mut key_subscribers = Vec::with_capacity(size);
+        let mut watched_keys = Vec::with_capacity(size);
         for _ in 0..size {
             data.push(RehashingHashMap::new());
             data_expiration_ms.push(RehashingHashMap::new());
             key_subscribers.push(RehashingHashMap::new());
+            watched_keys.push(HashMap::new());
         }
         return Database {
             config: config,
@@ -1532,6 +1540,7 @@ impl Database {
             pattern_subscribers: HashMap::new(),
             key_subscribers: key_subscribers,
             subscriber_id: 0,
+            watched_keys: watched_keys,
         }
     }
 
@@ -1703,6 +1712,20 @@ impl Database {
         subscriber_id
     }
 
+    pub fn key_watch(&mut self, index: usize, key: &Vec<u8>, identifier: usize) {
+        match self.watched_keys[index].contains_key(key) {
+            true => self.watched_keys[index].get_mut(key).unwrap().insert(identifier),
+            false => self.watched_keys[index].insert(key.clone(), HashSet::from_iter(vec![identifier])).is_some(),
+        };
+    }
+
+    pub fn key_watch_verify(&self, index: usize, key: &Vec<u8>, identifier: usize) -> bool {
+        match self.watched_keys[index].get(key) {
+            Some(ref l) => l.contains(&identifier),
+            None => false
+        }
+    }
+
     /// Publishes a `true` to all key listeners.
     pub fn key_updated(&mut self, index: usize, key: &Vec<u8>) {
         if self.config.active_rehashing {
@@ -1719,6 +1742,7 @@ impl Database {
             }
             None => (),
         }
+        self.watched_keys[index].remove(key);
     }
 
     /// Sets up the hashmap to subscribe clients to a channel.
@@ -3220,5 +3244,18 @@ mod test_command {
         let mut v = vec![];
         Value::String(ValueString::Integer(1)).dump(&mut v).unwrap();
         assert_eq!(&*v, b"\x00\xc0\x01\x07\x00\xd9J2E\xd9\xcb\xc4\xe6");
+    }
+
+    #[test]
+    fn watch() {
+        let config = Config::new(Logger::new(Level::Warning));
+        let mut database = Database::new(config);
+        database.key_watch(0, &vec![1], 31);
+        assert!(database.key_watch_verify(0, &vec![1], 31));
+        database.key_updated(0, &vec![2]);
+        database.key_updated(1, &vec![1]);
+        assert!(database.key_watch_verify(0, &vec![1], 31));
+        database.key_updated(0, &vec![1]);
+        assert!(!database.key_watch_verify(0, &vec![1], 31));
     }
 }
