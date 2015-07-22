@@ -1704,7 +1704,7 @@ impl Database {
     }
 
     /// Publishes a `true` to all key listeners.
-    pub fn key_publish(&mut self, index: usize, key: &Vec<u8>) {
+    pub fn key_updated(&mut self, index: usize, key: &Vec<u8>) {
         if self.config.active_rehashing {
             self.data[index].rehash();
             self.data_expiration_ms[index].rehash();

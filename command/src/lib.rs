@@ -83,7 +83,7 @@ fn generic_set(db: &mut Database, dbindex: usize, key: Vec<u8>, val: Vec<u8>, nx
 
     match db.get_or_create(dbindex, &key).set(val) {
         Ok(_) => {
-            db.key_publish(dbindex, &key);
+            db.key_updated(dbindex, &key);
             match expiration {
                 Some(msexp) => db.set_msexpiration(dbindex, key, msexp + mstime()),
                 None => (),
@@ -180,7 +180,7 @@ fn del(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
         match db.remove(dbindex, &key) {
             Some(_) => {
                 c += 1;
-                db.key_publish(dbindex, &key);
+                db.key_updated(dbindex, &key);
             },
             None => {},
         }
@@ -316,7 +316,7 @@ fn append(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response 
         Ok(len) => Response::Integer(len as i64),
         Err(err) => Response::Error(err.to_string()),
     };
-    db.key_publish(dbindex, &key);
+    db.key_updated(dbindex, &key);
     r
 }
 
@@ -418,7 +418,7 @@ fn generic_incr(parser: ParsedCommand, db: &mut Database, dbindex: usize, increm
         Ok(val) => Response::Integer(val),
         Err(err) =>  Response::Error(err.to_string()),
     };
-    db.key_publish(dbindex, &key);
+    db.key_updated(dbindex, &key);
     r
 }
 
@@ -456,7 +456,7 @@ fn incrbyfloat(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Resp
         Ok(val) => Response::Data(format!("{}", val).into_bytes()),
         Err(err) =>  Response::Error(err.to_string()),
     };
-    db.key_publish(dbindex, &key);
+    db.key_updated(dbindex, &key);
     r
 }
 
@@ -480,7 +480,7 @@ fn generic_push(parser: ParsedCommand, db: &mut Database, dbindex: usize, right:
             Err(err) => Response::Error(err.to_string()),
         }
     };
-    db.key_publish(dbindex, &key);
+    db.key_updated(dbindex, &key);
     r
 }
 
@@ -517,7 +517,7 @@ fn generic_pop(parser: ParsedCommand, db: &mut Database, dbindex: usize, right: 
             None => Response::Nil,
         }
     };
-    db.key_publish(dbindex, &key);
+    db.key_updated(dbindex, &key);
     r
 }
 
@@ -564,8 +564,8 @@ fn generic_rpoplpush(db: &mut Database, dbindex: usize, source: &Vec<u8>, destin
         destinationlist.push(el.clone(), false);
         Response::Data(el)
     };
-    db.key_publish(dbindex, source);
-    db.key_publish(dbindex, destination);
+    db.key_updated(dbindex, source);
+    db.key_updated(dbindex, destination);
     resp
 }
 
@@ -749,7 +749,7 @@ fn linsert(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response
         },
         None => Response::Integer(-1),
     };
-    db.key_publish(dbindex, &key);
+    db.key_updated(dbindex, &key);
     r
 }
 
@@ -791,7 +791,7 @@ fn lrem(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
         },
         None => Response::Array(Vec::new()),
     };
-    db.key_publish(dbindex, &key);
+    db.key_updated(dbindex, &key);
     r
 }
 
@@ -807,7 +807,7 @@ fn lset(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
         },
         None => Response::Error("ERR no such key".to_owned()),
     };
-    db.key_publish(dbindex, &key);
+    db.key_updated(dbindex, &key);
     r
 }
 
@@ -823,7 +823,7 @@ fn ltrim(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
         },
         None => Response::Status("OK".to_owned()),
     };
-    db.key_publish(dbindex, &key);
+    db.key_updated(dbindex, &key);
     r
 }
 
@@ -842,7 +842,7 @@ fn sadd(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
             }
         }
     }
-    db.key_publish(dbindex, &key);
+    db.key_updated(dbindex, &key);
     return Response::Integer(count);
 }
 
@@ -860,7 +860,7 @@ fn srem(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
             }
         }
     }
-    db.key_publish(dbindex, &key);
+    db.key_updated(dbindex, &key);
     return Response::Integer(count);
 }
 
@@ -967,8 +967,8 @@ fn smove(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
         }
     }
 
-    db.key_publish(dbindex, &source_key);
-    db.key_publish(dbindex, &destination_key);
+    db.key_updated(dbindex, &source_key);
+    db.key_updated(dbindex, &destination_key);
     return Response::Integer(1);
 }
 
@@ -1139,7 +1139,7 @@ fn zadd(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
         }
     }
     if count > 0 {
-        db.key_publish(dbindex, &key);
+        db.key_updated(dbindex, &key);
     }
     return Response::Integer(count);
 }
@@ -1186,7 +1186,7 @@ fn zincrby(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response
             Err(err) => return Response::Error(err.to_string()),
         }
     };
-    db.key_publish(dbindex, &key);
+    db.key_updated(dbindex, &key);
     return Response::Data(format!("{}", newscore).into_bytes());
 }
 
@@ -1208,7 +1208,7 @@ fn zrem(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
         }
     }
     if count > 0 {
-        db.key_publish(dbindex, &key);
+        db.key_updated(dbindex, &key);
     }
     return Response::Integer(count);
 }
@@ -1526,7 +1526,7 @@ fn zinter_union_store(parser: ParsedCommand, db: &mut Database, dbindex: usize, 
         Err(err) => Response::Error(err.to_string()),
     };
     *db.get_or_create(dbindex, &key) = value;
-    db.key_publish(dbindex, &key);
+    db.key_updated(dbindex, &key);
     r
 }
 
