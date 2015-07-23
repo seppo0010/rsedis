@@ -1719,6 +1719,12 @@ impl Database {
         };
     }
 
+    pub fn key_unwatch(&mut self, index: usize, key: &Vec<u8>, identifier: usize) {
+        if let Some(s) = self.watched_keys[index].get_mut(key) {
+            s.remove(&identifier);
+        }
+    }
+
     pub fn key_watch_verify(&self, index: usize, key: &Vec<u8>, identifier: usize) -> bool {
         match self.watched_keys[index].get(key) {
             Some(ref l) => l.contains(&identifier),
@@ -3256,6 +3262,17 @@ mod test_command {
         database.key_updated(1, &vec![1]);
         assert!(database.key_watch_verify(0, &vec![1], 31));
         database.key_updated(0, &vec![1]);
+        assert!(!database.key_watch_verify(0, &vec![1], 31));
+    }
+
+    #[test]
+    fn unwatch() {
+        let config = Config::new(Logger::new(Level::Warning));
+        let mut database = Database::new(config);
+        database.key_watch(0, &vec![1], 31);
+        database.key_watch(0, &vec![1], 32);
+        database.key_unwatch(0, &vec![1], 31);
+        assert!(database.key_watch_verify(0, &vec![1], 32));
         assert!(!database.key_watch_verify(0, &vec![1], 31));
     }
 }

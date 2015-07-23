@@ -1,4 +1,5 @@
 #![feature(collections_bound)]
+#![feature(drain)]
 extern crate config;
 extern crate database;
 extern crate logger;
@@ -7,8 +8,7 @@ extern crate response;
 extern crate util;
 
 use std::ascii::AsciiExt;
-use std::collections::Bound;
-use std::collections::HashMap;
+use std::collections::{Bound, HashMap, HashSet};
 use std::fmt::Error;
 use std::mem::replace;
 use std::sync::mpsc::Sender;
@@ -1650,6 +1650,7 @@ pub struct Client {
     pub pubsub_sender: Sender<Option<PubsubEvent>>,
     pub multi: bool,
     pub multi_commands: Vec<OwnedParsedCommand>,
+    pub watched_keys: HashSet<(usize, Vec<u8>)>,
     pub id: usize,
 }
 
@@ -1668,6 +1669,7 @@ impl Client {
             multi: false,
             multi_commands: Vec::new(),
             id: id,
+            watched_keys: HashSet::new(),
         }
     }
 }
@@ -1680,6 +1682,36 @@ fn keys(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     // Instead we should collect only once.
     let responses = db.keys(dbindex, &pattern);
     Response::Array(responses.into_iter().map(|i| Response::Data(i)).collect())
+}
+
+fn watch(parser: ParsedCommand, db: &mut Database, dbindex: usize, client_id: usize, watched_keys: &mut HashSet<(usize, Vec<u8>)>) -> Response {
+    validate!(parser.argv.len() >= 2, "Wrong number of parameters");
+
+    for i in 1..parser.argv.len() {
+        let key = try_validate!(parser.get_vec(i), "Invalid key");
+        db.key_watch(dbindex, &key, client_id);
+        watched_keys.insert((dbindex, key));
+    }
+
+    Response::Status("OK".to_owned())
+}
+
+fn generic_unwatch(db: &mut Database, client_id: usize, watched_keys: &mut HashSet<(usize, Vec<u8>)>) -> bool {
+    let mut watched_verified = true;
+    for (index, key) in watched_keys.drain().into_iter() {
+        if !db.key_watch_verify(index, &key, client_id) {
+            watched_verified = false;
+            break;
+        }
+    }
+    watched_verified
+}
+
+fn unwatch(parser: ParsedCommand, db: &mut Database, client_id: usize, watched_keys: &mut HashSet<(usize, Vec<u8>)>) -> Response {
+    validate!(parser.argv.len() == 1, "Wrong number of parameters");
+
+    generic_unwatch(db, client_id, watched_keys);
+    Response::Status("OK".to_owned())
 }
 
 pub fn command(
@@ -1720,6 +1752,9 @@ pub fn command(
             return Ok(Response::Error("ERR EXEC without MULTI".to_owned()))
         }
         client.multi = false;
+        if !generic_unwatch(db, client.id, &mut client.watched_keys) {
+            return Ok(Response::Nil);
+        }
         let c = replace(&mut client.multi_commands, vec![]);
         let r = Response::Array(c.iter().map(|c| command(c.get_command(), db, client).unwrap()).collect());
         return Ok(r);
@@ -1832,6 +1867,8 @@ pub fn command(
         "zinterstore" => zinterstore(parser, db, dbindex),
         "dump" => dump(parser, db, dbindex),
         "keys" => keys(parser, db, dbindex),
+        "watch" => watch(parser, db, dbindex, client.id, &mut client.watched_keys),
+        "unwatch" => unwatch(parser, db, client.id, &mut client.watched_keys),
         "subscribe"    => return subscribe(   parser, db, &mut client.subscriptions, client.pattern_subscriptions.len(), &client.pubsub_sender),
         "unsubscribe"  => return unsubscribe( parser, db, &mut client.subscriptions, client.pattern_subscriptions.len(), &client.pubsub_sender),
         "psubscribe"   => return psubscribe(  parser, db, client.subscriptions.len(), &mut client.pattern_subscriptions, &client.pubsub_sender),
@@ -3182,5 +3219,46 @@ mod test_command {
 
         // multi status back to normal
         assert_eq!(command(parser!(b"get key"), &mut db, &mut client).unwrap(), Response::Data(b"value".to_vec()));
+    }
+
+    #[test]
+    fn watch_multi_exec_fail_command() {
+        let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
+        let mut client = Client::mock();
+
+        assert_eq!(command(parser!(b"watch key"), &mut db, &mut client).unwrap(), Response::Status("OK".to_owned()));
+        assert_eq!(command(parser!(b"set key 1"), &mut db, &mut client).unwrap(), Response::Status("OK".to_owned()));
+        assert_eq!(command(parser!(b"multi"), &mut db, &mut client).unwrap(), Response::Status("OK".to_owned()));
+        assert_eq!(command(parser!(b"get key"), &mut db, &mut client).unwrap(), Response::Status("QUEUED".to_owned()));
+        assert_eq!(command(parser!(b"exec"), &mut db, &mut client).unwrap(), Response::Nil);
+    }
+
+    #[test]
+    fn watch_multi_exec_ok_command() {
+        let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
+        let mut client = Client::mock();
+
+        assert_eq!(command(parser!(b"watch key"), &mut db, &mut client).unwrap(), Response::Status("OK".to_owned()));
+        assert_eq!(command(parser!(b"get key"), &mut db, &mut client).unwrap(), Response::Nil);
+        assert_eq!(command(parser!(b"multi"), &mut db, &mut client).unwrap(), Response::Status("OK".to_owned()));
+        assert_eq!(command(parser!(b"set key 1"), &mut db, &mut client).unwrap(), Response::Status("QUEUED".to_owned()));
+        assert_eq!(command(parser!(b"EXEC"), &mut db, &mut client).unwrap(), Response::Array(vec![
+                    Response::Status("OK".to_owned()),
+                    ]));
+    }
+
+    #[test]
+    fn watch_unwatch_multi_exec_command() {
+        let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
+        let mut client = Client::mock();
+
+        assert_eq!(command(parser!(b"watch key"), &mut db, &mut client).unwrap(), Response::Status("OK".to_owned()));
+        assert_eq!(command(parser!(b"set key 1"), &mut db, &mut client).unwrap(), Response::Status("OK".to_owned()));
+        assert_eq!(command(parser!(b"unwatch"), &mut db, &mut client).unwrap(), Response::Status("OK".to_owned()));
+        assert_eq!(command(parser!(b"multi"), &mut db, &mut client).unwrap(), Response::Status("OK".to_owned()));
+        assert_eq!(command(parser!(b"get key"), &mut db, &mut client).unwrap(), Response::Status("QUEUED".to_owned()));
+        assert_eq!(command(parser!(b"EXEC"), &mut db, &mut client).unwrap(), Response::Array(vec![
+                    Response::Data(b"1".to_vec()),
+                    ]));
     }
 }

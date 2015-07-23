@@ -135,8 +135,8 @@
     - [x] punsubscribe
     - [x] publish
     - [ ] pubsub
-    - [ ] watch
-    - [ ] unwatch
+    - [x] watch
+    - [x] unwatch
     - [ ] cluster
     - [ ] restore
     - [ ] restore-asking
