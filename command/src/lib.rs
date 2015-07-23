@@ -1714,6 +1714,36 @@ fn unwatch(parser: ParsedCommand, db: &mut Database, client_id: usize, watched_k
     Response::Status("OK".to_owned())
 }
 
+fn multi(client: &mut Client) -> Response {
+    if client.multi {
+        Response::Error("ERR MULTI calls can not be nested".to_owned())
+    } else {
+        client.multi = true;
+        Response::Status("OK".to_owned())
+    }
+}
+fn exec(db: &mut Database, client: &mut Client) -> Response {
+    if !client.multi {
+        return Response::Error("ERR EXEC without MULTI".to_owned());
+    }
+    client.multi = false;
+    if !generic_unwatch(db, client.id, &mut client.watched_keys) {
+        return Response::Nil;
+    }
+    let c = replace(&mut client.multi_commands, vec![]);
+    Response::Array(c.iter().map(|c| command(c.get_command(), db, client).unwrap()).collect())
+}
+
+fn discard(client: &mut Client) -> Response {
+    if !client.multi {
+        Response::Error("ERR DISCARD without MULTI".to_owned())
+    } else {
+        client.multi = false;
+        client.multi_commands = vec![];
+        Response::Status("OK".to_owned())
+    }
+}
+
 pub fn command(
         parser: ParsedCommand,
         db: &mut Database,
@@ -1727,6 +1757,7 @@ pub fn command(
     if db.config.requirepass.is_none() {
         client.auth = true;
     }
+    // commands that are not executed before AUTH
     if command_name == "auth" {
         opt_validate!(parser.argv.len() == 2, "Wrong number of parameters");
         let password = try_opt_validate!(parser.get_str(1), "Invalid password");
@@ -1737,35 +1768,17 @@ pub fn command(
             return Ok(Response::Error("wrong password".to_owned()))
         }
     }
+
     if !client.auth {
         return Ok(Response::Error("require pass".to_owned()))
     }
-    if command_name == "multi" {
-        if client.multi {
-            return Ok(Response::Error("ERR MULTI calls can not be nested".to_owned()))
-        }
-        client.multi = true;
-        return Ok(Response::Status("OK".to_owned()));
-    }
-    if command_name == "exec" {
-        if !client.multi {
-            return Ok(Response::Error("ERR EXEC without MULTI".to_owned()))
-        }
-        client.multi = false;
-        if !generic_unwatch(db, client.id, &mut client.watched_keys) {
-            return Ok(Response::Nil);
-        }
-        let c = replace(&mut client.multi_commands, vec![]);
-        let r = Response::Array(c.iter().map(|c| command(c.get_command(), db, client).unwrap()).collect());
-        return Ok(r);
-    }
-    if command_name == "discard" {
-        if !client.multi {
-            return Ok(Response::Error("ERR DISCARD without MULTI".to_owned()))
-        }
-        client.multi = false;
-        client.multi_commands = vec![];
-        return Ok(Response::Status("OK".to_owned()));
+
+    // commands that are not executed inside MULTI
+    match command_name {
+        "multi" => return Ok(multi(client)),
+        "discard" => return Ok(discard(client)),
+        "exec" => return Ok(exec(db, client)),
+        _ => {},
     }
     if client.multi {
         client.multi_commands.push(parser.into_owned());
