@@ -164,7 +164,9 @@ struct Client {
     /// The socket connection
     stream: Stream,
     /// A reference to the database
-    db: Arc<Mutex<Database>>
+    db: Arc<Mutex<Database>>,
+    /// The client unique identifier
+    id: usize,
 }
 
 /// The database server
@@ -175,23 +177,27 @@ pub struct Server {
     listener_channels: Vec<Sender<u8>>,
     /// A list of threads listening for incoming connections
     listener_threads: Vec<thread::JoinHandle<()>>,
+    /// An incremental id for new clients
+    pub next_id: Arc<Mutex<usize>>,
 }
 
 impl Client {
     /// Creates a new TCP socket client
-    pub fn tcp(stream: TcpStream, db: Arc<Mutex<Database>>) -> Client {
+    pub fn tcp(stream: TcpStream, db: Arc<Mutex<Database>>, id: usize) -> Client {
         return Client {
             stream: Stream::Tcp(stream),
             db: db,
+            id: id,
         }
     }
 
     /// Creates a new UNIX socket client
     #[cfg(unix)]
-    pub fn unix(stream: UnixStream, db: Arc<Mutex<Database>>) -> Client {
+    pub fn unix(stream: UnixStream, db: Arc<Mutex<Database>>, id: usize) -> Client {
         return Client {
             stream: Stream::Unix(stream),
             db: db,
+            id: id,
         }
     }
 
@@ -241,7 +247,7 @@ impl Client {
         let (pubsub_tx, pubsub_rx) = channel::<Option<PubsubEvent>>();
         self.create_pubsub_thread(stream_tx.clone(), pubsub_rx);
 
-        let mut client = command::Client::new(pubsub_tx);
+        let mut client = command::Client::new(pubsub_tx, self.id);
         let mut parser = Parser::new();
 
         let mut this_command:Option<OwnedParsedCommand>;
@@ -344,6 +350,7 @@ macro_rules! handle_listener {
     ($logger: expr, $listener: expr, $server: expr, $rx: expr, $tcp_keepalive: expr, $timeout: expr, $t: ident) => ({
         let db = $server.db.clone();
         let sender = $logger.sender();
+        let next_id = $server.next_id.clone();
         thread::spawn(move || {
             for stream in $listener.incoming() {
                 if $rx.try_recv().is_ok() {
@@ -355,8 +362,13 @@ macro_rules! handle_listener {
                         sendlog!(sender, Verbose, "Accepted connection to {:?}", stream).unwrap();
                         let db1 = db.clone();
                         let mysender = sender.clone();
+                        let id = {
+                            let mut nid = next_id.lock().unwrap();
+                            *nid += 1;
+                            *nid - 1
+                        };
                         thread::spawn(move || {
-                            let mut client = Client::$t(stream, db1);
+                            let mut client = Client::$t(stream, db1, id);
                             client.stream.set_keepalive(if $tcp_keepalive > 0 { Some($tcp_keepalive) } else { None }).unwrap();
                             client.stream.set_read_timeout(if $timeout > 0 { Some(Duration::new($timeout, 0)) } else { None }).unwrap();
                             client.stream.set_write_timeout(if $timeout > 0 { Some(Duration::new($timeout, 0)) } else { None }).unwrap();
@@ -378,6 +390,7 @@ impl Server {
             db: Arc::new(Mutex::new(db)),
             listener_channels: Vec::new(),
             listener_threads: Vec::new(),
+            next_id: Arc::new(Mutex::new(0)),
         }
     }
 
@@ -533,6 +546,7 @@ mod test_networking {
     use std::io::{Read, Write};
     use std::net::TcpStream;
     use std::str::from_utf8;
+    use std::thread;
 
     use config::Config;
     use logger::{Logger, Level};
@@ -583,7 +597,6 @@ mod test_networking {
         assert_eq!(from_utf8(&c).unwrap(), "pong\r\n");
         server.stop();
     }
-
     #[test]
     fn allow_stop() {
         let port = 16381;
@@ -608,6 +621,22 @@ mod test_networking {
             let streamres = TcpStream::connect(&*addr);
             assert!(streamres.is_ok());
         }
+        server.stop();
+    }
+
+    #[test]
+    fn allow_multiple_clients() {
+        let port = 16382;
+        let mut server = Server::new(Config::mock(port, Logger::new(Level::Warning)));
+        server.start();
+
+        let addr = format!("127.0.0.1:{}", port);
+        let _ = TcpStream::connect(&*addr);
+        thread::sleep_ms(100);
+        assert_eq!(*server.next_id.lock().unwrap(), 1);
+        let _ = TcpStream::connect(&*addr);
+        thread::sleep_ms(100);
+        assert_eq!(*server.next_id.lock().unwrap(), 2);
         server.stop();
     }
 }

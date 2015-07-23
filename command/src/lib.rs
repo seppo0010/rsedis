@@ -1650,14 +1650,15 @@ pub struct Client {
     pub pubsub_sender: Sender<Option<PubsubEvent>>,
     pub multi: bool,
     pub multi_commands: Vec<OwnedParsedCommand>,
+    pub id: usize,
 }
 
 impl Client {
     pub fn mock() -> Self {
-        Self::new(channel().0)
+        Self::new(channel().0, 0)
     }
 
-    pub fn new(sender: Sender<Option<PubsubEvent>>) -> Self {
+    pub fn new(sender: Sender<Option<PubsubEvent>>, id: usize) -> Self {
         Client {
             dbindex: 0,
             auth: false,
@@ -1666,6 +1667,7 @@ impl Client {
             pubsub_sender: sender,
             multi: false,
             multi_commands: Vec::new(),
+            id: id,
         }
     }
 }
@@ -3065,7 +3067,7 @@ mod test_command {
     fn subscribe_publish_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
         let (tx, rx) = channel();
-        let mut client = Client::new(tx);
+        let mut client = Client::new(tx, 0);
         assert!(command(parser!(b"subscribe channel"), &mut db, &mut client).is_err());
         assert_eq!(command(parser!(b"publish channel hello-world"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(1));
         assert!(command(parser!(b"unsubscribe channel"), &mut db, &mut client).is_err());
