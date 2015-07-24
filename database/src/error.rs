@@ -22,7 +22,10 @@ impl fmt::Display for OperationError {
 
 impl Error for OperationError {
     fn description(&self) -> &str {
-        return "oops";
+        match *self {
+            OperationError::WrongTypeError => "WRONGTYPE Operation against a key holding the wrong kind of value",
+            _ => "ERR",
+        }
     }
 }
 
