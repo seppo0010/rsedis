@@ -24,7 +24,18 @@ impl ValueSet {
     }
 
     pub fn create_with_hashset(h: HashSet<Vec<u8>>) -> ValueSet {
-        ValueSet::Data(h)
+        let mut s = VecMap::new();
+        for v in h.iter() {
+            match vec_to_usize(&v) {
+                Ok(n) => { s.insert(n, ()); },
+                Err(_) => break,
+            }
+        }
+        if h.len() == s.len() {
+            ValueSet::Integer(s)
+        } else {
+            ValueSet::Data(h)
+        }
     }
 
     pub fn is_intset(&self) -> bool {
@@ -544,5 +555,11 @@ mod test_set {
         set.dump(&mut v).unwrap();
         assert!(v == b"\x0b\x0c\x02\x00\x00\x00\x02\x00\x00\x00\x01\x00\x02\x00\x07\x00".to_vec() ||
                 v == b"\x0b\x0c\x02\x00\x00\x00\x02\x00\x00\x00\x02\x00\x01\x00\x07\x00".to_vec());
+    }
+
+    #[test]
+    fn create_numeric() {
+        let s = ValueSet::create_with_hashset(HashSet::from_iter(vec![b"319".to_vec()]));
+        assert!(s.is_intset());
     }
 }
