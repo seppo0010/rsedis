@@ -57,7 +57,7 @@ macro_rules! try_validate {
 }
 
 macro_rules! get_values {
-    ($start: expr, $stop: expr, $parser: expr, $db: expr, $dbindex: expr) => ({
+    ($start: expr, $stop: expr, $parser: expr, $db: expr, $dbindex: expr, $default: expr) => ({
         validate!($parser.argv.len() >= $start, "Wrong number of parameters");
         validate!($parser.argv.len() >= $stop, "Wrong number of parameters");
         let mut sets = Vec::with_capacity($parser.argv.len() - $start);
@@ -65,7 +65,7 @@ macro_rules! get_values {
             let key = try_validate!($parser.get_vec(i), "Invalid key");
             match $db.get($dbindex, &key) {
                 Some(e) => sets.push(e),
-                None => (),
+                None => sets.push($default),
             };
         }
         sets
@@ -1009,7 +1009,8 @@ fn sdiff(parser: ParsedCommand, db: &Database, dbindex: usize) -> Response {
         Some(e) => e,
         None => return Response::Array(vec![]),
     };
-    let sets = get_values!(2, parser.argv.len(), parser, db, dbindex);
+    let nil = Value::Nil;
+    let sets = get_values!(2, parser.argv.len(), parser, db, dbindex, &nil);
 
     match el.sdiff(&sets) {
         Ok(set) => {
@@ -1028,7 +1029,8 @@ fn sdiffstore(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Respo
             Some(e) => e,
             None => return Response::Integer(0),
         };
-        let sets = get_values!(3, parser.argv.len(), parser, db, dbindex);
+        let nil = Value::Nil;
+        let sets = get_values!(3, parser.argv.len(), parser, db, dbindex, &nil);
         match el.sdiff(&sets) {
             Ok(set) => set,
             Err(err) => return Response::Error(err.to_string()),
@@ -1047,7 +1049,8 @@ fn sinter(parser: ParsedCommand, db: &Database, dbindex: usize) -> Response {
         Some(e) => e,
         None => return Response::Array(vec![]),
     };
-    let sets = get_values!(2, parser.argv.len(), parser, db, dbindex);
+    let nil = Value::Nil;
+    let sets = get_values!(2, parser.argv.len(), parser, db, dbindex, &nil);
     return match el.sinter(&sets) {
         Ok(set) => {
             Response::Array(set.iter().map(|x| Response::Data(x.clone())).collect::<Vec<_>>())
@@ -1065,7 +1068,8 @@ fn sinterstore(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Resp
             Some(e) => e,
             None => return Response::Integer(0),
         };
-        let sets = get_values!(3, parser.argv.len(), parser, db, dbindex);
+        let nil = Value::Nil;
+        let sets = get_values!(3, parser.argv.len(), parser, db, dbindex, &nil);
         match el.sinter(&sets) {
             Ok(set) => set,
             Err(err) => return Response::Error(err.to_string()),
@@ -1085,7 +1089,8 @@ fn sunion(parser: ParsedCommand, db: &Database, dbindex: usize) -> Response {
         Some(e) => e,
         None => &defaultel,
     };
-    let sets = get_values!(2, parser.argv.len(), parser, db, dbindex);
+    let nil = Value::Nil;
+    let sets = get_values!(2, parser.argv.len(), parser, db, dbindex, &nil);
     return match el.sunion(&sets) {
         Ok(set) => {
             Response::Array(set.iter().map(|x| Response::Data(x.clone())).collect::<Vec<_>>())
@@ -1104,7 +1109,8 @@ fn sunionstore(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Resp
             Some(e) => e,
             None => &defaultel,
         };
-        let sets = get_values!(3, parser.argv.len(), parser, db, dbindex);
+        let nil = Value::Nil;
+        let sets = get_values!(3, parser.argv.len(), parser, db, dbindex, &nil);
         match el.sunion(&sets) {
             Ok(set) => set,
             Err(err) => return Response::Error(err.to_string()),
@@ -1501,7 +1507,8 @@ fn zinter_union_store(parser: ParsedCommand, db: &mut Database, dbindex: usize, 
             }
             n as usize
         };
-        let zsets = get_values!(3, 2 + numkeys, parser, db, dbindex);
+        let nil = Value::Nil;
+        let zsets = get_values!(3, 2 + numkeys, parser, db, dbindex, &nil);
         let mut pos = 3 + numkeys;
         let mut weights = None;
         let mut aggregate = zset::Aggregate::Sum;
@@ -2730,6 +2737,19 @@ mod test_command {
         }).collect::<Vec<_>>();
         r.sort();
         assert_eq!(r, vec![b"2".to_vec(), b"3".to_vec()]);
+    }
+
+    #[test]
+    fn sinter_command_nil() {
+        let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
+        command(parser!(b"sadd key1 1 2 3"), &mut db, &mut Client::mock()).unwrap();
+        command(parser!(b"sadd key2 2 3 4"), &mut db, &mut Client::mock()).unwrap();
+
+        let arr = match command(parser!(b"sinter key1 key2 nokey"), &mut db, &mut Client::mock()).unwrap() {
+            Response::Array(arr) => arr,
+            _ => panic!("Expected array"),
+        };
+        assert_eq!(arr.len(), 0);
     }
 
     #[test]

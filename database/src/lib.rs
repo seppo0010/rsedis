@@ -847,12 +847,13 @@ impl Value {
     /// assert_eq!(val1.sdiff(&vec![&val2, &val3]).unwrap(), set);
     /// ```
     pub fn sdiff(&self, set_values: &Vec<&Value>) -> Result<HashSet<Vec<u8>>, OperationError> {
-        let emptyset = ValueSet::new();
-        let sets = try!(get_set_list(set_values, &emptyset));
-
         match *self {
             Value::Nil => Ok(HashSet::new()),
-            Value::Set(ref value) => Ok(value.sdiff(sets)),
+            Value::Set(ref value) => {
+                let emptyset = ValueSet::new();
+                let sets = try!(get_set_list(set_values, &emptyset));
+                Ok(value.sdiff(sets))
+            },
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -878,12 +879,13 @@ impl Value {
     /// assert_eq!(val1.sinter(&vec![&val2, &val3]).unwrap(), set);
     /// ```
     pub fn sinter(&self, set_values: &Vec<&Value>) -> Result<HashSet<Vec<u8>>, OperationError> {
-        let emptyset = ValueSet::new();
-        let sets = try!(get_set_list(set_values, &emptyset));
-
         match *self {
             Value::Nil => Ok(HashSet::new()),
-            Value::Set(ref value) => Ok(value.sinter(sets)),
+            Value::Set(ref value) => {
+                let emptyset = ValueSet::new();
+                let sets = try!(get_set_list(set_values, &emptyset));
+                Ok(value.sinter(sets))
+            },
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -2412,6 +2414,20 @@ mod test_command {
                 vec![v1, v2].iter().cloned().collect::<HashSet<_>>());
 
         assert_eq!(value1.sinter(&vec![&value2, &Value::Nil]).unwrap().len(), 0);
+    }
+
+    #[test]
+    fn sinter_nil() {
+        let mut value1 = Value::Nil;
+        let value2 = Value::Nil;
+        let v1 = vec![1, 2, 3, 4];
+        let v2 = vec![5, 6, 7, 8];
+
+        assert_eq!(value1.sadd(v1.clone(), 100).unwrap(), true);
+        assert_eq!(value1.sadd(v2.clone(), 100).unwrap(), true);
+
+        assert_eq!(value1.sinter(&vec![&value2]).unwrap().iter().collect::<Vec<_>>().len(), 0);
+        assert_eq!(value2.sinter(&vec![&value1]).unwrap().iter().collect::<Vec<_>>().len(), 0);
     }
 
     #[test]
