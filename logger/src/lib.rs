@@ -2,7 +2,7 @@
 
 #[cfg(unix)] use std::ascii::AsciiExt;
 use std::io;
-use std::io::{Write, stderr};
+use std::io::{Write, stderr, stdout};
 use std::iter::FromIterator;
 use std::fs::{File, OpenOptions};
 use std::fmt::{Debug, Error, Formatter};
@@ -62,6 +62,8 @@ macro_rules! sendlog {
 enum Output {
     /// Sends logs to a channel
     Channel(Sender<Vec<u8>>),
+    /// Writes to the standard output
+    Stdout,
     /// Writes to the standard error
     Stderr,
     /// Writes to a `File` in `String` path
@@ -73,6 +75,7 @@ impl Debug for Output {
         match *self {
             Output::Channel(_) => fmt.write_str("Channel"),
             Output::Stderr => fmt.write_str("Stderr"),
+            Output::Stdout => fmt.write_str("Stdout"),
             Output::File(_, ref filename) => fmt.write_fmt(format_args!("File: {}", filename)),
         }
     }
@@ -83,6 +86,7 @@ impl Write for Output {
         match *self {
             Output::Channel(ref v) => { v.send(Vec::from_iter(data.iter().cloned())).unwrap(); Ok(data.len()) },
             Output::Stderr => stderr().write(data),
+            Output::Stdout => stdout().write(data),
             Output::File(ref mut v, _) => v.write(data),
         }
     }
@@ -91,6 +95,7 @@ impl Write for Output {
         match *self {
             Output::Channel(_) => Ok(()),
             Output::Stderr => stderr().flush(),
+            Output::Stdout => stdout().flush(),
             Output::File(ref mut v, _) => v.flush(),
         }
     }
@@ -101,6 +106,7 @@ impl Clone for Output {
         match *self {
             Output::Channel(ref v) => Output::Channel(v.clone()),
             Output::Stderr => Output::Stderr,
+            Output::Stdout => Output::Stdout,
             Output::File(_, ref path) => Output::File(OpenOptions::new().write(true).create(true).open(path).unwrap(), path.clone()),
         }
     }
@@ -274,10 +280,23 @@ impl Logger {
     /// logger.log(Level::Warning, "hello world".to_owned());
     /// ```
     pub fn new(level: Level) -> Self {
+        Self::create(level, Output::Stdout)
+    }
+
+    /// Creates a new logger that writes in the standard error.
+    ///
+    /// # Examples
+    /// ```
+    /// # use logger::{Logger, Level};
+    /// #
+    /// let logger = Logger::new_err(Level::Warning);
+    /// logger.log(Level::Warning, "hello world".to_owned());
+    /// ```
+    pub fn new_err(level: Level) -> Self {
         Self::create(level, Output::Stderr)
     }
 
-    /// Creates a new logger that writes in the standard output.
+    /// Creates a new logger that sends log messages to `s`.
     ///
     /// # Examples
     /// ```
