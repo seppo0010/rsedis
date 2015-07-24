@@ -1,0 +1,13 @@
+[package]
+name = "compat"
+version = "0.1.0"
+authors = ["Sebastian Waisbrot <seppo0010@gmail.com>"]
+
+[target.x86_64-unknown-linux-gnu.dependencies]
+libc ="0.1.8"
+
+[target.x86_64-apple-darwin.dependencies]
+libc ="0.1.8"
+
+[target.x86_64-pc-windows-gnu.dependencies]
+kernel32-sys = "0.1.2"

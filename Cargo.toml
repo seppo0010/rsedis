@@ -36,3 +36,6 @@ path = "networking"
 
 [dependencies.logger]
 path = "logger"
+
+[dependencies.compat]
+path = "compat"

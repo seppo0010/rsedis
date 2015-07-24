@@ -2,11 +2,13 @@ extern crate rsedis;
 extern crate config;
 extern crate logger;
 extern crate networking;
+extern crate compat;
 
 use std::env::args;
 use std::process::exit;
 use std::thread;
 
+use compat::getpid;
 use config::Config;
 use networking::Server;
 use logger::{Logger, Level};
@@ -25,6 +27,11 @@ fn main() {
         },
         None => (),
     }
+    let (port, daemonize) = (config.port, config.daemonize);
     let mut server = Server::new(config);
+    if !daemonize {
+        println!("Port: {}", port);
+        println!("PID: {}", getpid());
+    }
     server.run();
 }
