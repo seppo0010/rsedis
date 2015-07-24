@@ -482,7 +482,10 @@ impl Server {
         };
         for (host, port) in addresses {
             match self.listen((&host[..], port), tcp_keepalive, timeout, tcp_backlog) {
-                Ok(ok) => ok,
+                Ok(_) => {
+                    let db = self.db.lock().unwrap();
+                    log!(db.config.logger, Notice, "The server is now ready to accept connections on port {}", port);
+                },
                 Err(err) => {
                     let db = self.db.lock().unwrap();
                     log!(db.config.logger, Warning, "Creating Server TCP listening socket {}:{}: {:?}", host, port, err);
