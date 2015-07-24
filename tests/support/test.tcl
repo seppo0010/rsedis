@@ -70,6 +70,9 @@ proc wait_for_condition {maxtries delay e _else_ elsescript} {
     }
 }
 
+proc xtest {name code {okpattern undefined}} {
+}
+
 proc test {name code {okpattern undefined}} {
     # abort if tagged with a tag to deny
     foreach tag $::denytags {

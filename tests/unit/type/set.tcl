@@ -66,7 +66,7 @@ start_server {
         assert_equal [lsort {A a b c B}] [lsort [r smembers myset]]
     }
 
-    test "Set encoding after DEBUG RELOAD" {
+    xtest "Set encoding after DEBUG RELOAD" {
         r del myintset myhashset mylargeintset
         for {set i 0} {$i <  100} {incr i} { r sadd myintset $i }
         for {set i 0} {$i < 1280} {incr i} { r sadd mylargeintset $i }
@@ -156,7 +156,7 @@ start_server {
             assert_equal [list 195 196 197 198 199 $large] [lsort [r smembers setres]]
         }
 
-        test "SINTERSTORE with two sets, after a DEBUG RELOAD - $type" {
+        xtest "SINTERSTORE with two sets, after a DEBUG RELOAD - $type" {
             r debug reload
             r sinterstore setres set1 set2
             assert_encoding $type setres
