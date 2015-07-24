@@ -1040,6 +1040,7 @@ fn sdiffstore(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Respo
     db.remove(dbindex, &destination_key);
     let r = set.len() as i64;
     db.get_or_create(dbindex, &destination_key).create_set(set);
+    db.key_updated(dbindex, &destination_key);
     Response::Integer(r)
 }
 
@@ -1064,11 +1065,11 @@ fn sinterstore(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Resp
     let destination_key = try_validate!(parser.get_vec(1), "Invalid destination");
     let set = {
         let key = try_validate!(parser.get_vec(2), "Invalid key");
+        let nil = Value::Nil;
         let el = match db.get(dbindex, &key) {
             Some(e) => e,
-            None => return Response::Integer(0),
+            None => &nil,
         };
-        let nil = Value::Nil;
         let sets = get_values!(3, parser.argv.len(), parser, db, dbindex, &nil);
         match el.sinter(&sets) {
             Ok(set) => set,
@@ -1079,6 +1080,7 @@ fn sinterstore(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Resp
     db.remove(dbindex, &destination_key);
     let r = set.len() as i64;
     db.get_or_create(dbindex, &destination_key).create_set(set);
+    db.key_updated(dbindex, &destination_key);
     Response::Integer(r)
 }
 
@@ -1120,6 +1122,7 @@ fn sunionstore(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Resp
     db.remove(dbindex, &destination_key);
     let r = set.len() as i64;
     db.get_or_create(dbindex, &destination_key).create_set(set);
+    db.key_updated(dbindex, &destination_key);
     Response::Integer(r)
 }
 

@@ -1483,6 +1483,16 @@ impl Value {
             Value::SortedSet(ref s) => s.debug_object().to_owned(),
         }
     }
+
+    pub fn is_empty(&self) -> bool {
+        match *self {
+            Value::Nil => true,
+            Value::String(ref s) => s.strlen() == 0,
+            Value::List(ref l) => l.llen() == 0,
+            Value::Set(ref s) => s.scard() == 0,
+            Value::SortedSet(ref s) => s.zcard() == 0,
+        }
+    }
 }
 
 pub struct Database {
@@ -1745,11 +1755,20 @@ impl Database {
     }
 
     /// Publishes a `true` to all key listeners.
+    /// If the value is now empty, it is removed.
     pub fn key_updated(&mut self, index: usize, key: &Vec<u8>) {
         if self.config.active_rehashing {
             self.data[index].rehash();
             self.data_expiration_ms[index].rehash();
             self.key_subscribers[index].rehash();
+        }
+
+        let is_empty = match self.data[index].get(key) {
+            Some(v) => v.is_empty(),
+            None => false,
+        };
+        if is_empty {
+            self.remove(index, key);
         }
 
         match self.key_subscribers[index].remove(key) {
@@ -2356,6 +2375,20 @@ mod test_command {
 
         let v = value.spop(1).unwrap();
         assert!(v == [v1] || v == [v2] || v == [v3]);
+    }
+
+    #[test]
+    fn delete_empty() {
+        let config = Config::new(Logger::new(Level::Warning));
+        let mut database = Database::new(config);
+
+        let key = vec![1u8];
+        let value = vec![1u8, 2, 3, 4];
+        assert!(database.get_or_create(0, &key).set(value).is_ok());
+        assert!(database.get_or_create(0, &key).set(Vec::new()).is_ok());
+        assert!(!database.get(0, &key).is_none());
+        database.key_updated(0, &key);
+        assert!(database.get(0, &key).is_none());
     }
 
     #[test]
