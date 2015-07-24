@@ -58,9 +58,11 @@ impl Response {
 
     /// Returns true if and only if the response is an error.
     pub fn is_error(&self) -> bool {
-        match *self {
-            Response::Error(_) => true,
-            _ => false,
-        }
+        if let Response::Error(_) = *self { true } else { false }
+    }
+
+    /// Is the response a status
+    pub fn is_status(&self) -> bool {
+        if let Response::Status(_) = *self { true } else { false }
     }
 }

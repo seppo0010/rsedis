@@ -188,6 +188,24 @@ fn del(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     return Response::Integer(c);
 }
 
+fn debug_object(db: &mut Database, dbindex: usize, key: Vec<u8>) -> Option<String> {
+    db.get(dbindex, &key).map(|val| val.debug_object())
+}
+
+fn debug(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
+    validate!(parser.argv.len() == 3, "Wrong number of parameters");
+
+    let subcommand = try_validate!(parser.get_str(1), "Syntax error");
+
+    match &*subcommand.to_ascii_lowercase() {
+        "object" => match debug_object(db, dbindex, try_validate!(parser.get_vec(2), "Invalid key")) {
+            Some(s) => Response::Status(s),
+            None => Response::Error("no such key".to_owned()),
+        },
+        _ => Response::Error("Invalid debug command".to_owned()),
+    }
+}
+
 fn dbsize(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 1, "Wrong number of parameters");
     Response::Integer(db.dbsize(dbindex) as i64)
@@ -1807,6 +1825,7 @@ pub fn command(
         "setnx" => setnx(parser, db, dbindex),
         "setex" => setex(parser, db, dbindex),
         "psetex" => psetex(parser, db, dbindex),
+        "debug" => debug(parser, db, dbindex),
         "del" => del(parser, db, dbindex),
         "dbsize" => dbsize(parser, db, dbindex),
         "append" => append(parser, db, dbindex),
@@ -2064,6 +2083,13 @@ mod test_command {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
         assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
         assert_eq!(command(parser!(b"del key key2"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(1));
+    }
+
+    #[test]
+    fn debug_command() {
+        let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
+        assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
+        assert!(command(parser!(b"debug object key"), &mut db, &mut Client::mock()).unwrap().is_status());
     }
 
     #[test]

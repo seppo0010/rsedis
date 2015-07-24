@@ -1471,6 +1471,16 @@ impl Value {
         encode_u64_to_slice_u8(crc, &mut data).unwrap();
         Ok(try!(writer.write(&*data)))
     }
+
+    pub fn debug_object(&self) -> String {
+        match *self {
+            Value::Nil => "Value at:0x0000000000 refcount:0 encoding:nil serializedlength:0 lru:0 lru_seconds_idle:0".to_owned(),
+            Value::String(ref s) => s.debug_object(),
+            Value::List(ref l) => l.debug_object().to_owned(),
+            Value::Set(ref s) => s.debug_object().to_owned(),
+            Value::SortedSet(ref s) => s.debug_object().to_owned(),
+        }
+    }
 }
 
 pub struct Database {

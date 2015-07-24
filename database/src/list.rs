@@ -197,6 +197,15 @@ impl ValueList {
         ].concat();
         writer.write(&*data)
     }
+
+    pub fn debug_object(&self) -> String {
+        let mut serialized_data = vec![];
+        let serialized = self.dump(&mut serialized_data).unwrap();
+        let encoding = match *self {
+            ValueList::Data(_) => "linkedlist",
+        };
+        format!("Value at:0x0000000000 refcount:1 encoding:{} serializedlength:{} lru:0 lru_seconds_idle:0", encoding, serialized).to_owned()
+    }
 }
 
 #[cfg(test)]
