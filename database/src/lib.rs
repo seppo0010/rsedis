@@ -911,7 +911,7 @@ impl Value {
         let sets = try!(get_set_list(set_values, &emptyset));
 
         match *self {
-            Value::Nil => Ok(HashSet::new()),
+            Value::Nil => Ok(emptyset.sunion(sets)),
             Value::Set(ref value) => Ok(value.sunion(sets)),
             _ => Err(OperationError::WrongTypeError),
         }
@@ -2436,6 +2436,22 @@ mod test_command {
                 vec![&v1, &v2].iter().cloned().cloned().collect::<HashSet<_>>());
 
         assert_eq!(value1.sunion(&vec![&value2, &Value::Nil]).unwrap(),
+                vec![&v1, &v2, &v3].iter().cloned().cloned().collect::<HashSet<_>>());
+    }
+
+    #[test]
+    fn sunion_nil() {
+        let value1 = Value::Nil;
+        let mut value2 = Value::Nil;
+        let v1 = vec![1, 2, 3, 4];
+        let v2 = vec![5, 6, 7, 8];
+        let v3 = vec![0, 9, 1, 2];
+
+        assert_eq!(value2.sadd(v1.clone(), 100).unwrap(), true);
+        assert_eq!(value2.sadd(v2.clone(), 100).unwrap(), true);
+        assert_eq!(value2.sadd(v3.clone(), 100).unwrap(), true);
+
+        assert_eq!(value1.sunion(&vec![&value2]).unwrap(),
                 vec![&v1, &v2, &v3].iter().cloned().cloned().collect::<HashSet<_>>());
     }
 
