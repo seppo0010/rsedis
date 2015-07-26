@@ -1,6 +1,5 @@
 #![feature(collections_bound)]
 #![feature(drain)]
-#![feature(vecmap)]
 
 extern crate config;
 extern crate logger;

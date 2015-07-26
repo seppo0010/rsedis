@@ -1,4 +1,3 @@
-use std::collections::VecMap;
 use std::collections::HashSet;
 use std::io;
 use std::io::Write;
@@ -14,20 +13,20 @@ use rand::distributions::{Sample, IndependentSample, Range};
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum ValueSet {
-    Integer(VecMap<()>),
+    Integer(HashSet<usize>),
     Data(HashSet<Vec<u8>>),
 }
 
 impl ValueSet {
     pub fn new() -> ValueSet {
-        ValueSet::Integer(VecMap::new())
+        ValueSet::Integer(HashSet::new())
     }
 
     pub fn create_with_hashset(h: HashSet<Vec<u8>>) -> ValueSet {
-        let mut s = VecMap::new();
+        let mut s = HashSet::new();
         for v in h.iter() {
             match vec_to_usize(&v) {
-                Ok(n) => { s.insert(n, ()); },
+                Ok(n) => { s.insert(n); },
                 Err(_) => break,
             }
         }
@@ -49,8 +48,8 @@ impl ValueSet {
         let mut h = HashSet::new();
         match *self {
             ValueSet::Integer(ref mut set) => {
-                for i in set.keys() {
-                    h.insert(usize_to_vec(i));
+                for i in set.iter() {
+                    h.insert(usize_to_vec(i.clone()));
                 }
             },
             ValueSet::Data(_) => return,
@@ -63,7 +62,7 @@ impl ValueSet {
             ValueSet::Integer(ref mut set) => {
                 if set.len() < max_int_size {
                     match vec_to_usize(&el) {
-                        Ok(v) => return set.insert(v, ()).is_none(),
+                        Ok(v) => return set.insert(v),
                         Err(_) => (), // no return
                     }
                 }
@@ -80,7 +79,7 @@ impl ValueSet {
         match *self {
             ValueSet::Data(ref mut set) => set.remove(el),
             ValueSet::Integer(ref mut set) => match vec_to_usize(&el) {
-                Ok(v) => set.remove(&v).is_some(),
+                Ok(v) => set.remove(&v),
                 Err(_) => false, // only have usize, removing not a usize
             }
         }
@@ -90,7 +89,7 @@ impl ValueSet {
         match *self {
             ValueSet::Data(ref set) => set.contains(el),
             ValueSet::Integer(ref set) => match vec_to_usize(&el) {
-                Ok(v) => set.contains_key(&v),
+                Ok(v) => set.contains(&v),
                 Err(_) => false, // only have usize, removing not a usize
             }
         }
@@ -106,7 +105,7 @@ impl ValueSet {
     pub fn smembers(&self) -> Vec<Vec<u8>> {
         match *self {
             ValueSet::Data(ref set) => set.iter().map(|x| x.clone()).collect::<Vec<_>>(),
-            ValueSet::Integer(ref set) => set.keys().map(|x| usize_to_vec(x)).collect::<Vec<_>>()
+            ValueSet::Integer(ref set) => set.iter().map(|x| usize_to_vec(x.clone())).collect::<Vec<_>>()
         }
     }
 
@@ -142,11 +141,11 @@ impl ValueSet {
         r
     }
 
-    fn srandmember_integer(&self, set: &VecMap<()>, count: usize, allow_duplicates: bool) -> Vec<Vec<u8>> {
+    fn srandmember_integer(&self, set: &HashSet<usize>, count: usize, allow_duplicates: bool) -> Vec<Vec<u8>> {
         // TODO: implemented in O(n), should be O(1)
         let mut r = Vec::new();
         for pos in self.get_random_positions(set.len(), count, allow_duplicates) {
-            r.push(usize_to_vec(set.keys().skip(pos).take(1).next().unwrap()));
+            r.push(usize_to_vec(set.iter().skip(pos).take(1).next().unwrap().clone()));
         }
         r
     }
@@ -165,7 +164,7 @@ impl ValueSet {
         if count >= len {
             return match *self {
                 ValueSet::Data(ref mut set) => set.drain().collect::<Vec<_>>(),
-                ValueSet::Integer(ref mut set) => set.drain().map(|(x, _)| usize_to_vec(x)).collect::<Vec<_>>(),
+                ValueSet::Integer(ref mut set) => set.drain().map(|x| usize_to_vec(x)).collect::<Vec<_>>(),
             };
         }
 
@@ -183,7 +182,7 @@ impl ValueSet {
             ValueSet::Integer(ref mut set) => {
                 let mut r = Vec::new();
                 for pos in positions {
-                    let el = set.keys().skip(pos).take(1).next().unwrap();
+                    let el = set.iter().skip(pos).take(1).next().unwrap().clone();
                     set.remove(&el);
                     r.push(usize_to_vec(el));
                 }
@@ -199,8 +198,8 @@ impl ValueSet {
                 for newvalue in sets {
                     match *newvalue {
                         ValueSet::Integer(ref set) => {
-                            for el in set.keys() {
-                                elements.remove(&usize_to_vec(el));
+                            for el in set.iter() {
+                                elements.remove(&usize_to_vec(el.clone()));
                             }
                         }
                         ValueSet::Data(ref set) => {
@@ -213,11 +212,11 @@ impl ValueSet {
                 elements
             },
             ValueSet::Integer(ref original_set) => {
-                let mut elements: VecMap<_> = original_set.clone();
+                let mut elements: HashSet<usize> = original_set.clone();
                 for newvalue in sets {
                     match *newvalue {
                         ValueSet::Integer(ref set) => {
-                            for el in set.keys() {
+                            for el in set.iter() {
                                 elements.remove(&el);
                             }
                         }
@@ -225,13 +224,13 @@ impl ValueSet {
                             for el in set {
                                 match vec_to_usize(el) {
                                     Ok(i) => elements.remove(&i),
-                                    Err(_) => None,
+                                    Err(_) => false,
                                 };
                             }
                         },
                     }
                 }
-                elements.iter().map(|(x, _)| usize_to_vec(x)).collect()
+                elements.iter().map(|x| usize_to_vec(x.clone())).collect()
             }
         }
     }
@@ -243,7 +242,7 @@ impl ValueSet {
                 for newvalue in sets {
                     match *newvalue {
                         ValueSet::Integer(ref set) => {
-                            result = result.intersection(&set.keys().map(|x| usize_to_vec(x)).collect::<HashSet<_>>()).cloned().collect();
+                            result = result.intersection(&set.iter().map(|x| usize_to_vec(x.clone())).collect::<HashSet<_>>()).cloned().collect();
                         },
                         ValueSet::Data(ref set) => {
                             result = result.intersection(set).cloned().collect();
@@ -254,11 +253,11 @@ impl ValueSet {
                 result
             },
             ValueSet::Integer(ref original_set) => {
-                let mut result: HashSet<usize> = original_set.keys().collect::<HashSet<_>>();
+                let mut result: HashSet<usize> = original_set.iter().cloned().collect::<HashSet<_>>();
                 for newvalue in sets {
                     match *newvalue {
                         ValueSet::Integer(ref set) => {
-                            result = result.intersection(&set.keys().collect::<HashSet<_>>()).cloned().collect();
+                            result = result.intersection(&set.iter().cloned().collect::<HashSet<_>>()).cloned().collect();
                         },
                         ValueSet::Data(ref set) => {
                             result = result.intersection(&set.iter().filter_map(|x| vec_to_usize(x).ok()).collect::<HashSet<_>>()).cloned().collect();
@@ -266,7 +265,7 @@ impl ValueSet {
                     }
                     if result.len() == 0 { break; }
                 }
-                result.into_iter().map(|x| usize_to_vec(x)).collect()
+                result.into_iter().map(|x| usize_to_vec(x.clone())).collect()
             }
         }
     }
@@ -274,12 +273,12 @@ impl ValueSet {
     pub fn sunion(&self, sets: Vec<&ValueSet>) -> HashSet<Vec<u8>> {
         let mut result: HashSet<Vec<u8>> = match *self {
             ValueSet::Data(ref original_set) => original_set.clone(),
-            ValueSet::Integer(ref set) => set.keys().map(|x| usize_to_vec(x)).collect::<HashSet<_>>(),
+            ValueSet::Integer(ref set) => set.iter().map(|x| usize_to_vec(x.clone())).collect::<HashSet<_>>(),
         };
         for newvalue in sets {
             match *newvalue {
                 ValueSet::Integer(ref set) => {
-                    result = result.union(&set.keys().map(|x| usize_to_vec(x)).collect::<HashSet<_>>()).cloned().collect();
+                    result = result.union(&set.iter().map(|x| usize_to_vec(x.clone())).collect::<HashSet<_>>()).cloned().collect();
                 },
                 ValueSet::Data(ref set) => {
                     result = result.union(set).cloned().collect();
@@ -295,7 +294,7 @@ impl ValueSet {
         match *self {
             ValueSet::Integer(ref set) => {
                 settype = TYPE_SET_INTSET;
-                let max = set.keys().rev().take(1).next().unwrap();
+                let max = set.iter().max().unwrap().clone();
                 let encoding = if max <= 0xff {
                     2
                 } else if max <= 0xffff {
@@ -309,11 +308,11 @@ impl ValueSet {
                 let mut tmp = vec![];
                 encode_u32_to_slice_u8(encoding, &mut tmp).unwrap();
                 encode_u32_to_slice_u8(set.len() as u32, &mut tmp).unwrap();
-                for item in set.keys() {
+                for item in set.iter() {
                     let r = match encoding {
-                        2 => encode_u16_to_slice_u8(item as u16, &mut tmp),
-                        4 => encode_u32_to_slice_u8(item as u32, &mut tmp),
-                        8 => encode_u64_to_slice_u8(item as u64, &mut tmp),
+                        2 => encode_u16_to_slice_u8(item.clone() as u16, &mut tmp),
+                        4 => encode_u32_to_slice_u8(item.clone() as u32, &mut tmp),
+                        8 => encode_u64_to_slice_u8(item.clone() as u64, &mut tmp),
                         _ => panic!("Unexpected encoding {}", encoding),
                     };
                     match r {
