@@ -1,4 +1,5 @@
 #![feature(collections_bound)]
+extern crate util;
 
 use std::collections::Bound;
 use std::error::Error;
@@ -6,6 +7,8 @@ use std::fmt;
 use std::iter;
 use std::num::{ParseIntError,ParseFloatError};
 use std::str::{from_utf8,Utf8Error};
+
+use util::format_repr;
 
 /// A command argument
 #[derive(Debug, Clone)]
@@ -335,6 +338,13 @@ impl Parser {
     }
 }
 
+impl fmt::Debug for Parser {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        try!(f.write_str("Parser: "));
+        format_repr(f, &(&*self.data)[self.position..self.written])
+    }
+}
+
 #[cfg(test)]
 mod test_parser {
     use super::{parse, ParseError, Parser};
@@ -437,5 +447,17 @@ mod test_parser {
         }
         parser.next().unwrap();
         assert_eq!(parser.next().unwrap_err(), ParseError::Incomplete);
+    }
+
+    #[test]
+    fn parser_debug_formatter() {
+        let mut parser = Parser::new();
+        let message = b"*2\r\n$3\r\n\x01\x00\x08\r\n$4\r\n\xffarz\r\n";
+        {
+            parser.written += message.len();
+            let mut v = parser.get_mut();
+            v.extend(&*message.to_vec());
+        }
+        assert_eq!(format!("{:?}", parser), "Parser: \"*2\\r\\n$3\\r\\n\\x01\\x00\\b\\r\\n$4\\r\\n\\xffarz\\r\\n\"");
     }
 }
