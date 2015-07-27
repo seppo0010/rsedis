@@ -129,21 +129,21 @@ start_server {tags {"string"}} {
         list [r getset foo xyz] [r get foo]
     } {bar xyz}
 
-    test {MSET base case} {
+    xtest {MSET base case} {
         r mset x 10 y "foo bar" z "x x x x x x x\n\n\r\n"
         r mget x y z
     } [list 10 {foo bar} "x x x x x x x\n\n\r\n"]
 
-    test {MSET wrong number of args} {
+    xtest {MSET wrong number of args} {
         catch {r mset x 10 y "foo bar" z} err
         format $err
     } {*wrong number*}
 
-    test {MSETNX with already existent key} {
+    xtest {MSETNX with already existent key} {
         list [r msetnx x1 xxx y2 yyy x 20] [r exists x1] [r exists y2]
     } {0 0 0}
 
-    test {MSETNX with not existing keys} {
+    xtest {MSETNX with not existing keys} {
         list [r msetnx x1 xxx y2 yyy] [r get x1] [r get y2]
     } {1 xxx yyy}
 
