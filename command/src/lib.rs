@@ -394,10 +394,10 @@ fn setrange(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Respons
 fn setbit(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 4, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
-    let index = try_validate!(parser.get_i64(2), "Invalid index");
-    validate!(index >= 0, "Invalid index");
-    let value = try_validate!(parser.get_i64(3), "Invalid value");
-    validate!(value == 0 || value == 1, "Value out of range");
+    let index = try_validate!(parser.get_i64(2), "ERR bit offset is not an integer or out of range");
+    validate!(index >= 0 && index < 4 * 1024 * 1024 * 1024, "ERR bit offset is not an integer or out of range");
+    let value = try_validate!(parser.get_i64(3), "ERR bit is not an integer or out of range");
+    validate!(value == 0 || value == 1, "ERR bit is not an integer or out of range");
     match db.get_or_create(dbindex, &key).setbit(index as usize, value == 1) {
         Ok(s) => Response::Integer(if s { 1 } else { 0 }),
         Err(e) => Response::Error(e.to_string()),
