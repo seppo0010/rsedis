@@ -960,7 +960,7 @@ fn smove(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
 
     {
         match db.get(dbindex, &destination_key) {
-            Some(e) => if !e.is_set() { return Response::Error("Invalid destination".to_owned()); },
+            Some(e) => if !e.is_set() { return Response::Error("WRONGTYPE Operation against a key holding the wrong kind of value".to_owned()); },
             None => (),
         }
     }
@@ -2658,7 +2658,7 @@ mod test_command {
         assert_eq!(command(parser!(b"smove k1 k2 5"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(0));
 
         assert_eq!(command(parser!(b"set k3 value"), &mut db, &mut Client::mock()).unwrap(), Response::Status("OK".to_owned()));
-        assert_eq!(command(parser!(b"smove k1 k3 3"), &mut db, &mut Client::mock()).unwrap(), Response::Error("Invalid destination".to_owned()));
+        assert_eq!(command(parser!(b"smove k1 k3 3"), &mut db, &mut Client::mock()).unwrap(), Response::Error("WRONGTYPE Operation against a key holding the wrong kind of value".to_owned()));
     }
 
     #[test]
