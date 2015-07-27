@@ -385,10 +385,12 @@ fn setrange(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Respons
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let index = try_validate!(parser.get_i64(2), "Invalid index");
     let value = try_validate!(parser.get_vec(3), "Invalid value");
-    match db.get_or_create(dbindex, &key).setrange(index, value) {
+    let r = match db.get_or_create(dbindex, &key).setrange(index, value) {
         Ok(s) => Response::Integer(s as i64),
         Err(e) => Response::Error(e.to_string()),
-    }
+    };
+    db.key_updated(dbindex, &key);
+    r
 }
 
 fn setbit(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
