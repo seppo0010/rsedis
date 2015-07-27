@@ -119,12 +119,12 @@ start_server {tags {"string"}} {
         r mget foo baazz bar myset
     } {BAR {} FOO {}}
 
-    test {GETSET (set new value)} {
+    xtest {GETSET (set new value)} {
         r del foo
         list [r getset foo xyz] [r get foo]
     } {{} xyz}
 
-    test {GETSET (replace old value)} {
+    xtest {GETSET (replace old value)} {
         r set foo bar
         list [r getset foo xyz] [r get foo]
     } {bar xyz}
