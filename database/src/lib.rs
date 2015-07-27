@@ -1712,6 +1712,7 @@ impl Database {
         }
         let val = Value::Nil;
         self.data[index].insert(key.clone(), val);
+        self.remove_msexpiration(index, key);
         return self.data[index].get_mut(key).unwrap();
     }
 
