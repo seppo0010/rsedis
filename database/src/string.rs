@@ -147,6 +147,10 @@ impl ValueString {
     }
 
     pub fn setrange(&mut self, _index: i64, data: Vec<u8>) -> usize {
+        if data.len() == 0 {
+            return self.strlen();
+        }
+
         match *self {
             ValueString::Integer(i) => *self = ValueString::Data(format!("{}", i).into_bytes()),
             ValueString::Data(_) => (),
