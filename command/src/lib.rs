@@ -338,12 +338,12 @@ fn append(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response 
     r
 }
 
-fn generic_get(db: &Database, dbindex: usize, key: Vec<u8>) -> Response {
+fn generic_get(db: &Database, dbindex: usize, key: Vec<u8>, err_on_wrongtype: bool) -> Response {
     let obj = db.get(dbindex, &key);
     match obj {
         Some(value) => match value.get() {
             Ok(r) => Response::Data(r),
-            Err(err) => Response::Error(err.to_string()),
+            Err(err) => if err_on_wrongtype { Response::Error(err.to_string()) } else { Response::Nil },
         },
         None => Response::Nil,
     }
@@ -352,7 +352,7 @@ fn generic_get(db: &Database, dbindex: usize, key: Vec<u8>) -> Response {
 fn get(parser: ParsedCommand, db: &Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 2, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
-    generic_get(db, dbindex, key)
+    generic_get(db, dbindex, key, true)
 }
 
 fn mget(parser: ParsedCommand, db: &Database, dbindex: usize) -> Response {
@@ -360,7 +360,7 @@ fn mget(parser: ParsedCommand, db: &Database, dbindex: usize) -> Response {
     let mut responses = Vec::with_capacity(parser.argv.len() - 1);
     for i in 1..parser.argv.len() {
         let key = try_validate!(parser.get_vec(i), "Invalid key");
-        responses.push(generic_get(db, dbindex, key));
+        responses.push(generic_get(db, dbindex, key, false));
     }
     Response::Array(responses)
 }
