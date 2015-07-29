@@ -8,6 +8,8 @@ environment:
 build: false
 
 test_script:
+  - cargo build
+  - tclsh tests/test_helper.tcl
   - cargo test --verbose --package command
   - cargo test --verbose --package compat
   - cargo test --verbose --package config
