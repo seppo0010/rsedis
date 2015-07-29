@@ -96,8 +96,8 @@ fn generic_set(db: &mut Database, dbindex: usize, key: Vec<u8>, val: Vec<u8>, nx
 
 fn set(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() >= 3, "Wrong number of parameters");
-    let key = try_validate!(parser.get_vec(1), "Invalid key");
-    let val = try_validate!(parser.get_vec(2), "Invalid value");
+    let key = try_validate!(parser.get_vec(1), "ERR syntax error");
+    let val = try_validate!(parser.get_vec(2), "ERR syntax error");
     let mut nx = false;
     let mut xx = false;
     let mut expiration = None;
@@ -107,21 +107,21 @@ fn set(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
             skip = false;
             continue;
         }
-        let param = try_validate!(parser.get_str(i), "Invalid parameter");
+        let param = try_validate!(parser.get_str(i), "ERR syntax error");
         match &*param.to_ascii_lowercase() {
             "nx" => nx = true,
             "xx" => xx = true,
             "px" => {
-                let px = try_validate!(parser.get_i64(i + 1), "Invalid parameter");
+                let px = try_validate!(parser.get_i64(i + 1), "ERR syntax error");
                 expiration = Some(px);
                 skip = true;
             },
             "ex" => {
-                let ex = try_validate!(parser.get_i64(i + 1), "Invalid parameter");
+                let ex = try_validate!(parser.get_i64(i + 1), "ERR syntax error");
                 expiration = Some(ex * 1000);
                 skip = true;
             },
-            _ => return Response::Error("Invalid parameter".to_owned()),
+            _ => return Response::Error("ERR syntax error".to_owned()),
         }
     }
 
@@ -133,8 +133,8 @@ fn set(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
 
 fn setnx(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 3, "Wrong number of parameters");
-    let key = try_validate!(parser.get_vec(1), "Invalid key");
-    let val = try_validate!(parser.get_vec(2), "Invalid value");
+    let key = try_validate!(parser.get_vec(1), "ERR syntax error");
+    let val = try_validate!(parser.get_vec(2), "ERR syntax error");
     match generic_set(db, dbindex, key, val, true, false, None) {
         Ok(updated) => Response::Integer(if updated { 1 } else { 0 }),
         Err(r) => r
@@ -143,9 +143,9 @@ fn setnx(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
 
 fn setex(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 4, "Wrong number of parameters");
-    let key = try_validate!(parser.get_vec(1), "Invalid key");
-    let exp = try_validate!(parser.get_i64(2), "Invalid expiration");
-    let val = try_validate!(parser.get_vec(3), "Invalid value");
+    let key = try_validate!(parser.get_vec(1), "ERR syntax error");
+    let exp = try_validate!(parser.get_i64(2), "ERR syntax error");
+    let val = try_validate!(parser.get_vec(3), "ERR syntax error");
     match generic_set(db, dbindex, key, val, false, false, Some(exp * 1000)) {
         Ok(_) => Response::Status("OK".to_owned()),
         Err(r) => r
@@ -154,9 +154,9 @@ fn setex(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
 
 fn psetex(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 4, "Wrong number of parameters");
-    let key = try_validate!(parser.get_vec(1), "Invalid key");
-    let exp = try_validate!(parser.get_i64(2), "Invalid value");
-    let val = try_validate!(parser.get_vec(3), "Invalid value");
+    let key = try_validate!(parser.get_vec(1), "ERR syntax error");
+    let exp = try_validate!(parser.get_i64(2), "ERR syntax error");
+    let val = try_validate!(parser.get_vec(3), "ERR syntax error");
     match generic_set(db, dbindex, key, val, false, false, Some(exp)) {
         Ok(_) => Response::Status("OK".to_owned()),
         Err(r) => r
