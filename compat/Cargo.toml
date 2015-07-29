@@ -9,5 +9,5 @@ libc ="0.1.8"
 [target.x86_64-apple-darwin.dependencies]
 libc ="0.1.8"
 
-[target.x86_64-pc-windows-gnu.dependencies]
+[dependencies]
 kernel32-sys = "0.1.2"
