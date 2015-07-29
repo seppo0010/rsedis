@@ -146,7 +146,7 @@ impl ValueString {
         bitval != 0
     }
 
-    pub fn setrange(&mut self, _index: i64, data: Vec<u8>) -> usize {
+    pub fn setrange(&mut self, _index: usize, data: Vec<u8>) -> usize {
         if data.len() == 0 {
             return self.strlen();
         }
@@ -161,10 +161,7 @@ impl ValueString {
             _ => panic!("String must be data"),
         };
 
-        let mut index = match normalize_position(_index, d.len()) {
-            Ok(i) => i,
-            Err(g) => if !g { 0 } else { _index as usize },
-        };
+        let mut index = _index;
         for _ in d.len()..index {
             d.push(0);
         }

@@ -330,9 +330,17 @@ fn append(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response 
     validate!(parser.argv.len() == 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let val = try_validate!(parser.get_vec(2), "Invalid value");
-    let r = match db.get_or_create(dbindex, &key).append(val) {
-        Ok(len) => Response::Integer(len as i64),
-        Err(err) => Response::Error(err.to_string()),
+    let r = {
+        let oldval = db.get_or_create(dbindex, &key);
+        let oldlen = match oldval.strlen() {
+            Ok(len) => len,
+            Err(err) => return Response::Error(err.to_string()),
+        };
+        validate!(oldlen + val.len() <= 512*1024*1024, "ERR string exceeds maximum allowed size (512MB)");
+        match oldval.append(val) {
+            Ok(len) => Response::Integer(len as i64),
+            Err(err) => Response::Error(err.to_string()),
+        }
     };
     db.key_updated(dbindex, &key);
     r
@@ -383,11 +391,21 @@ fn getrange(parser: ParsedCommand, db: &Database, dbindex: usize) -> Response {
 fn setrange(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate!(parser.argv.len() == 4, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
-    let index = try_validate!(parser.get_i64(2), "Invalid index");
+    let index = {
+        let v = try_validate!(parser.get_i64(2), "Invalid index");
+        if v < 0 {
+            return Response::Error("ERR offset is out of range".to_owned());
+        }
+        v as usize
+    };
     let value = try_validate!(parser.get_vec(3), "Invalid value");
-    let r = match db.get_or_create(dbindex, &key).setrange(index, value) {
-        Ok(s) => Response::Integer(s as i64),
-        Err(e) => Response::Error(e.to_string()),
+    let r = {
+        let oldval = db.get_or_create(dbindex, &key);
+        validate!(index + value.len() <= 512*1024*1024, "ERR string exceeds maximum allowed size (512MB)");
+        match oldval.setrange(index, value) {
+            Ok(s) => Response::Integer(s as i64),
+            Err(e) => Response::Error(e.to_string()),
+        }
     };
     db.key_updated(dbindex, &key);
     r

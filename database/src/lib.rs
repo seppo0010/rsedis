@@ -360,7 +360,6 @@ impl Value {
     }
 
     /// Updates the string value overwriting with provided data from the index.
-    /// Negative index starts from the end.
     /// If the string was shorter than the index, it is filled with null bytes.
     /// Fails if the value is not a string.
     /// Returns the number of bytes with the new data appended
@@ -372,10 +371,8 @@ impl Value {
     /// let mut val = Value::Nil;
     /// assert_eq!(val.setrange(1, vec![1, 2]).unwrap(), 3);
     /// assert_eq!(val.get().unwrap(), vec![0, 1, 2]);
-    /// assert_eq!(val.setrange(-1, vec![100, 101]).unwrap(), 4);
-    /// assert_eq!(val.get().unwrap(), vec![0, 1, 100, 101]);
     /// ```
-    pub fn setrange(&mut self, index: i64, data: Vec<u8>) -> Result<usize, OperationError> {
+    pub fn setrange(&mut self, index: usize, data: Vec<u8>) -> Result<usize, OperationError> {
         match *self {
             Value::Nil => *self = Value::String(ValueString::Data(Vec::new())),
             Value::String(_) => (),
