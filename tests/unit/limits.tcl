@@ -1,5 +1,5 @@
 start_server {tags {"limits"} overrides {maxclients 10}} {
-    test {Check if maxclients works refusing connections} {
+    xtest {Check if maxclients works refusing connections} {
         set c 0
         catch {
             while {$c < 50} {

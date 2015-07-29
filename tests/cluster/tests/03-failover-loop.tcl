@@ -5,11 +5,11 @@
 
 source "../tests/includes/init-tests.tcl"
 
-test "Create a 5 nodes cluster" {
+xtest "Create a 5 nodes cluster" {
     create_cluster 5 5
 }
 
-test "Cluster is up" {
+xtest "Cluster is up" {
     assert_cluster_state ok
 }
 
@@ -39,7 +39,7 @@ while {[incr iterations -1]} {
     puts "--- Iteration $iterations ---"
 
     if {$role eq {master}} {
-        test "Wait for slave of #$tokill to sync" {
+        xtest "Wait for slave of #$tokill to sync" {
             wait_for_condition 1000 50 {
                 [string match {*state=online*} [RI $tokill slave0]]
             } else {
@@ -49,7 +49,7 @@ while {[incr iterations -1]} {
         set slave_config_epoch [CI $slave cluster_my_epoch]
     }
 
-    test "Cluster is writable before failover" {
+    xtest "Cluster is writable before failover" {
         for {set i 0} {$i < 100} {incr i} {
             catch {$cluster set $key:$i $val:$i} err
             assert {$err eq {OK}}
@@ -61,12 +61,12 @@ while {[incr iterations -1]} {
         }
     }
 
-    test "Killing node #$tokill" {
+    xtest "Killing node #$tokill" {
         kill_instance redis $tokill
     }
 
     if {$role eq {master}} {
-        test "Wait failover by #$slave with old epoch $slave_config_epoch" {
+        xtest "Wait failover by #$slave with old epoch $slave_config_epoch" {
             wait_for_condition 1000 50 {
                 [CI $slave cluster_my_epoch] > $slave_config_epoch
             } else {
@@ -75,22 +75,22 @@ while {[incr iterations -1]} {
         }
     }
 
-    test "Cluster should eventually be up again" {
+    xtest "Cluster should eventually be up again" {
         assert_cluster_state ok
     }
 
-    test "Cluster is writable again" {
+    xtest "Cluster is writable again" {
         for {set i 0} {$i < 100} {incr i} {
             catch {$cluster set $key:$i:2 $val:$i:2} err
             assert {$err eq {OK}}
         }
     }
 
-    test "Restarting node #$tokill" {
+    xtest "Restarting node #$tokill" {
         restart_instance redis $tokill
     }
 
-    test "Instance #$tokill is now a slave" {
+    xtest "Instance #$tokill is now a slave" {
         wait_for_condition 1000 50 {
             [RI $tokill role] eq {slave}
         } else {
@@ -98,7 +98,7 @@ while {[incr iterations -1]} {
         }
     }
 
-    test "We can read back the value we set before" {
+    xtest "We can read back the value we set before" {
         for {set i 0} {$i < 100} {incr i} {
             catch {$cluster get $key:$i} err
             assert {$err eq "$val:$i"}
@@ -108,7 +108,7 @@ while {[incr iterations -1]} {
     }
 }
 
-test "Post condition: current_epoch >= my_epoch everywhere" {
+xtest "Post condition: current_epoch >= my_epoch everywhere" {
     foreach_redis_id id {
         assert {[CI $id cluster_current_epoch] >= [CI $id cluster_my_epoch]}
     }

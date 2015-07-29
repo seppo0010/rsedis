@@ -1,5 +1,5 @@
 start_server {tags {"obuf-limits"}} {
-    test {Client output buffer hard limit is enforced} {
+    xtest {Client output buffer hard limit is enforced} {
         r config set client-output-buffer-limit {pubsub 100000 0 0}
         set rd1 [redis_deferring_client]
 
@@ -19,7 +19,7 @@ start_server {tags {"obuf-limits"}} {
         $rd1 close
     }
 
-    test {Client output buffer soft limit is not enforced if time is not overreached} {
+    xtest {Client output buffer soft limit is not enforced if time is not overreached} {
         r config set client-output-buffer-limit {pubsub 0 100000 10}
         set rd1 [redis_deferring_client]
 
@@ -45,7 +45,7 @@ start_server {tags {"obuf-limits"}} {
         $rd1 close
     }
 
-    test {Client output buffer soft limit is enforced if time is overreached} {
+    xtest {Client output buffer soft limit is enforced if time is overreached} {
         r config set client-output-buffer-limit {pubsub 0 100000 3}
         set rd1 [redis_deferring_client]
 

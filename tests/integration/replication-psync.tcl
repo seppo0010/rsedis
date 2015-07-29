@@ -29,7 +29,7 @@ proc test_psync {descr duration backlog_size backlog_ttl delay cond} {
             set load_handle1 [start_bg_complex_data $master_host $master_port 11 100000]
             set load_handle2 [start_bg_complex_data $master_host $master_port 12 100000]
 
-            test {Slave should be able to synchronize with the master} {
+            xtest {Slave should be able to synchronize with the master} {
                 $slave slaveof $master_host $master_port
                 wait_for_condition 50 100 {
                     [lindex [r role] 0] eq {slave} &&
@@ -40,7 +40,7 @@ proc test_psync {descr duration backlog_size backlog_ttl delay cond} {
             }
 
             # Check that the background clients are actually writing.
-            test {Detect write load to master} {
+            xtest {Detect write load to master} {
                 wait_for_condition 50 100 {
                     [$master dbsize] > 100
                 } else {
@@ -48,7 +48,7 @@ proc test_psync {descr duration backlog_size backlog_ttl delay cond} {
                 }
             }
 
-            test "Test replication partial resync: $descr" {
+            xtest "Test replication partial resync: $descr" {
                 # Now while the clients are writing data, break the maste-slave
                 # link multiple times.
                 for {set j 0} {$j < $duration*10} {incr j} {
@@ -98,6 +98,7 @@ proc test_psync {descr duration backlog_size backlog_ttl delay cond} {
     }
 }
 
+proc disabled {} {
 test_psync {ok psync} 6 1000000 3600 0 {
     assert {[s -1 sync_partial_ok] > 0}
 }
@@ -112,4 +113,5 @@ test_psync {ok after delay} 3 100000000 3600 3 {
 
 test_psync {backlog expired} 3 100000000 1 3 {
     assert {[s -1 sync_partial_err] > 0}
+}
 }

@@ -6,15 +6,15 @@ source "../tests/includes/init-tests.tcl"
 
 # Create a cluster with 5 master and 10 slaves, so that we have 2
 # slaves for each master.
-test "Create a 5 nodes cluster" {
+xtest "Create a 5 nodes cluster" {
     create_cluster 5 10
 }
 
-test "Cluster is up" {
+xtest "Cluster is up" {
     assert_cluster_state ok
 }
 
-test "Each master should have two replicas attached" {
+xtest "Each master should have two replicas attached" {
     foreach_redis_id id {
         if {$id < 5} {
             wait_for_condition 1000 50 {
@@ -26,7 +26,7 @@ test "Each master should have two replicas attached" {
     }
 }
 
-test "Killing all the slaves of master #0 and #1" {
+xtest "Killing all the slaves of master #0 and #1" {
     kill_instance redis 5
     kill_instance redis 10
     kill_instance redis 6
@@ -36,7 +36,7 @@ test "Killing all the slaves of master #0 and #1" {
 
 foreach_redis_id id {
     if {$id < 5} {
-        test "Master #$id should have at least one replica" {
+        xtest "Master #$id should have at least one replica" {
             wait_for_condition 1000 50 {
                 [llength [lindex [R $id role] 2]] >= 1
             } else {

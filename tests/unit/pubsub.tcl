@@ -47,7 +47,7 @@ start_server {tags {"pubsub"}} {
         __consume_subscribe_messages $client punsubscribe $channels
     }
 
-    test "Pub/Sub PING" {
+    xtest "Pub/Sub PING" {
         set rd1 [redis_deferring_client]
         subscribe $rd1 somechannel
         # While subscribed to non-zero channels PING works in Pub/Sub mode.
@@ -63,7 +63,7 @@ start_server {tags {"pubsub"}} {
         list $reply1 $reply2 $reply3
     } {{pong {}} {pong foo} PONG}
 
-    test "PUBLISH/SUBSCRIBE basics" {
+    xtest "PUBLISH/SUBSCRIBE basics" {
         set rd1 [redis_deferring_client]
 
         # subscribe to two channels
@@ -88,7 +88,7 @@ start_server {tags {"pubsub"}} {
         $rd1 close
     }
 
-    test "PUBLISH/SUBSCRIBE with two clients" {
+    xtest "PUBLISH/SUBSCRIBE with two clients" {
         set rd1 [redis_deferring_client]
         set rd2 [redis_deferring_client]
 
@@ -103,7 +103,7 @@ start_server {tags {"pubsub"}} {
         $rd2 close
     }
 
-    test "PUBLISH/SUBSCRIBE after UNSUBSCRIBE without arguments" {
+    xtest "PUBLISH/SUBSCRIBE after UNSUBSCRIBE without arguments" {
         set rd1 [redis_deferring_client]
         assert_equal {1 2 3} [subscribe $rd1 {chan1 chan2 chan3}]
         unsubscribe $rd1
@@ -115,7 +115,7 @@ start_server {tags {"pubsub"}} {
         $rd1 close
     }
 
-    test "SUBSCRIBE to one channel more than once" {
+    xtest "SUBSCRIBE to one channel more than once" {
         set rd1 [redis_deferring_client]
         assert_equal {1 1 1} [subscribe $rd1 {chan1 chan1 chan1}]
         assert_equal 1 [r publish chan1 hello]
@@ -125,7 +125,7 @@ start_server {tags {"pubsub"}} {
         $rd1 close
     }
 
-    test "UNSUBSCRIBE from non-subscribed channels" {
+    xtest "UNSUBSCRIBE from non-subscribed channels" {
         set rd1 [redis_deferring_client]
         assert_equal {0 0 0} [unsubscribe $rd1 {foo bar quux}]
 
@@ -133,7 +133,7 @@ start_server {tags {"pubsub"}} {
         $rd1 close
     }
 
-    test "PUBLISH/PSUBSCRIBE basics" {
+    xtest "PUBLISH/PSUBSCRIBE basics" {
         set rd1 [redis_deferring_client]
 
         # subscribe to two patterns
@@ -161,7 +161,7 @@ start_server {tags {"pubsub"}} {
         $rd1 close
     }
 
-    test "PUBLISH/PSUBSCRIBE with two clients" {
+    xtest "PUBLISH/PSUBSCRIBE with two clients" {
         set rd1 [redis_deferring_client]
         set rd2 [redis_deferring_client]
 
@@ -176,7 +176,7 @@ start_server {tags {"pubsub"}} {
         $rd2 close
     }
 
-    test "PUBLISH/PSUBSCRIBE after PUNSUBSCRIBE without arguments" {
+    xtest "PUBLISH/PSUBSCRIBE after PUNSUBSCRIBE without arguments" {
         set rd1 [redis_deferring_client]
         assert_equal {1 2 3} [psubscribe $rd1 {chan1.* chan2.* chan3.*}]
         punsubscribe $rd1
@@ -188,7 +188,7 @@ start_server {tags {"pubsub"}} {
         $rd1 close
     }
 
-    test "PUNSUBSCRIBE from non-subscribed channels" {
+    xtest "PUNSUBSCRIBE from non-subscribed channels" {
         set rd1 [redis_deferring_client]
         assert_equal {0 0 0} [punsubscribe $rd1 {foo.* bar.* quux.*}]
 
@@ -196,11 +196,11 @@ start_server {tags {"pubsub"}} {
         $rd1 close
     }
 
-    test "NUMSUB returns numbers, not strings (#1561)" {
+    xtest "NUMSUB returns numbers, not strings (#1561)" {
         r pubsub numsub abc def
     } {abc 0 def 0}
 
-    test "Mix SUBSCRIBE and PSUBSCRIBE" {
+    xtest "Mix SUBSCRIBE and PSUBSCRIBE" {
         set rd1 [redis_deferring_client]
         assert_equal {1} [subscribe $rd1 {foo.bar}]
         assert_equal {2} [psubscribe $rd1 {foo.*}]
@@ -213,7 +213,7 @@ start_server {tags {"pubsub"}} {
         $rd1 close
     }
 
-    test "PUNSUBSCRIBE and UNSUBSCRIBE should always reply" {
+    xtest "PUNSUBSCRIBE and UNSUBSCRIBE should always reply" {
         # Make sure we are not subscribed to any channel at all.
         r punsubscribe
         r unsubscribe
@@ -225,7 +225,7 @@ start_server {tags {"pubsub"}} {
 
     ### Keyspace events notification tests
 
-    test "Keyspace notifications: we receive keyspace notifications" {
+    xtest "Keyspace notifications: we receive keyspace notifications" {
         r config set notify-keyspace-events KA
         set rd1 [redis_deferring_client]
         assert_equal {1} [psubscribe $rd1 *]
@@ -234,7 +234,7 @@ start_server {tags {"pubsub"}} {
         $rd1 close
     }
 
-    test "Keyspace notifications: we receive keyevent notifications" {
+    xtest "Keyspace notifications: we receive keyevent notifications" {
         r config set notify-keyspace-events EA
         set rd1 [redis_deferring_client]
         assert_equal {1} [psubscribe $rd1 *]
@@ -243,7 +243,7 @@ start_server {tags {"pubsub"}} {
         $rd1 close
     }
 
-    test "Keyspace notifications: we can receive both kind of events" {
+    xtest "Keyspace notifications: we can receive both kind of events" {
         r config set notify-keyspace-events KEA
         set rd1 [redis_deferring_client]
         assert_equal {1} [psubscribe $rd1 *]
@@ -253,7 +253,7 @@ start_server {tags {"pubsub"}} {
         $rd1 close
     }
 
-    test "Keyspace notifications: we are able to mask events" {
+    xtest "Keyspace notifications: we are able to mask events" {
         r config set notify-keyspace-events KEl
         r del mylist
         set rd1 [redis_deferring_client]
@@ -266,7 +266,7 @@ start_server {tags {"pubsub"}} {
         $rd1 close
     }
 
-    test "Keyspace notifications: general events test" {
+    xtest "Keyspace notifications: general events test" {
         r config set notify-keyspace-events KEg
         set rd1 [redis_deferring_client]
         assert_equal {1} [psubscribe $rd1 *]
@@ -280,7 +280,7 @@ start_server {tags {"pubsub"}} {
         $rd1 close
     }
 
-    test "Keyspace notifications: list events test" {
+    xtest "Keyspace notifications: list events test" {
         r config set notify-keyspace-events KEl
         r del mylist
         set rd1 [redis_deferring_client]
@@ -297,7 +297,7 @@ start_server {tags {"pubsub"}} {
         $rd1 close
     }
 
-    test "Keyspace notifications: set events test" {
+    xtest "Keyspace notifications: set events test" {
         r config set notify-keyspace-events Ks
         r del myset
         set rd1 [redis_deferring_client]
@@ -312,7 +312,7 @@ start_server {tags {"pubsub"}} {
         $rd1 close
     }
 
-    test "Keyspace notifications: zset events test" {
+    xtest "Keyspace notifications: zset events test" {
         r config set notify-keyspace-events Kz
         r del myzset
         set rd1 [redis_deferring_client]
@@ -327,7 +327,7 @@ start_server {tags {"pubsub"}} {
         $rd1 close
     }
 
-    test "Keyspace notifications: hash events test" {
+    xtest "Keyspace notifications: hash events test" {
         r config set notify-keyspace-events Kh
         r del myhash
         set rd1 [redis_deferring_client]
@@ -339,7 +339,7 @@ start_server {tags {"pubsub"}} {
         $rd1 close
     }
 
-    test "Keyspace notifications: expired events (triggered expire)" {
+    xtest "Keyspace notifications: expired events (triggered expire)" {
         r config set notify-keyspace-events Ex
         r del foo
         set rd1 [redis_deferring_client]
@@ -354,7 +354,7 @@ start_server {tags {"pubsub"}} {
         $rd1 close
     }
 
-    test "Keyspace notifications: expired events (background expire)" {
+    xtest "Keyspace notifications: expired events (background expire)" {
         r config set notify-keyspace-events Ex
         r del foo
         set rd1 [redis_deferring_client]
@@ -364,7 +364,7 @@ start_server {tags {"pubsub"}} {
         $rd1 close
     }
 
-    test "Keyspace notifications: evicted events" {
+    xtest "Keyspace notifications: evicted events" {
         r config set notify-keyspace-events Ee
         r config set maxmemory-policy allkeys-lru
         r flushdb
@@ -377,7 +377,7 @@ start_server {tags {"pubsub"}} {
         $rd1 close
     }
 
-    test "Keyspace notifications: test CONFIG GET/SET of event flags" {
+    xtest "Keyspace notifications: test CONFIG GET/SET of event flags" {
         r config set notify-keyspace-events gKE
         assert_equal {gKE} [lindex [r config get notify-keyspace-events] 1]
         r config set notify-keyspace-events {$lshzxeKE}

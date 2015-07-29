@@ -2,23 +2,23 @@
 
 source "../tests/includes/init-tests.tcl"
 
-test "Create a 5 nodes cluster" {
+xtest "Create a 5 nodes cluster" {
     create_cluster 5 5
 }
 
-test "Cluster is up" {
+xtest "Cluster is up" {
     assert_cluster_state ok
 }
 
-test "Cluster is writable" {
+xtest "Cluster is writable" {
     cluster_write_test 0
 }
 
-test "Instance #5 is a slave" {
+xtest "Instance #5 is a slave" {
     assert {[RI 5 role] eq {slave}}
 }
 
-test "Instance #5 synced with the master" {
+xtest "Instance #5 synced with the master" {
     wait_for_condition 1000 50 {
         [RI 5 master_link_status] eq {up}
     } else {
@@ -34,7 +34,7 @@ set cluster [redis_cluster 127.0.0.1:[get_instance_attrib redis 0 port]]
 catch {unset content}
 array set content {}
 
-test "Send CLUSTER FAILOVER to #5, during load" {
+xtest "Send CLUSTER FAILOVER to #5, during load" {
     for {set j 0} {$j < $numops} {incr j} {
         # Write random data to random list.
         set listid [randomInt $numkeys]
@@ -59,7 +59,7 @@ test "Send CLUSTER FAILOVER to #5, during load" {
     }
 }
 
-test "Wait for failover" {
+xtest "Wait for failover" {
     wait_for_condition 1000 50 {
         [CI 1 cluster_current_epoch] > $current_epoch
     } else {
@@ -67,26 +67,26 @@ test "Wait for failover" {
     }
 }
 
-test "Cluster should eventually be up again" {
+xtest "Cluster should eventually be up again" {
     assert_cluster_state ok
 }
 
-test "Cluster is writable" {
+xtest "Cluster is writable" {
     cluster_write_test 1
 }
 
-test "Instance #5 is now a master" {
+xtest "Instance #5 is now a master" {
     assert {[RI 5 role] eq {master}}
 }
 
-test "Verify $numkeys keys for consistency with logical content" {
+xtest "Verify $numkeys keys for consistency with logical content" {
     # Check that the Redis Cluster content matches our logical content.
     foreach {key value} [array get content] {
         assert {[$cluster lrange $key 0 -1] eq $value}
     }
 }
 
-test "Instance #0 gets converted into a slave" {
+xtest "Instance #0 gets converted into a slave" {
     wait_for_condition 1000 50 {
         [RI 0 role] eq {slave}
     } else {
@@ -98,23 +98,23 @@ test "Instance #0 gets converted into a slave" {
 
 source "../tests/includes/init-tests.tcl"
 
-test "Create a 5 nodes cluster" {
+xtest "Create a 5 nodes cluster" {
     create_cluster 5 5
 }
 
-test "Cluster is up" {
+xtest "Cluster is up" {
     assert_cluster_state ok
 }
 
-test "Cluster is writable" {
+xtest "Cluster is writable" {
     cluster_write_test 0
 }
 
-test "Instance #5 is a slave" {
+xtest "Instance #5 is a slave" {
     assert {[RI 5 role] eq {slave}}
 }
 
-test "Instance #5 synced with the master" {
+xtest "Instance #5 synced with the master" {
     wait_for_condition 1000 50 {
         [RI 5 master_link_status] eq {up}
     } else {
@@ -122,21 +122,21 @@ test "Instance #5 synced with the master" {
     }
 }
 
-test "Make instance #0 unreachable without killing it" {
+xtest "Make instance #0 unreachable without killing it" {
     R 0 deferred 1
     R 0 DEBUG SLEEP 10
 }
 
-test "Send CLUSTER FAILOVER to instance #5" {
+xtest "Send CLUSTER FAILOVER to instance #5" {
     R 5 cluster failover
 }
 
-test "Instance #5 is still a slave after some time (no failover)" {
+xtest "Instance #5 is still a slave after some time (no failover)" {
     after 5000
     assert {[RI 5 role] eq {master}}
 }
 
-test "Wait for instance #0 to return back alive" {
+xtest "Wait for instance #0 to return back alive" {
     R 0 deferred 0
     assert {[R 0 read] eq {OK}}
 }
@@ -145,23 +145,23 @@ test "Wait for instance #0 to return back alive" {
 
 source "../tests/includes/init-tests.tcl"
 
-test "Create a 5 nodes cluster" {
+xtest "Create a 5 nodes cluster" {
     create_cluster 5 5
 }
 
-test "Cluster is up" {
+xtest "Cluster is up" {
     assert_cluster_state ok
 }
 
-test "Cluster is writable" {
+xtest "Cluster is writable" {
     cluster_write_test 0
 }
 
-test "Instance #5 is a slave" {
+xtest "Instance #5 is a slave" {
     assert {[RI 5 role] eq {slave}}
 }
 
-test "Instance #5 synced with the master" {
+xtest "Instance #5 synced with the master" {
     wait_for_condition 1000 50 {
         [RI 5 master_link_status] eq {up}
     } else {
@@ -169,16 +169,16 @@ test "Instance #5 synced with the master" {
     }
 }
 
-test "Make instance #0 unreachable without killing it" {
+xtest "Make instance #0 unreachable without killing it" {
     R 0 deferred 1
     R 0 DEBUG SLEEP 10
 }
 
-test "Send CLUSTER FAILOVER to instance #5" {
+xtest "Send CLUSTER FAILOVER to instance #5" {
     R 5 cluster failover force
 }
 
-test "Instance #5 is a master after some time" {
+xtest "Instance #5 is a master after some time" {
     wait_for_condition 1000 50 {
         [RI 5 role] eq {master}
     } else {
@@ -186,7 +186,7 @@ test "Instance #5 is a master after some time" {
     }
 }
 
-test "Wait for instance #0 to return back alive" {
+xtest "Wait for instance #0 to return back alive" {
     R 0 deferred 0
     assert {[R 0 read] eq {OK}}
 }

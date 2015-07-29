@@ -1,39 +1,39 @@
 start_server {tags {"keyspace"}} {
-    test {DEL against a single item} {
+    xtest {DEL against a single item} {
         r set x foo
         assert {[r get x] eq "foo"}
         r del x
         r get x
     } {}
 
-    test {Vararg DEL} {
+    xtest {Vararg DEL} {
         r set foo1 a
         r set foo2 b
         r set foo3 c
         list [r del foo1 foo2 foo3 foo4] [r mget foo1 foo2 foo3]
     } {3 {{} {} {}}}
 
-    test {KEYS with pattern} {
+    xtest {KEYS with pattern} {
         foreach key {key_x key_y key_z foo_a foo_b foo_c} {
             r set $key hello
         }
         lsort [r keys foo*]
     } {foo_a foo_b foo_c}
 
-    test {KEYS to get all keys} {
+    xtest {KEYS to get all keys} {
         lsort [r keys *]
     } {foo_a foo_b foo_c key_x key_y key_z}
 
-    test {DBSIZE} {
+    xtest {DBSIZE} {
         r dbsize
     } {6}
 
-    test {DEL all keys} {
+    xtest {DEL all keys} {
         foreach key [r keys *] {r del $key}
         r dbsize
     } {0}
 
-    test "DEL against expired key" {
+    xtest "DEL against expired key" {
         r debug set-active-expire 0
         r setex keyExpire 1 valExpire
         after 1100
@@ -41,7 +41,7 @@ start_server {tags {"keyspace"}} {
         r debug set-active-expire 1
     }
 
-    test {EXISTS} {
+    xtest {EXISTS} {
         set res {}
         r set newkey test
         append res [r exists newkey]
@@ -49,7 +49,7 @@ start_server {tags {"keyspace"}} {
         append res [r exists newkey]
     } {10}
 
-    test {Zero length value in key. SET/GET/EXISTS} {
+    xtest {Zero length value in key. SET/GET/EXISTS} {
         r set emptykey {}
         set res [r get emptykey]
         append res [r exists emptykey]
@@ -57,7 +57,7 @@ start_server {tags {"keyspace"}} {
         append res [r exists emptykey]
     } {10}
 
-    test {Commands pipelining} {
+    xtest {Commands pipelining} {
         set fd [r channel]
         puts -nonewline $fd "SET k1 xyzk\r\nGET k1\r\nPING\r\n"
         flush $fd
@@ -68,23 +68,23 @@ start_server {tags {"keyspace"}} {
         format $res
     } {1xyzk1}
 
-    test {Non existing command} {
+    xtest {Non existing command} {
         catch {r foobaredcommand} err
         string match ERR* $err
     } {1}
 
-    test {RENAME basic usage} {
+    xtest {RENAME basic usage} {
         r set mykey hello
         r rename mykey mykey1
         r rename mykey1 mykey2
         r get mykey2
     } {hello}
 
-    test {RENAME source key should no longer exist} {
+    xtest {RENAME source key should no longer exist} {
         r exists mykey
     } {0}
 
-    test {RENAME against already existing key} {
+    xtest {RENAME against already existing key} {
         r set mykey a
         r set mykey2 b
         r rename mykey2 mykey
@@ -92,7 +92,7 @@ start_server {tags {"keyspace"}} {
         append res [r exists mykey2]
     } {b0}
 
-    test {RENAMENX basic usage} {
+    xtest {RENAMENX basic usage} {
         r del mykey
         r del mykey2
         r set mykey foobar
@@ -101,39 +101,39 @@ start_server {tags {"keyspace"}} {
         append res [r exists mykey]
     } {foobar0}
 
-    test {RENAMENX against already existing key} {
+    xtest {RENAMENX against already existing key} {
         r set mykey foo
         r set mykey2 bar
         r renamenx mykey mykey2
     } {0}
 
-    test {RENAMENX against already existing key (2)} {
+    xtest {RENAMENX against already existing key (2)} {
         set res [r get mykey]
         append res [r get mykey2]
     } {foobar}
 
-    test {RENAME against non existing source key} {
+    xtest {RENAME against non existing source key} {
         catch {r rename nokey foobar} err
         format $err
     } {ERR*}
 
-    test {RENAME where source and dest key are the same (existing)} {
+    xtest {RENAME where source and dest key are the same (existing)} {
         r set mykey foo
         r rename mykey mykey
     } {OK}
 
-    test {RENAMENX where source and dest key are the same (existing)} {
+    xtest {RENAMENX where source and dest key are the same (existing)} {
         r set mykey foo
         r renamenx mykey mykey
     } {0}
 
-    test {RENAME where source and dest key are the same (non existing)} {
+    xtest {RENAME where source and dest key are the same (non existing)} {
         r del mykey
         catch {r rename mykey mykey} err
         format $err
     } {ERR*}
 
-    test {RENAME with volatile key, should move the TTL as well} {
+    xtest {RENAME with volatile key, should move the TTL as well} {
         r del mykey mykey2
         r set mykey foo
         r expire mykey 100
@@ -142,7 +142,7 @@ start_server {tags {"keyspace"}} {
         assert {[r ttl mykey2] > 95 && [r ttl mykey2] <= 100}
     }
 
-    test {RENAME with volatile key, should not inherit TTL of target key} {
+    xtest {RENAME with volatile key, should not inherit TTL of target key} {
         r del mykey mykey2
         r set mykey foo
         r set mykey2 bar
@@ -152,14 +152,14 @@ start_server {tags {"keyspace"}} {
         r ttl mykey2
     } {-1}
 
-    test {DEL all keys again (DB 0)} {
+    xtest {DEL all keys again (DB 0)} {
         foreach key [r keys *] {
             r del $key
         }
         r dbsize
     } {0}
 
-    test {DEL all keys again (DB 1)} {
+    xtest {DEL all keys again (DB 1)} {
         r select 10
         foreach key [r keys *] {
             r del $key
@@ -169,7 +169,7 @@ start_server {tags {"keyspace"}} {
         format $res
     } {0}
 
-    test {MOVE basic usage} {
+    xtest {MOVE basic usage} {
         r set mykey foobar
         r move mykey 10
         set res {}
@@ -182,18 +182,18 @@ start_server {tags {"keyspace"}} {
         format $res
     } [list 0 0 foobar 1]
 
-    test {MOVE against key existing in the target DB} {
+    xtest {MOVE against key existing in the target DB} {
         r set mykey hello
         r move mykey 10
     } {0}
 
-    test {MOVE against non-integer DB (#1428)} {
+    xtest {MOVE against non-integer DB (#1428)} {
         r set mykey hello
         catch {r move mykey notanumber} e
         set e
     } {*ERR*index out of range}
 
-    test {SET/GET keys in different DBs} {
+    xtest {SET/GET keys in different DBs} {
         r set a hello
         r set b world
         r select 10
@@ -210,7 +210,7 @@ start_server {tags {"keyspace"}} {
         format $res
     } {hello world foo bared}
 
-    test {RANDOMKEY} {
+    xtest {RANDOMKEY} {
         r flushdb
         r set foo x
         r set bar y
@@ -228,19 +228,19 @@ start_server {tags {"keyspace"}} {
         list $foo_seen $bar_seen
     } {1 1}
 
-    test {RANDOMKEY against empty DB} {
+    xtest {RANDOMKEY against empty DB} {
         r flushdb
         r randomkey
     } {}
 
-    test {RANDOMKEY regression 1} {
+    xtest {RANDOMKEY regression 1} {
         r flushdb
         r set x 10
         r del x
         r randomkey
     } {}
 
-    test {KEYS * two times with long key, Github issue #1208} {
+    xtest {KEYS * two times with long key, Github issue #1208} {
         r flushdb
         r set dlskeriewrioeuwqoirueioqwrueoqwrueqw test
         r keys *

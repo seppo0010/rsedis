@@ -5,24 +5,24 @@
 source "../tests/includes/init-tests.tcl"
 
 # Create a cluster with 5 master and 5 slaves.
-test "Create a 5 nodes cluster" {
+xtest "Create a 5 nodes cluster" {
     create_cluster 5 5
 }
 
-test "Cluster is up" {
+xtest "Cluster is up" {
     assert_cluster_state ok
 }
 
-test "The first master has actually one slave" {
+xtest "The first master has actually one slave" {
     assert {[llength [lindex [R 0 role] 2]] == 1}
 }
 
-test {Slaves of #0 is instance #5 as expected} {
+xtest {Slaves of #0 is instance #5 as expected} {
     set port0 [get_instance_attrib redis 0 port]
     assert {[lindex [R 5 role] 2] == $port0}
 }
 
-test "Instance #5 synced with the master" {
+xtest "Instance #5 synced with the master" {
     wait_for_condition 1000 50 {
         [RI 5 master_link_status] eq {up}
     } else {
@@ -30,11 +30,11 @@ test "Instance #5 synced with the master" {
     }
 }
 
-test "Lower the slave validity factor of #5 to the value of 2" {
+xtest "Lower the slave validity factor of #5 to the value of 2" {
     assert {[R 5 config set cluster-slave-validity-factor 2] eq {OK}}
 }
 
-test "Break master-slave link and prevent further reconnections" {
+xtest "Break master-slave link and prevent further reconnections" {
     # Stop the slave with a multi/exec transaction so that the master will
     # be killed as soon as it can accept writes again.
     R 5 multi
@@ -59,15 +59,15 @@ test "Break master-slave link and prevent further reconnections" {
     kill_instance redis 0
 }
 
-test "Slave #5 is reachable and alive" {
+xtest "Slave #5 is reachable and alive" {
     assert {[R 5 ping] eq {PONG}}
 }
 
-test "Slave #5 should not be able to failover" {
+xtest "Slave #5 should not be able to failover" {
     after 10000
     assert {[RI 5 role] eq {slave}}
 }
 
-test "Cluster should be down" {
+xtest "Cluster should be down" {
     assert_cluster_state fail
 }

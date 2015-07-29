@@ -3,7 +3,7 @@ set system_name [string tolower [exec uname -s]]
 
 if {$system_name eq {linux} || $system_name eq {darwin}} {
     start_server [list overrides [list dir $server_path]] {
-        test "Server is able to generate a stack trace on selected systems" {
+        xtest "Server is able to generate a stack trace on selected systems" {
             r config set watchdog-period 200
             r debug sleep 1
             set pattern "*debugCommand*"

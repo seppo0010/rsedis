@@ -1,5 +1,5 @@
 start_server {tags {"expire"}} {
-    test {EXPIRE - set timeouts multiple times} {
+    xtest {EXPIRE - set timeouts multiple times} {
         r set x foobar
         set v1 [r expire x 5]
         set v2 [r ttl x]
@@ -9,18 +9,18 @@ start_server {tags {"expire"}} {
         list $v1 $v2 $v3 $v4
     } {1 [45] 1 10}
 
-    test {EXPIRE - It should be still possible to read 'x'} {
+    xtest {EXPIRE - It should be still possible to read 'x'} {
         r get x
     } {foobar}
 
     tags {"slow"} {
-        test {EXPIRE - After 2.1 seconds the key should no longer be here} {
+        xtest {EXPIRE - After 2.1 seconds the key should no longer be here} {
             after 2100
             list [r get x] [r exists x]
         } {{} 0}
     }
 
-    test {EXPIRE - write on expire should work} {
+    xtest {EXPIRE - write on expire should work} {
         r del x
         r lpush x foo
         r expire x 1000
@@ -28,52 +28,52 @@ start_server {tags {"expire"}} {
         r lrange x 0 -1
     } {bar foo}
 
-    test {EXPIREAT - Check for EXPIRE alike behavior} {
+    xtest {EXPIREAT - Check for EXPIRE alike behavior} {
         r del x
         r set x foo
         r expireat x [expr [clock seconds]+15]
         r ttl x
     } {1[345]}
 
-    test {SETEX - Set + Expire combo operation. Check for TTL} {
-        r setex x 12 test
+    xtest {SETEX - Set + Expire combo operation. Check for TTL} {
+        r setex x 12 xtest
         r ttl x
     } {1[012]}
 
-    test {SETEX - Check value} {
+    xtest {SETEX - Check value} {
         r get x
-    } {test}
+    } {xtest}
 
-    test {SETEX - Overwrite old key} {
+    xtest {SETEX - Overwrite old key} {
         r setex y 1 foo
         r get y
     } {foo}
 
     tags {"slow"} {
-        test {SETEX - Wait for the key to expire} {
+        xtest {SETEX - Wait for the key to expire} {
             after 1100
             r get y
         } {}
     }
 
-    test {SETEX - Wrong time parameter} {
+    xtest {SETEX - Wrong time parameter} {
         catch {r setex z -10 foo} e
         set _ $e
     } {*invalid expire*}
 
-    test {PERSIST can undo an EXPIRE} {
+    xtest {PERSIST can undo an EXPIRE} {
         r set x foo
         r expire x 50
         list [r ttl x] [r persist x] [r ttl x] [r get x]
     } {50 1 -1 foo}
 
-    test {PERSIST returns 0 against non existing or non volatile keys} {
+    xtest {PERSIST returns 0 against non existing or non volatile keys} {
         r set x foo
         list [r persist foo] [r persist nokeyatall]
     } {0 0}
 
-    test {EXPIRE pricision is now the millisecond} {
-        # This test is very likely to do a false positive if the
+    xtest {EXPIRE pricision is now the millisecond} {
+        # This xtest is very likely to do a false positive if the
         # server is under pressure, so if it does not work give it a few more
         # chances.
         for {set j 0} {$j < 3} {incr j} {
@@ -88,8 +88,8 @@ start_server {tags {"expire"}} {
         list $a $b
     } {somevalue {}}
 
-    test {PEXPIRE/PSETEX/PEXPIREAT can set sub-second expires} {
-        # This test is very likely to do a false positive if the
+    xtest {PEXPIRE/PSETEX/PEXPIREAT can set sub-second expires} {
+        # This xtest is very likely to do a false positive if the
         # server is under pressure, so if it does not work give it a few more
         # chances.
         for {set j 0} {$j < 3} {incr j} {
@@ -121,32 +121,32 @@ start_server {tags {"expire"}} {
         list $a $b
     } {somevalue {}}
 
-    test {TTL returns tiem to live in seconds} {
+    xtest {TTL returns tiem to live in seconds} {
         r del x
         r setex x 10 somevalue
         set ttl [r ttl x]
         assert {$ttl > 8 && $ttl <= 10}
     }
 
-    test {PTTL returns time to live in milliseconds} {
+    xtest {PTTL returns time to live in milliseconds} {
         r del x
         r setex x 1 somevalue
         set ttl [r pttl x]
         assert {$ttl > 900 && $ttl <= 1000}
     }
 
-    test {TTL / PTTL return -1 if key has no expire} {
+    xtest {TTL / PTTL return -1 if key has no expire} {
         r del x
         r set x hello
         list [r ttl x] [r pttl x]
     } {-1 -1}
 
-    test {TTL / PTTL return -2 if key does not exit} {
+    xtest {TTL / PTTL return -2 if key does not exit} {
         r del x
         list [r ttl x] [r pttl x]
     } {-2 -2}
 
-    test {Redis should actively expire keys incrementally} {
+    xtest {Redis should actively expire keys incrementally} {
         r flushdb
         r psetex key1 500 a
         r psetex key2 500 a
@@ -160,7 +160,7 @@ start_server {tags {"expire"}} {
         list $size1 $size2
     } {3 0}
 
-    test {Redis should lazy expire keys} {
+    xtest {Redis should lazy expire keys} {
         r flushdb
         r debug set-active-expire 0
         r psetex key1 500 a
@@ -178,7 +178,7 @@ start_server {tags {"expire"}} {
         list $size1 $size2 $size3
     } {3 3 0}
 
-    test {EXPIRE should not resurrect keys (issue #1026)} {
+    xtest {EXPIRE should not resurrect keys (issue #1026)} {
         r debug set-active-expire 0
         r set foo bar
         r pexpire foo 500
@@ -188,7 +188,7 @@ start_server {tags {"expire"}} {
         r exists foo
     } {0}
 
-    test {5 keys in, 5 keys out} {
+    xtest {5 keys in, 5 keys out} {
         r flushdb
         r set a c
         r expire a 5

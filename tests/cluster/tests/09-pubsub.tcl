@@ -2,7 +2,7 @@
 
 source "../tests/includes/init-tests.tcl"
 
-test "Create a 5 nodes cluster" {
+xtest "Create a 5 nodes cluster" {
     create_cluster 5 5
 }
 
@@ -31,10 +31,10 @@ proc test_cluster_publish {instance instances} {
     }
 }
 
-test "Test publishing to master" {
+xtest "Test publishing to master" {
     test_cluster_publish 0 10
 }
 
-test "Test publishing to slave" {
+xtest "Test publishing to slave" {
     test_cluster_publish 5 10
 }

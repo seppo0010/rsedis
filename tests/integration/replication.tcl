@@ -7,7 +7,7 @@ start_server {tags {"repl"}} {
         set B_host [srv 0 host]
         set B_port [srv 0 port]
 
-        test {Set instance A as slave of B} {
+        xtest {Set instance A as slave of B} {
             $A slaveof $B_host $B_port
             wait_for_condition 50 100 {
                 [lindex [$A role] 0] eq {slave} &&
@@ -17,7 +17,7 @@ start_server {tags {"repl"}} {
             }
         }
 
-        test {BRPOPLPUSH replication, when blocking against empty list} {
+        xtest {BRPOPLPUSH replication, when blocking against empty list} {
             set rd [redis_deferring_client]
             $rd brpoplpush a b 5
             r lpush a foo
@@ -28,7 +28,7 @@ start_server {tags {"repl"}} {
             }
         }
 
-        test {BRPOPLPUSH replication, list exists} {
+        xtest {BRPOPLPUSH replication, list exists} {
             set rd [redis_deferring_client]
             r lpush c 1
             r lpush c 2
@@ -38,7 +38,7 @@ start_server {tags {"repl"}} {
             assert_equal [$A debug digest] [$B debug digest]
         }
 
-        test {BLPOP followed by role change, issue #2473} {
+        xtest {BLPOP followed by role change, issue #2473} {
             set rd [redis_deferring_client]
             $rd blpop foo 0 ; # Block while B is a master
 
@@ -73,29 +73,30 @@ start_server {tags {"repl"}} {
     r set mykey foo
 
     start_server {} {
-        test {Second server should have role master at first} {
+        proc disabled {} {
+        xtest {Second server should have role master at first} {
             s role
         } {master}
 
-        test {SLAVEOF should start with link status "down"} {
+        xtest {SLAVEOF should start with link status "down"} {
             r slaveof [srv -1 host] [srv -1 port]
             s master_link_status
         } {down}
 
-        test {The role should immediately be changed to "slave"} {
+        xtest {The role should immediately be changed to "slave"} {
             s role
         } {slave}
 
         wait_for_sync r
-        test {Sync should have transferred keys from master} {
+        xtest {Sync should have transferred keys from master} {
             r get mykey
         } {foo}
 
-        test {The link status should be up} {
+        xtest {The link status should be up} {
             s master_link_status
         } {up}
 
-        test {SET on the master should immediately propagate} {
+        xtest {SET on the master should immediately propagate} {
             r -1 set mykey bar
 
             wait_for_condition 500 100 {
@@ -105,13 +106,13 @@ start_server {tags {"repl"}} {
             }
         }
 
-        test {FLUSHALL should replicate} {
+        xtest {FLUSHALL should replicate} {
             r -1 flushall
             if {$::valgrind} {after 2000}
             list [r -1 dbsize] [r 0 dbsize]
         } {0 0}
 
-        test {ROLE in master reports master with a slave} {
+        xtest {ROLE in master reports master with a slave} {
             set res [r -1 role]
             lassign $res role offset slaves
             assert {$role eq {master}}
@@ -121,16 +122,18 @@ start_server {tags {"repl"}} {
             assert {$slave_offset <= $offset}
         }
 
-        test {ROLE in slave reports slave in connected state} {
+        xtest {ROLE in slave reports slave in connected state} {
             set res [r role]
             lassign $res role master_host master_port slave_state slave_offset
             assert {$role eq {slave}}
             assert {$slave_state eq {connected}}
         }
+        }
     }
 }
 
 foreach dl {no yes} {
+    proc disabled {} {
     start_server {tags {"repl"}} {
         set master [srv 0 client]
         $master config set repl-diskless-sync $dl
@@ -148,7 +151,7 @@ foreach dl {no yes} {
                 lappend slaves [srv 0 client]
                 start_server {} {
                     lappend slaves [srv 0 client]
-                    test "Connect multiple slaves at the same time (issue #141), diskless=$dl" {
+                    xtest "Connect multiple slaves at the same time (issue #141), diskless=$dl" {
                         # Send SLAVEOF commands to slaves
                         [lindex $slaves 0] slaveof $master_host $master_port
                         [lindex $slaves 1] slaveof $master_host $master_port
@@ -211,5 +214,6 @@ foreach dl {no yes} {
                }
             }
         }
+    }
     }
 }

@@ -1,6 +1,8 @@
 proc start_bg_complex_data {host port db ops} {
+proc disabled {} {
     set tclsh [info nameofexecutable]
     exec $tclsh tests/helpers/bg_complex_data.tcl $host $port $db $ops &
+}
 }
 
 proc stop_bg_complex_data {handle} {
@@ -19,13 +21,13 @@ start_server {tags {"repl"}} {
         set load_handle1 [start_bg_complex_data $master_host $master_port 11 100000]
         set load_handle2 [start_bg_complex_data $master_host $master_port 12 100000]
 
-        test {First server should have role slave after SLAVEOF} {
+        xtest {First server should have role slave after SLAVEOF} {
             $slave slaveof $master_host $master_port
             after 1000
             s 0 role
         } {slave}
 
-        test {Test replication with parallel clients writing in differnet DBs} {
+        xtest {Test replication with parallel clients writing in differnet DBs} {
             after 5000
             stop_bg_complex_data $load_handle0
             stop_bg_complex_data $load_handle1
@@ -62,7 +64,7 @@ start_server {tags {"repl"}} {
         set master_port [srv -1 port]
         set slave [srv 0 client]
 
-        test {First server should have role slave after SLAVEOF} {
+        xtest {First server should have role slave after SLAVEOF} {
             $slave slaveof $master_host $master_port
             wait_for_condition 50 100 {
                 [s 0 master_link_status] eq {up}
@@ -71,20 +73,20 @@ start_server {tags {"repl"}} {
             }
         }
 
-        test {With min-slaves-to-write (1,3): master should be writable} {
+        xtest {With min-slaves-to-write (1,3): master should be writable} {
             $master config set min-slaves-max-lag 3
             $master config set min-slaves-to-write 1
             $master set foo bar
         } {OK}
 
-        test {With min-slaves-to-write (2,3): master should not be writable} {
+        xtest {With min-slaves-to-write (2,3): master should not be writable} {
             $master config set min-slaves-max-lag 3
             $master config set min-slaves-to-write 2
             catch {$master set foo bar} e
             set e
         } {NOREPLICAS*}
 
-        test {With min-slaves-to-write: master not writable with lagged slave} {
+        xtest {With min-slaves-to-write: master not writable with lagged slave} {
             $master config set min-slaves-max-lag 2
             $master config set min-slaves-to-write 1
             assert {[$master set foo bar] eq {OK}}
@@ -104,7 +106,7 @@ start_server {tags {"repl"}} {
         set master_port [srv -1 port]
         set slave [srv 0 client]
 
-        test {First server should have role slave after SLAVEOF} {
+        xtest {First server should have role slave after SLAVEOF} {
             $slave slaveof $master_host $master_port
             wait_for_condition 50 100 {
                 [s 0 role] eq {slave}
@@ -113,7 +115,7 @@ start_server {tags {"repl"}} {
             }
         }
 
-        test {Replication: commands with many arguments (issue #1221)} {
+        xtest {Replication: commands with many arguments (issue #1221)} {
             # We now issue large MSET commands, that may trigger a specific
             # class of bugs, see issue #1221.
             for {set j 0} {$j < 100} {incr j} {
@@ -133,7 +135,7 @@ start_server {tags {"repl"}} {
             assert {[$master dbsize] > 0}
         }
 
-        test {Replication of SPOP command -- alsoPropagate() API} {
+        xtest {Replication of SPOP command -- alsoPropagate() API} {
             $master del myset
             set size [expr 1+[randomInt 100]]
             set content {}

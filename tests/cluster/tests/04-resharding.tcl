@@ -5,11 +5,11 @@
 
 source "../tests/includes/init-tests.tcl"
 
-test "Create a 5 nodes cluster" {
+xtest "Create a 5 nodes cluster" {
     create_cluster 5 5
 }
 
-test "Cluster is up" {
+xtest "Cluster is up" {
     assert_cluster_state ok
 }
 
@@ -40,7 +40,7 @@ catch {unset content}
 array set content {}
 set tribpid {}
 
-test "Cluster consistency during live resharding" {
+xtest "Cluster consistency during live resharding" {
     for {set j 0} {$j < $numops} {incr j} {
         # Trigger the resharding once we execute half the ops.
         if {$tribpid ne {} &&
@@ -94,7 +94,7 @@ test "Cluster consistency during live resharding" {
 
 }
 
-test "Verify $numkeys keys for consistency with logical content" {
+xtest "Verify $numkeys keys for consistency with logical content" {
     # Check that the Redis Cluster content matches our logical content.
     foreach {key value} [array get content] {
         assert {[$cluster lrange $key 0 -1] eq $value}

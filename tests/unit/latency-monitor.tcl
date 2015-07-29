@@ -3,7 +3,7 @@ start_server {tags {"latency-monitor"}} {
     r config set latency-monitor-threshold 200
     r latency reset
 
-    test {Test latency events logging} {
+    xtest {Test latency events logging} {
         r debug sleep 0.3
         after 1100
         r debug sleep 0.4
@@ -12,7 +12,7 @@ start_server {tags {"latency-monitor"}} {
         assert {[r latency history command] >= 3}
     }
 
-    test {LATENCY HISTORY output is ok} {
+    xtest {LATENCY HISTORY output is ok} {
         set min 250
         set max 450
         foreach event [r latency history command] {
@@ -24,7 +24,7 @@ start_server {tags {"latency-monitor"}} {
         }
     }
 
-    test {LATENCY LATEST output is ok} {
+    xtest {LATENCY LATEST output is ok} {
         foreach event [r latency latest] {
             lassign $event eventname time latency max
             assert {$eventname eq "command"}
@@ -34,16 +34,16 @@ start_server {tags {"latency-monitor"}} {
         }
     }
 
-    test {LATENCY HISTORY / RESET with wrong event name is fine} {
+    xtest {LATENCY HISTORY / RESET with wrong event name is fine} {
         assert {[llength [r latency history blabla]] == 0}
         assert {[r latency reset blabla] == 0}
     }
 
-    test {LATENCY DOCTOR produces some output} {
+    xtest {LATENCY DOCTOR produces some output} {
         assert {[string length [r latency doctor]] > 0}
     }
 
-    test {LATENCY RESET is able to reset events} {
+    xtest {LATENCY RESET is able to reset events} {
         assert {[r latency reset] > 0}
         assert {[r latency latest] eq {}}
     }

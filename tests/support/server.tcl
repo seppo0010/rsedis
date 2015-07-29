@@ -37,7 +37,7 @@ proc kill_server config {
         catch {
             if {[string match {*Darwin*} [exec uname -a]]} {
                 tags {"leaks"} {
-                    test "Check for memory leaks (pid $pid)" {
+                    xtest "Check for memory leaks (pid $pid)" {
                         set output {0 leaks}
                         catch {exec leaks $pid} output
                         if {[string match {*process does not exist*} $output] ||

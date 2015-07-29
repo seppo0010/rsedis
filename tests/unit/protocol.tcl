@@ -1,66 +1,66 @@
 start_server {tags {"protocol"}} {
-    test "Handle an empty query" {
+    xtest "Handle an empty query" {
         reconnect
         r write "\r\n"
         r flush
         assert_equal "PONG" [r ping]
     }
 
-    test "Negative multibulk length" {
+    xtest "Negative multibulk length" {
         reconnect
         r write "*-10\r\n"
         r flush
         assert_equal PONG [r ping]
     }
 
-    test "Out of range multibulk length" {
+    xtest "Out of range multibulk length" {
         reconnect
         r write "*20000000\r\n"
         r flush
         assert_error "*invalid multibulk length*" {r read}
     }
 
-    test "Wrong multibulk payload header" {
+    xtest "Wrong multibulk payload header" {
         reconnect
         r write "*3\r\n\$3\r\nSET\r\n\$1\r\nx\r\nfooz\r\n"
         r flush
         assert_error "*expected '$', got 'f'*" {r read}
     }
 
-    test "Negative multibulk payload length" {
+    xtest "Negative multibulk payload length" {
         reconnect
         r write "*3\r\n\$3\r\nSET\r\n\$1\r\nx\r\n\$-10\r\n"
         r flush
         assert_error "*invalid bulk length*" {r read}
     }
 
-    test "Out of range multibulk payload length" {
+    xtest "Out of range multibulk payload length" {
         reconnect
         r write "*3\r\n\$3\r\nSET\r\n\$1\r\nx\r\n\$2000000000\r\n"
         r flush
         assert_error "*invalid bulk length*" {r read}
     }
 
-    test "Non-number multibulk payload length" {
+    xtest "Non-number multibulk payload length" {
         reconnect
         r write "*3\r\n\$3\r\nSET\r\n\$1\r\nx\r\n\$blabla\r\n"
         r flush
         assert_error "*invalid bulk length*" {r read}
     }
 
-    test "Multi bulk request not followed by bulk arguments" {
+    xtest "Multi bulk request not followed by bulk arguments" {
         reconnect
         r write "*1\r\nfoo\r\n"
         r flush
         assert_error "*expected '$', got 'f'*" {r read}
     }
 
-    test "Generic wrong number of args" {
+    xtest "Generic wrong number of args" {
         reconnect
         assert_error "*wrong*arguments*ping*" {r ping x y z}
     }
 
-    test "Unbalanced number of quotes" {
+    xtest "Unbalanced number of quotes" {
         reconnect
         r write "set \"\"\"test-key\"\"\" test-value\r\n"
         r write "ping\r\n"
@@ -71,7 +71,7 @@ start_server {tags {"protocol"}} {
     set c 0
     foreach seq [list "\x00" "*\x00" "$\x00"] {
         incr c
-        test "Protocol desync regression test #$c" {
+        xtest "Protocol desync regression test #$c" {
             set s [socket [srv 0 host] [srv 0 port]]
             puts -nonewline $s $seq
             set payload [string repeat A 1024]"\n"
@@ -101,7 +101,7 @@ start_server {tags {"protocol"}} {
 }
 
 start_server {tags {"regression"}} {
-    test "Regression for a crash with blocking ops and pipelining" {
+    xtest "Regression for a crash with blocking ops and pipelining" {
         set rd [redis_deferring_client]
         set fd [r channel]
         set proto "*3\r\n\$5\r\nBLPOP\r\n\$6\r\nnolist\r\n\$1\r\n0\r\n"

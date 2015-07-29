@@ -39,20 +39,20 @@ proc simulate_bit_op {op args} {
 }
 
 start_server {tags {"bitops"}} {
-    test {BITCOUNT returns 0 against non existing key} {
+    xtest {BITCOUNT returns 0 against non existing key} {
         r bitcount no-key
     } 0
 
     catch {unset num}
     foreach vec [list "" "\xaa" "\x00\x00\xff" "foobar" "123"] {
         incr num
-        test "BITCOUNT against test vector #$num" {
+        xtest "BITCOUNT against test vector #$num" {
             r set str $vec
             assert {[r bitcount str] == [count_bits $vec]}
         }
     }
 
-    test {BITCOUNT fuzzing without start/end} {
+    xtest {BITCOUNT fuzzing without start/end} {
         for {set j 0} {$j < 100} {incr j} {
             set str [randstring 0 3000]
             r set str $str
@@ -60,7 +60,7 @@ start_server {tags {"bitops"}} {
         }
     }
 
-    test {BITCOUNT fuzzing with start/end} {
+    xtest {BITCOUNT fuzzing with start/end} {
         for {set j 0} {$j < 100} {incr j} {
             set str [randstring 0 3000]
             r set str $str
@@ -74,7 +74,7 @@ start_server {tags {"bitops"}} {
         }
     }
 
-    test {BITCOUNT with start, end} {
+    xtest {BITCOUNT with start, end} {
         r set s "foobar"
         assert_equal [r bitcount s 0 -1] [count_bits "foobar"]
         assert_equal [r bitcount s 1 -2] [count_bits "ooba"]
@@ -82,12 +82,12 @@ start_server {tags {"bitops"}} {
         assert_equal [r bitcount s 0 1000] [count_bits "foobar"]
     }
 
-    test {BITCOUNT syntax error #1} {
+    xtest {BITCOUNT syntax error #1} {
         catch {r bitcount s 0} e
         set e
     } {ERR*syntax*}
 
-    test {BITCOUNT regression test for github issue #582} {
+    xtest {BITCOUNT regression test for github issue #582} {
         r del str
         r setbit foo 0 1
         if {[catch {r bitcount foo 0 4294967296} e]} {
@@ -98,37 +98,37 @@ start_server {tags {"bitops"}} {
         }
     } {1}
 
-    test {BITCOUNT misaligned prefix} {
+    xtest {BITCOUNT misaligned prefix} {
         r del str
         r set str ab
         r bitcount str 1 -1
     } {3}
 
-    test {BITCOUNT misaligned prefix + full words + remainder} {
+    xtest {BITCOUNT misaligned prefix + full words + remainder} {
         r del str
         r set str __PPxxxxxxxxxxxxxxxxRR__
         r bitcount str 2 -3
     } {74}
 
-    test {BITOP NOT (empty string)} {
+    xtest {BITOP NOT (empty string)} {
         r set s ""
         r bitop not dest s
         r get dest
     } {}
 
-    test {BITOP NOT (known string)} {
+    xtest {BITOP NOT (known string)} {
         r set s "\xaa\x00\xff\x55"
         r bitop not dest s
         r get dest
     } "\x55\xff\x00\xaa"
 
-    test {BITOP where dest and target are the same key} {
+    xtest {BITOP where dest and target are the same key} {
         r set s "\xaa\x00\xff\x55"
         r bitop not s s
         r get s
     } "\x55\xff\x00\xaa"
 
-    test {BITOP AND|OR|XOR don't change the string with single input key} {
+    xtest {BITOP AND|OR|XOR don't change the string with single input key} {
         r set a "\x01\x02\xff"
         r bitop and res1 a
         r bitop or  res2 a
@@ -136,7 +136,7 @@ start_server {tags {"bitops"}} {
         list [r get res1] [r get res2] [r get res3]
     } [list "\x01\x02\xff" "\x01\x02\xff" "\x01\x02\xff"]
 
-    test {BITOP missing key is considered a stream of zero} {
+    xtest {BITOP missing key is considered a stream of zero} {
         r set a "\x01\x02\xff"
         r bitop and res1 no-suck-key a
         r bitop or  res2 no-suck-key a no-such-key
@@ -144,7 +144,7 @@ start_server {tags {"bitops"}} {
         list [r get res1] [r get res2] [r get res3]
     } [list "\x00\x00\x00" "\x01\x02\xff" "\x01\x02\xff"]
 
-    test {BITOP shorter keys are zero-padded to the key with max length} {
+    xtest {BITOP shorter keys are zero-padded to the key with max length} {
         r set a "\x01\x02\xff\xff"
         r set b "\x01\x02\xff"
         r bitop and res1 a b
@@ -154,7 +154,7 @@ start_server {tags {"bitops"}} {
     } [list "\x01\x02\xff\x00" "\x01\x02\xff\xff" "\x00\x00\x00\xff"]
 
     foreach op {and or xor} {
-        test "BITOP $op fuzzing" {
+        xtest "BITOP $op fuzzing" {
             for {set i 0} {$i < 10} {incr i} {
                 r flushall
                 set vec {}
@@ -172,7 +172,7 @@ start_server {tags {"bitops"}} {
         }
     }
 
-    test {BITOP NOT fuzzing} {
+    xtest {BITOP NOT fuzzing} {
         for {set i 0} {$i < 10} {incr i} {
             r flushall
             set str [randstring 0 1000]
@@ -182,14 +182,14 @@ start_server {tags {"bitops"}} {
         }
     }
 
-    test {BITOP with integer encoded source objects} {
+    xtest {BITOP with integer encoded source objects} {
         r set a 1
         r set b 2
         r bitop xor dest a b a
         r get dest
     } {2}
 
-    test {BITOP with non string source key} {
+    xtest {BITOP with non string source key} {
         r del c
         r set a 1
         r set b 2
@@ -198,43 +198,43 @@ start_server {tags {"bitops"}} {
         set e
     } {WRONGTYPE*}
 
-    test {BITOP with empty string after non empty string (issue #529)} {
+    xtest {BITOP with empty string after non empty string (issue #529)} {
         r flushdb
         r set a "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
         r bitop or x a b
     } {32}
 
-    test {BITPOS bit=0 with empty key returns 0} {
+    xtest {BITPOS bit=0 with empty key returns 0} {
         r del str
         r bitpos str 0
     } {0}
 
-    test {BITPOS bit=1 with empty key returns -1} {
+    xtest {BITPOS bit=1 with empty key returns -1} {
         r del str
         r bitpos str 1
     } {-1}
 
-    test {BITPOS bit=0 with string less than 1 word works} {
+    xtest {BITPOS bit=0 with string less than 1 word works} {
         r set str "\xff\xf0\x00"
         r bitpos str 0
     } {12}
 
-    test {BITPOS bit=1 with string less than 1 word works} {
+    xtest {BITPOS bit=1 with string less than 1 word works} {
         r set str "\x00\x0f\x00"
         r bitpos str 1
     } {12}
 
-    test {BITPOS bit=0 starting at unaligned address} {
+    xtest {BITPOS bit=0 starting at unaligned address} {
         r set str "\xff\xf0\x00"
         r bitpos str 0 1
     } {12}
 
-    test {BITPOS bit=1 starting at unaligned address} {
+    xtest {BITPOS bit=1 starting at unaligned address} {
         r set str "\x00\x0f\xff"
         r bitpos str 1 1
     } {12}
 
-    test {BITPOS bit=0 unaligned+full word+reminder} {
+    xtest {BITPOS bit=0 unaligned+full word+reminder} {
         r del str
         r set str "\xff\xff\xff" ; # Prefix
         # Followed by two (or four in 32 bit systems) full words
@@ -254,7 +254,7 @@ start_server {tags {"bitops"}} {
         assert {[r bitpos str 0 8] == 216}
     }
 
-    test {BITPOS bit=1 unaligned+full word+reminder} {
+    xtest {BITPOS bit=1 unaligned+full word+reminder} {
         r del str
         r set str "\x00\x00\x00" ; # Prefix
         # Followed by two (or four in 32 bit systems) full words
@@ -274,7 +274,7 @@ start_server {tags {"bitops"}} {
         assert {[r bitpos str 1 8] == 216}
     }
 
-    test {BITPOS bit=1 returns -1 if string is all 0 bits} {
+    xtest {BITPOS bit=1 returns -1 if string is all 0 bits} {
         r set str ""
         for {set j 0} {$j < 20} {incr j} {
             assert {[r bitpos str 1] == -1}
@@ -282,7 +282,7 @@ start_server {tags {"bitops"}} {
         }
     }
 
-    test {BITPOS bit=0 works with intervals} {
+    xtest {BITPOS bit=0 works with intervals} {
         r set str "\x00\xff\x00"
         assert {[r bitpos str 0 0 -1] == 0}
         assert {[r bitpos str 0 1 -1] == 16}
@@ -291,7 +291,7 @@ start_server {tags {"bitops"}} {
         assert {[r bitpos str 0 1 1] == -1}
     }
 
-    test {BITPOS bit=1 works with intervals} {
+    xtest {BITPOS bit=1 works with intervals} {
         r set str "\x00\xff\x00"
         assert {[r bitpos str 1 0 -1] == 8}
         assert {[r bitpos str 1 1 -1] == 8}
@@ -300,14 +300,14 @@ start_server {tags {"bitops"}} {
         assert {[r bitpos str 1 1 1] == 8}
     }
 
-    test {BITPOS bit=0 changes behavior if end is given} {
+    xtest {BITPOS bit=0 changes behavior if end is given} {
         r set str "\xff\xff\xff"
         assert {[r bitpos str 0] == 24}
         assert {[r bitpos str 0 0] == 24}
         assert {[r bitpos str 0 0 -1] == -1}
     }
 
-    test {BITPOS bit=1 fuzzy testing using SETBIT} {
+    xtest {BITPOS bit=1 fuzzy testing using SETBIT} {
         r del str
         set max 524288; # 64k
         set first_one_pos -1
@@ -323,7 +323,7 @@ start_server {tags {"bitops"}} {
         }
     }
 
-    test {BITPOS bit=0 fuzzy testing using SETBIT} {
+    xtest {BITPOS bit=0 fuzzy testing using SETBIT} {
         set max 524288; # 64k
         set first_zero_pos $max
         r set str [string repeat "\xff" [expr $max/8]]

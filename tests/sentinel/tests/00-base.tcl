@@ -8,7 +8,7 @@ if {$::simulate_error} {
     }
 }
 
-test "Basic failover works if the master is down" {
+xtest "Basic failover works if the master is down" {
     set old_port [RI $master_id tcp_port]
     set addr [S 0 SENTINEL GET-MASTER-ADDR-BY-NAME mymaster]
     assert {[lindex $addr 1] == $old_port}
@@ -25,11 +25,11 @@ test "Basic failover works if the master is down" {
     set master_id [get_instance_id_by_port redis [lindex $addr 1]]
 }
 
-test "New master [join $addr {:}] role matches" {
+xtest "New master [join $addr {:}] role matches" {
     assert {[RI $master_id role] eq {master}}
 }
 
-test "All the other slaves now point to the new master" {
+xtest "All the other slaves now point to the new master" {
     foreach_redis_id id {
         if {$id != $master_id && $id != 0} {
             wait_for_condition 1000 50 {
@@ -41,7 +41,7 @@ test "All the other slaves now point to the new master" {
     }
 }
 
-test "The old master eventually gets reconfigured as a slave" {
+xtest "The old master eventually gets reconfigured as a slave" {
     wait_for_condition 1000 50 {
         [RI 0 master_port] == [lindex $addr 1]
     } else {
@@ -49,7 +49,7 @@ test "The old master eventually gets reconfigured as a slave" {
     }
 }
 
-test "ODOWN is not possible without N (quorum) Sentinels reports" {
+xtest "ODOWN is not possible without N (quorum) Sentinels reports" {
     foreach_sentinel_id id {
         S $id SENTINEL SET mymaster quorum [expr $sentinels+1]
     }
@@ -64,7 +64,7 @@ test "ODOWN is not possible without N (quorum) Sentinels reports" {
     restart_instance redis $master_id
 }
 
-test "Failover is not possible without majority agreement" {
+xtest "Failover is not possible without majority agreement" {
     foreach_sentinel_id id {
         S $id SENTINEL SET mymaster quorum $quorum
     }
@@ -88,7 +88,7 @@ test "Failover is not possible without majority agreement" {
     }
 }
 
-test "Failover works if we configure for absolute agreement" {
+xtest "Failover works if we configure for absolute agreement" {
     foreach_sentinel_id id {
         S $id SENTINEL SET mymaster quorum $sentinels
     }
@@ -121,6 +121,6 @@ test "Failover works if we configure for absolute agreement" {
     }
 }
 
-test "New master [join $addr {:}] role matches" {
+xtest "New master [join $addr {:}] role matches" {
     assert {[RI $master_id role] eq {master}}
 }

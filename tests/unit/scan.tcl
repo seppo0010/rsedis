@@ -1,5 +1,5 @@
 start_server {tags {"scan"}} {
-    test "SCAN basic" {
+    xtest "SCAN basic" {
         r flushdb
         r debug populate 1000
 
@@ -17,7 +17,7 @@ start_server {tags {"scan"}} {
         assert_equal 1000 [llength $keys]
     }
 
-    test "SCAN COUNT" {
+    xtest "SCAN COUNT" {
         r flushdb
         r debug populate 1000
 
@@ -35,7 +35,7 @@ start_server {tags {"scan"}} {
         assert_equal 1000 [llength $keys]
     }
 
-    test "SCAN MATCH" {
+    xtest "SCAN MATCH" {
         r flushdb
         r debug populate 1000
 
@@ -54,7 +54,7 @@ start_server {tags {"scan"}} {
     }
 
     foreach enc {intset hashtable} {
-        test "SSCAN with encoding $enc" {
+        xtest "SSCAN with encoding $enc" {
             # Create the Set
             r del set
             if {$enc eq {intset}} {
@@ -88,7 +88,7 @@ start_server {tags {"scan"}} {
     }
 
     foreach enc {ziplist hashtable} {
-        test "HSCAN with encoding $enc" {
+        xtest "HSCAN with encoding $enc" {
             # Create the Hash
             r del hash
             if {$enc eq {ziplist}} {
@@ -128,7 +128,7 @@ start_server {tags {"scan"}} {
     }
 
     foreach enc {ziplist skiplist} {
-        test "ZSCAN with encoding $enc" {
+        xtest "ZSCAN with encoding $enc" {
             # Create the Sorted Set
             r del zset
             if {$enc eq {ziplist}} {
@@ -167,7 +167,7 @@ start_server {tags {"scan"}} {
         }
     }
 
-    test "SCAN guarantees check under write load" {
+    xtest "SCAN guarantees check under write load" {
         r flushdb
         r debug populate 100
 
@@ -196,7 +196,7 @@ start_server {tags {"scan"}} {
         assert_equal 100 [llength $keys2]
     }
 
-    test "SSCAN with integer encoded object (issue #1345)" {
+    xtest "SSCAN with integer encoded object (issue #1345)" {
         set objects {1 a}
         r del set
         r sadd set {*}$objects
@@ -206,28 +206,28 @@ start_server {tags {"scan"}} {
         assert_equal [lsort -unique [lindex $res 1]] {1}
     }
 
-    test "SSCAN with PATTERN" {
+    xtest "SSCAN with PATTERN" {
         r del mykey
         r sadd mykey foo fab fiz foobar 1 2 3 4
         set res [r sscan mykey 0 MATCH foo* COUNT 10000]
         lsort -unique [lindex $res 1]
     } {foo foobar}
 
-    test "HSCAN with PATTERN" {
+    xtest "HSCAN with PATTERN" {
         r del mykey
         r hmset mykey foo 1 fab 2 fiz 3 foobar 10 1 a 2 b 3 c 4 d
         set res [r hscan mykey 0 MATCH foo* COUNT 10000]
         lsort -unique [lindex $res 1]
     } {1 10 foo foobar}
 
-    test "ZSCAN with PATTERN" {
+    xtest "ZSCAN with PATTERN" {
         r del mykey
         r zadd mykey 1 foo 2 fab 3 fiz 10 foobar
         set res [r zscan mykey 0 MATCH foo* COUNT 10000]
         lsort -unique [lindex $res 1]
     }
 
-    test "ZSCAN scores: regression test for issue #2175" {
+    xtest "ZSCAN scores: regression test for issue #2175" {
         r del mykey
         for {set j 0} {$j < 500} {incr j} {
             r zadd mykey 9.8813129168249309e-323 $j

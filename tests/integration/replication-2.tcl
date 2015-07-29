@@ -1,12 +1,12 @@
 start_server {tags {"repl"}} {
     start_server {} {
-        test {First server should have role slave after SLAVEOF} {
+        xtest {First server should have role slave after SLAVEOF} {
             r -1 slaveof [srv 0 host] [srv 0 port]
             after 1000
             s -1 role
         } {slave}
 
-        test {If min-slaves-to-write is honored, write is accepted} {
+        xtest {If min-slaves-to-write is honored, write is accepted} {
             r config set min-slaves-to-write 1
             r config set min-slaves-max-lag 10
             r set foo 12345
@@ -17,14 +17,14 @@ start_server {tags {"repl"}} {
             }
         }
 
-        test {No write if min-slaves-to-write is < attached slaves} {
+        xtest {No write if min-slaves-to-write is < attached slaves} {
             r config set min-slaves-to-write 2
             r config set min-slaves-max-lag 10
             catch {r set foo 12345} err
             set err
         } {NOREPLICAS*}
 
-        test {If min-slaves-to-write is honored, write is accepted (again)} {
+        xtest {If min-slaves-to-write is honored, write is accepted (again)} {
             r config set min-slaves-to-write 1
             r config set min-slaves-max-lag 10
             r set foo 12345
@@ -35,7 +35,7 @@ start_server {tags {"repl"}} {
             }
         }
 
-        test {No write if min-slaves-max-lag is > of the slave lag} {
+        xtest {No write if min-slaves-max-lag is > of the slave lag} {
             r -1 deferred 1
             r config set min-slaves-to-write 1
             r config set min-slaves-max-lag 2
@@ -48,7 +48,7 @@ start_server {tags {"repl"}} {
             set err
         } {NOREPLICAS*}
 
-        test {min-slaves-to-write is ignored by slaves} {
+        xtest {min-slaves-to-write is ignored by slaves} {
             r config set min-slaves-to-write 1
             r config set min-slaves-max-lag 10
             r -1 config set min-slaves-to-write 1
@@ -61,12 +61,14 @@ start_server {tags {"repl"}} {
             }
         }
 
+        proc disabled {} {
         # Fix parameters for the next test to work
         r config set min-slaves-to-write 0
         r -1 config set min-slaves-to-write 0
         r flushall
+        }
 
-        test {MASTER and SLAVE dataset should be identical after complex ops} {
+        xtest {MASTER and SLAVE dataset should be identical after complex ops} {
             createComplexDataset r 10000
             after 500
             if {[r debug digest] ne [r -1 debug digest]} {

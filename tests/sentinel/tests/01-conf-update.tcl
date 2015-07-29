@@ -2,7 +2,7 @@
 
 source "../tests/includes/init-tests.tcl"
 
-test "We can failover with Sentinel 1 crashed" {
+xtest "We can failover with Sentinel 1 crashed" {
     set old_port [RI $master_id tcp_port]
     set addr [S 0 SENTINEL GET-MASTER-ADDR-BY-NAME mymaster]
     assert {[lindex $addr 1] == $old_port}
@@ -25,7 +25,7 @@ test "We can failover with Sentinel 1 crashed" {
     set master_id [get_instance_id_by_port redis [lindex $addr 1]]
 }
 
-test "After Sentinel 1 is restarted, its config gets updated" {
+xtest "After Sentinel 1 is restarted, its config gets updated" {
     restart_instance sentinel 1
     wait_for_condition 1000 50 {
         [lindex [S 1 SENTINEL GET-MASTER-ADDR-BY-NAME mymaster] 1] != $old_port
@@ -34,6 +34,6 @@ test "After Sentinel 1 is restarted, its config gets updated" {
     }
 }
 
-test "New master [join $addr {:}] role matches" {
+xtest "New master [join $addr {:}] role matches" {
     assert {[RI $master_id role] eq {master}}
 }

@@ -1,74 +1,74 @@
 start_server {tags {"scripting"}} {
-    test {EVAL - Does Lua interpreter replies to our requests?} {
+    xtest {EVAL - Does Lua interpreter replies to our requests?} {
         r eval {return 'hello'} 0
     } {hello}
 
-    test {EVAL - Lua integer -> Redis protocol type conversion} {
+    xtest {EVAL - Lua integer -> Redis protocol type conversion} {
         r eval {return 100.5} 0
     } {100}
 
-    test {EVAL - Lua string -> Redis protocol type conversion} {
+    xtest {EVAL - Lua string -> Redis protocol type conversion} {
         r eval {return 'hello world'} 0
     } {hello world}
 
-    test {EVAL - Lua true boolean -> Redis protocol type conversion} {
+    xtest {EVAL - Lua true boolean -> Redis protocol type conversion} {
         r eval {return true} 0
     } {1}
 
-    test {EVAL - Lua false boolean -> Redis protocol type conversion} {
+    xtest {EVAL - Lua false boolean -> Redis protocol type conversion} {
         r eval {return false} 0
     } {}
 
-    test {EVAL - Lua status code reply -> Redis protocol type conversion} {
+    xtest {EVAL - Lua status code reply -> Redis protocol type conversion} {
         r eval {return {ok='fine'}} 0
     } {fine}
 
-    test {EVAL - Lua error reply -> Redis protocol type conversion} {
+    xtest {EVAL - Lua error reply -> Redis protocol type conversion} {
         catch {
             r eval {return {err='this is an error'}} 0
         } e
         set _ $e
     } {this is an error}
 
-    test {EVAL - Lua table -> Redis protocol type conversion} {
+    xtest {EVAL - Lua table -> Redis protocol type conversion} {
         r eval {return {1,2,3,'ciao',{1,2}}} 0
     } {1 2 3 ciao {1 2}}
 
-    test {EVAL - Are the KEYS and ARGV arrays populated correctly?} {
+    xtest {EVAL - Are the KEYS and ARGV arrays populated correctly?} {
         r eval {return {KEYS[1],KEYS[2],ARGV[1],ARGV[2]}} 2 a b c d
     } {a b c d}
 
-    test {EVAL - is Lua able to call Redis API?} {
+    xtest {EVAL - is Lua able to call Redis API?} {
         r set mykey myval
         r eval {return redis.call('get',KEYS[1])} 1 mykey
     } {myval}
 
-    test {EVALSHA - Can we call a SHA1 if already defined?} {
+    xtest {EVALSHA - Can we call a SHA1 if already defined?} {
         r evalsha fd758d1589d044dd850a6f05d52f2eefd27f033f 1 mykey
     } {myval}
 
-    test {EVALSHA - Can we call a SHA1 in uppercase?} {
+    xtest {EVALSHA - Can we call a SHA1 in uppercase?} {
         r evalsha FD758D1589D044DD850A6F05D52F2EEFD27F033F 1 mykey
     } {myval}
 
-    test {EVALSHA - Do we get an error on invalid SHA1?} {
+    xtest {EVALSHA - Do we get an error on invalid SHA1?} {
         catch {r evalsha NotValidShaSUM 0} e
         set _ $e
     } {NOSCRIPT*}
 
-    test {EVALSHA - Do we get an error on non defined SHA1?} {
+    xtest {EVALSHA - Do we get an error on non defined SHA1?} {
         catch {r evalsha ffd632c7d33e571e9f24556ebed26c3479a87130 0} e
         set _ $e
     } {NOSCRIPT*}
 
-    test {EVAL - Redis integer -> Lua type conversion} {
+    xtest {EVAL - Redis integer -> Lua type conversion} {
         r eval {
             local foo = redis.pcall('incr','x')
             return {type(foo),foo}
         } 0
     } {number 1}
 
-    test {EVAL - Redis bulk -> Lua type conversion} {
+    xtest {EVAL - Redis bulk -> Lua type conversion} {
         r set mykey myval
         r eval {
             local foo = redis.pcall('get','mykey')
@@ -76,7 +76,7 @@ start_server {tags {"scripting"}} {
         } 0
     } {string myval}
 
-    test {EVAL - Redis multi bulk -> Lua type conversion} {
+    xtest {EVAL - Redis multi bulk -> Lua type conversion} {
         r del mylist
         r rpush mylist a
         r rpush mylist b
@@ -87,14 +87,14 @@ start_server {tags {"scripting"}} {
         } 0
     } {table a b c 3}
 
-    test {EVAL - Redis status reply -> Lua type conversion} {
+    xtest {EVAL - Redis status reply -> Lua type conversion} {
         r eval {
             local foo = redis.pcall('set','mykey','myval')
             return {type(foo),foo['ok']}
         } 0
     } {table OK}
 
-    test {EVAL - Redis error reply -> Lua type conversion} {
+    xtest {EVAL - Redis error reply -> Lua type conversion} {
         r set mykey myval
         r eval {
             local foo = redis.pcall('incr','mykey')
@@ -102,7 +102,7 @@ start_server {tags {"scripting"}} {
         } 0
     } {table {ERR value is not an integer or out of range}}
 
-    test {EVAL - Redis nil bulk reply -> Lua type conversion} {
+    xtest {EVAL - Redis nil bulk reply -> Lua type conversion} {
         r del mykey
         r eval {
             local foo = redis.pcall('get','mykey')
@@ -110,14 +110,14 @@ start_server {tags {"scripting"}} {
         } 0
     } {boolean 1}
 
-    test {EVAL - Is the Lua client using the currently selected DB?} {
+    xtest {EVAL - Is the Lua client using the currently selected DB?} {
         r set mykey "this is DB 9"
         r select 10
         r set mykey "this is DB 10"
         r eval {return redis.pcall('get','mykey')} 0
     } {this is DB 10}
 
-    test {EVAL - SELECT inside Lua should not affect the caller} {
+    xtest {EVAL - SELECT inside Lua should not affect the caller} {
         # here we DB 10 is selected
         r set mykey "original value"
         r eval {return redis.pcall('select','9')} 0
@@ -127,7 +127,7 @@ start_server {tags {"scripting"}} {
     } {original value}
 
     if 0 {
-        test {EVAL - Script can't run more than configured time limit} {
+        xtest {EVAL - Script can't run more than configured time limit} {
             r config set lua-time-limit 1
             catch {
                 r eval {
@@ -139,13 +139,13 @@ start_server {tags {"scripting"}} {
         } {*execution time*}
     }
 
-    test {EVAL - Scripts can't run certain commands} {
+    xtest {EVAL - Scripts can't run certain commands} {
         set e {}
         catch {r eval {return redis.pcall('spop','x')} 0} e
         set e
     } {*not allowed*}
 
-    test {EVAL - Scripts can't run certain commands} {
+    xtest {EVAL - Scripts can't run certain commands} {
         set e {}
         catch {
             r eval "redis.pcall('randomkey'); return redis.pcall('set','x','ciao')" 0
@@ -153,13 +153,13 @@ start_server {tags {"scripting"}} {
         set e
     } {*not allowed after*}
 
-    test {EVAL - No arguments to redis.call/pcall is considered an error} {
+    xtest {EVAL - No arguments to redis.call/pcall is considered an error} {
         set e {}
         catch {r eval {return redis.call()} 0} e
         set e
     } {*one argument*}
 
-    test {EVAL - redis.call variant raises a Lua error on Redis cmd error (1)} {
+    xtest {EVAL - redis.call variant raises a Lua error on Redis cmd error (1)} {
         set e {}
         catch {
             r eval "redis.call('nosuchcommand')" 0
@@ -167,7 +167,7 @@ start_server {tags {"scripting"}} {
         set e
     } {*Unknown Redis*}
 
-    test {EVAL - redis.call variant raises a Lua error on Redis cmd error (1)} {
+    xtest {EVAL - redis.call variant raises a Lua error on Redis cmd error (1)} {
         set e {}
         catch {
             r eval "redis.call('get','a','b','c')" 0
@@ -175,7 +175,7 @@ start_server {tags {"scripting"}} {
         set e
     } {*number of args*}
 
-    test {EVAL - redis.call variant raises a Lua error on Redis cmd error (1)} {
+    xtest {EVAL - redis.call variant raises a Lua error on Redis cmd error (1)} {
         set e {}
         r set foo bar
         catch {
@@ -184,7 +184,7 @@ start_server {tags {"scripting"}} {
         set e
     } {*against a key*}
 
-    test {EVAL - JSON numeric decoding} {
+    xtest {EVAL - JSON numeric decoding} {
         # We must return the table as a string because otherwise
         # Redis converts floats to ints and we get 0 and 1023 instead
         # of 0.0003 and 1023.2 as the parsed output.
@@ -195,13 +195,13 @@ start_server {tags {"scripting"}} {
         } 0
     } {0 -5000 -1 0.0003 1023.2 0}
 
-    test {EVAL - JSON string decoding} {
+    xtest {EVAL - JSON string decoding} {
         r eval {local decoded = cjson.decode('{"keya": "a", "keyb": "b"}')
                 return {decoded.keya, decoded.keyb}
         } 0
     } {a b}
 
-    test {EVAL - cmsgpack can pack double?} {
+    xtest {EVAL - cmsgpack can pack double?} {
         r eval {local encoded = cmsgpack.pack(0.1)
                 local h = ""
                 for i = 1, #encoded do
@@ -211,7 +211,7 @@ start_server {tags {"scripting"}} {
         } 0
     } {cb3fb999999999999a}
 
-    test {EVAL - cmsgpack can pack negative int64?} {
+    xtest {EVAL - cmsgpack can pack negative int64?} {
         r eval {local encoded = cmsgpack.pack(-1099511627776)
                 local h = ""
                 for i = 1, #encoded do
@@ -221,7 +221,7 @@ start_server {tags {"scripting"}} {
         } 0
     } {d3ffffff0000000000}
 
-    test {EVAL - cmsgpack can pack and unpack circular references?} {
+    xtest {EVAL - cmsgpack can pack and unpack circular references?} {
         r eval {local a = {x=nil,y=5}
                 local b = {x=a}
                 a['x'] = b
@@ -253,7 +253,7 @@ start_server {tags {"scripting"}} {
         } 0
     } {82a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a17882a17905a17881a178c0 1 1}
 
-    test {EVAL - Numerical sanity check from bitop} {
+    xtest {EVAL - Numerical sanity check from bitop} {
         r eval {assert(0x7fffffff == 2147483647, "broken hex literals");
                 assert(0xffffffff == -1 or 0xffffffff == 2^32-1,
                     "broken hex literals");
@@ -264,7 +264,7 @@ start_server {tags {"scripting"}} {
         } 0
     } {}
 
-    test {EVAL - Verify minimal bitop functionality} {
+    xtest {EVAL - Verify minimal bitop functionality} {
         r eval {assert(bit.tobit(1) == 1);
                 assert(bit.band(1) == 1);
                 assert(bit.bxor(1,2) == 3);
@@ -272,7 +272,7 @@ start_server {tags {"scripting"}} {
         } 0
     } {}
 
-    test {SCRIPTING FLUSH - is able to clear the scripts cache?} {
+    xtest {SCRIPTING FLUSH - is able to clear the scripts cache?} {
         r set mykey myval
         set v [r evalsha fd758d1589d044dd850a6f05d52f2eefd27f033f 1 mykey]
         assert_equal $v myval
@@ -282,57 +282,57 @@ start_server {tags {"scripting"}} {
         set e
     } {NOSCRIPT*}
 
-    test {SCRIPT EXISTS - can detect already defined scripts?} {
+    xtest {SCRIPT EXISTS - can detect already defined scripts?} {
         r eval "return 1+1" 0
         r script exists a27e7e8a43702b7046d4f6a7ccf5b60cef6b9bd9 a27e7e8a43702b7046d4f6a7ccf5b60cef6b9bda
     } {1 0}
 
-    test {SCRIPT LOAD - is able to register scripts in the scripting cache} {
+    xtest {SCRIPT LOAD - is able to register scripts in the scripting cache} {
         list \
             [r script load "return 'loaded'"] \
             [r evalsha b534286061d4b9e4026607613b95c06c06015ae8 0]
     } {b534286061d4b9e4026607613b95c06c06015ae8 loaded}
 
-    test "In the context of Lua the output of random commands gets ordered" {
+    xtest "In the context of Lua the output of random commands gets ordered" {
         r del myset
         r sadd myset a b c d e f g h i l m n o p q r s t u v z aa aaa azz
         r eval {return redis.call('smembers',KEYS[1])} 1 myset
     } {a aa aaa azz b c d e f g h i l m n o p q r s t u v z}
 
-    test "SORT is normally not alpha re-ordered for the scripting engine" {
+    xtest "SORT is normally not alpha re-ordered for the scripting engine" {
         r del myset
         r sadd myset 1 2 3 4 10
         r eval {return redis.call('sort',KEYS[1],'desc')} 1 myset
     } {10 4 3 2 1}
 
-    test "SORT BY <constant> output gets ordered for scripting" {
+    xtest "SORT BY <constant> output gets ordered for scripting" {
         r del myset
         r sadd myset a b c d e f g h i l m n o p q r s t u v z aa aaa azz
         r eval {return redis.call('sort',KEYS[1],'by','_')} 1 myset
     } {a aa aaa azz b c d e f g h i l m n o p q r s t u v z}
 
-    test "SORT BY <constant> with GET gets ordered for scripting" {
+    xtest "SORT BY <constant> with GET gets ordered for scripting" {
         r del myset
         r sadd myset a b c
         r eval {return redis.call('sort',KEYS[1],'by','_','get','#','get','_:*')} 1 myset
     } {a {} b {} c {}}
 
-    test "redis.sha1hex() implementation" {
+    xtest "redis.sha1hex() implementation" {
         list [r eval {return redis.sha1hex('')} 0] \
              [r eval {return redis.sha1hex('Pizza & Mandolino')} 0]
     } {da39a3ee5e6b4b0d3255bfef95601890afd80709 74822d82031af7493c20eefa13bd07ec4fada82f}
 
-    test {Globals protection reading an undeclared global variable} {
+    xtest {Globals protection reading an undeclared global variable} {
         catch {r eval {return a} 0} e
         set e
     } {*ERR*attempted to access unexisting global*}
 
-    test {Globals protection setting an undeclared global*} {
+    xtest {Globals protection setting an undeclared global*} {
         catch {r eval {a=10} 0} e
         set e
     } {*ERR*attempted to create global*}
 
-    test {Test an example script DECR_IF_GT} {
+    xtest {Test an example script DECR_IF_GT} {
         set decr_if_gt {
             local current
 
@@ -354,13 +354,13 @@ start_server {tags {"scripting"}} {
         set res
     } {4 3 2 2 2}
 
-    test {Scripting engine resets PRNG at every script execution} {
+    xtest {Scripting engine resets PRNG at every script execution} {
         set rand1 [r eval {return tostring(math.random())} 0]
         set rand2 [r eval {return tostring(math.random())} 0]
         assert_equal $rand1 $rand2
     }
 
-    test {Scripting engine PRNG can be seeded correctly} {
+    xtest {Scripting engine PRNG can be seeded correctly} {
         set rand1 [r eval {
             math.randomseed(ARGV[1]); return tostring(math.random())
         } 0 10]
@@ -374,7 +374,7 @@ start_server {tags {"scripting"}} {
         assert {$rand2 ne $rand3}
     }
 
-    test {EVAL does not leak in the Lua stack} {
+    xtest {EVAL does not leak in the Lua stack} {
         r set x 0
         # Use a non blocking client to speedup the loop.
         set rd [redis_deferring_client]
@@ -389,7 +389,7 @@ start_server {tags {"scripting"}} {
         r get x
     } {10000}
 
-    test {EVAL processes writes from AOF in read-only slaves} {
+    xtest {EVAL processes writes from AOF in read-only slaves} {
         r flushall
         r config set appendonly yes
         r eval {redis.call("set",KEYS[1],"100")} 1 foo
@@ -408,7 +408,7 @@ start_server {tags {"scripting"}} {
         set res
     } {102}
 
-    test {We can call scripts rewriting client->argv from Lua} {
+    xtest {We can call scripts rewriting client->argv from Lua} {
         r del myset
         r sadd myset a b c
         r mset a 1 b 2 c 3 d 4
@@ -419,7 +419,7 @@ start_server {tags {"scripting"}} {
         assert {[r spop myset] eq {}}
     }
 
-    test {Call Redis command with many args from Lua (issue #1764)} {
+    xtest {Call Redis command with many args from Lua (issue #1764)} {
         r eval {
             local i
             local x={}
@@ -432,7 +432,7 @@ start_server {tags {"scripting"}} {
         } 0
     } {1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100}
 
-    test {Number conversion precision test (issue #1118)} {
+    xtest {Number conversion precision test (issue #1118)} {
         r eval {
               local value = 9007199254740991
               redis.call("set","foo",value)
@@ -440,19 +440,19 @@ start_server {tags {"scripting"}} {
         } 0
     } {9007199254740991}
 
-    test {String containing number precision test (regression of issue #1118)} {
+    xtest {String containing number precision test (regression of issue #1118)} {
         r eval {
             redis.call("set", "key", "12039611435714932082")
             return redis.call("get", "key")
         } 0
     } {12039611435714932082}
 
-    test {Verify negative arg count is error instead of crash (issue #1842)} {
+    xtest {Verify negative arg count is error instead of crash (issue #1842)} {
         catch { r eval { return "hello" } -12 } e
         set e
     } {ERR Number of keys can't be negative}
 
-    test {Correct handling of reused argv (issue #1939)} {
+    xtest {Correct handling of reused argv (issue #1939)} {
         r eval {
               for i = 0, 10 do
                   redis.call('SET', 'a', '1')
@@ -468,7 +468,7 @@ start_server {tags {"scripting"}} {
 # Start a new server since the last test in this stanza will kill the
 # instance at all.
 start_server {tags {"scripting"}} {
-    test {Timedout read-only scripts can be killed by SCRIPT KILL} {
+    xtest {Timedout read-only scripts can be killed by SCRIPT KILL} {
         set rd [redis_deferring_client]
         r config set lua-time-limit 10
         $rd eval {while true do end} 0
@@ -480,13 +480,13 @@ start_server {tags {"scripting"}} {
         assert_equal [r ping] "PONG"
     }
 
-    test {Timedout script link is still usable after Lua returns} {
+    xtest {Timedout script link is still usable after Lua returns} {
         r config set lua-time-limit 10
         r eval {for i=1,100000 do redis.call('ping') end return 'ok'} 0
         r ping
     } {PONG}
 
-    test {Timedout scripts that modified data can't be killed by SCRIPT KILL} {
+    xtest {Timedout scripts that modified data can't be killed by SCRIPT KILL} {
         set rd [redis_deferring_client]
         r config set lua-time-limit 10
         $rd eval {redis.call('set',KEYS[1],'y'); while true do end} 1 x
@@ -501,7 +501,7 @@ start_server {tags {"scripting"}} {
 
     # Note: keep this test at the end of this server stanza because it
     # kills the server.
-    test {SHUTDOWN NOSAVE can kill a timedout script anyway} {
+    xtest {SHUTDOWN NOSAVE can kill a timedout script anyway} {
         # The server sould be still unresponding to normal commands.
         catch {r ping} e
         assert_match {BUSY*} $e
@@ -514,7 +514,7 @@ start_server {tags {"scripting"}} {
 
 start_server {tags {"scripting repl"}} {
     start_server {} {
-        test {Before the slave connects we issue two EVAL commands} {
+        xtest {Before the slave connects we issue two EVAL commands} {
             # One with an error, but still executing a command.
             # SHA is: 67164fc43fa971f76fd1aaeeaf60c1c178d25876
             catch {
@@ -525,7 +525,7 @@ start_server {tags {"scripting repl"}} {
             r eval {return redis.call('incr',KEYS[1])} 1 x
         } {2}
 
-        test {Connect a slave to the main instance} {
+        xtest {Connect a slave to the main instance} {
             r -1 slaveof [srv 0 host] [srv 0 port]
             wait_for_condition 50 100 {
                 [s -1 role] eq {slave} &&
@@ -535,7 +535,7 @@ start_server {tags {"scripting repl"}} {
             }
         }
 
-        test {Now use EVALSHA against the master, with both SHAs} {
+        xtest {Now use EVALSHA against the master, with both SHAs} {
             # The server should replicate successful and unsuccessful
             # commands as EVAL instead of EVALSHA.
             catch {
@@ -544,7 +544,7 @@ start_server {tags {"scripting repl"}} {
             r evalsha 6f5ade10a69975e903c6d07b10ea44c6382381a5 1 x
         } {4}
 
-        test {If EVALSHA was replicated as EVAL, 'x' should be '4'} {
+        xtest {If EVALSHA was replicated as EVAL, 'x' should be '4'} {
             wait_for_condition 50 100 {
                 [r -1 get x] eq {4}
             } else {
@@ -552,7 +552,7 @@ start_server {tags {"scripting repl"}} {
             }
         }
 
-        test {Replication of script multiple pushes to list with BLPOP} {
+        xtest {Replication of script multiple pushes to list with BLPOP} {
             set rd [redis_deferring_client]
             $rd brpop a 0
             r eval {
@@ -569,7 +569,7 @@ start_server {tags {"scripting repl"}} {
             set res
         } {a 1}
 
-        test {EVALSHA replication when first call is readonly} {
+        xtest {EVALSHA replication when first call is readonly} {
             r del x
             r eval {if tonumber(ARGV[1]) > 0 then redis.call('incr', KEYS[1]) end} 1 x 0
             r evalsha 6e0e2745aa546d0b50b801a20983b70710aef3ce 1 x 0
@@ -581,7 +581,7 @@ start_server {tags {"scripting repl"}} {
             }
         }
 
-        test {Lua scripts using SELECT are replicated correctly} {
+        xtest {Lua scripts using SELECT are replicated correctly} {
             r eval {
                 redis.call("set","foo1","bar1")
                 redis.call("select","10")

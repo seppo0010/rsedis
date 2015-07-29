@@ -1,10 +1,12 @@
 start_server {tags {"aofrw"}} {
+    proc disabled {} {
     # Enable the AOF
     r config set appendonly yes
     r config set auto-aof-rewrite-percentage 0 ; # Disable auto-rewrite.
     waitForBgrewriteaof r
+    }
 
-    test {AOF rewrite during write load} {
+    xtest {AOF rewrite during write load} {
         # Start a write load for 10 seconds
         set master [srv 0 client]
         set master_host [srv 0 host]
@@ -62,7 +64,7 @@ start_server {tags {"aofrw"}} {
 }
 
 start_server {tags {"aofrw"}} {
-    test {Turning off AOF kills the background writing child if any} {
+    xtest {Turning off AOF kills the background writing child if any} {
         r config set appendonly yes
         waitForBgrewriteaof r
         r multi
@@ -78,7 +80,7 @@ start_server {tags {"aofrw"}} {
 
     foreach d {string int} {
         foreach e {quicklist} {
-            test "AOF rewrite of list with $e encoding, $d data" {
+            xtest "AOF rewrite of list with $e encoding, $d data" {
                 r flushall
                 set len 1000
                 for {set j 0} {$j < $len} {incr j} {
@@ -104,7 +106,7 @@ start_server {tags {"aofrw"}} {
 
     foreach d {string int} {
         foreach e {intset hashtable} {
-            test "AOF rewrite of set with $e encoding, $d data" {
+            xtest "AOF rewrite of set with $e encoding, $d data" {
                 r flushall
                 if {$e eq {intset}} {set len 10} else {set len 1000}
                 for {set j 0} {$j < $len} {incr j} {
@@ -132,7 +134,7 @@ start_server {tags {"aofrw"}} {
 
     foreach d {string int} {
         foreach e {ziplist hashtable} {
-            test "AOF rewrite of hash with $e encoding, $d data" {
+            xtest "AOF rewrite of hash with $e encoding, $d data" {
                 r flushall
                 if {$e eq {ziplist}} {set len 10} else {set len 1000}
                 for {set j 0} {$j < $len} {incr j} {
@@ -158,7 +160,7 @@ start_server {tags {"aofrw"}} {
 
     foreach d {string int} {
         foreach e {ziplist skiplist} {
-            test "AOF rewrite of zset with $e encoding, $d data" {
+            xtest "AOF rewrite of zset with $e encoding, $d data" {
                 r flushall
                 if {$e eq {ziplist}} {set len 10} else {set len 1000}
                 for {set j 0} {$j < $len} {incr j} {
@@ -182,7 +184,7 @@ start_server {tags {"aofrw"}} {
         }
     }
 
-    test {BGREWRITEAOF is delayed if BGSAVE is in progress} {
+    xtest {BGREWRITEAOF is delayed if BGSAVE is in progress} {
         r multi
         r bgsave
         r bgrewriteaof
@@ -195,7 +197,7 @@ start_server {tags {"aofrw"}} {
         }
     }
 
-    test {BGREWRITEAOF is refused if already in progress} {
+    xtest {BGREWRITEAOF is refused if already in progress} {
         catch {
             r multi
             r bgrewriteaof

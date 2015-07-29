@@ -1,34 +1,34 @@
 start_server {tags {"hll"}} {
-    test {HyperLogLog self test passes} {
+    xtest {HyperLogLog self test passes} {
         catch {r pfselftest} e
         set e
     } {OK}
 
-    test {PFADD without arguments creates an HLL value} {
+    xtest {PFADD without arguments creates an HLL value} {
         r pfadd hll
         r exists hll
     } {1}
 
-    test {Approximated cardinality after creation is zero} {
+    xtest {Approximated cardinality after creation is zero} {
         r pfcount hll
     } {0}
 
-    test {PFADD returns 1 when at least 1 reg was modified} {
+    xtest {PFADD returns 1 when at least 1 reg was modified} {
         r pfadd hll a b c
     } {1}
 
-    test {PFADD returns 0 when no reg was modified} {
+    xtest {PFADD returns 0 when no reg was modified} {
         r pfadd hll a b c
     } {0}
 
-    test {PFADD works with empty string (regression)} {
+    xtest {PFADD works with empty string (regression)} {
         r pfadd hll ""
     }
 
     # Note that the self test stresses much better the
     # cardinality estimation error. We are testing just the
     # command implementation itself here.
-    test {PFCOUNT returns approximated cardinality of set} {
+    xtest {PFCOUNT returns approximated cardinality of set} {
         r del hll
         set res {}
         r pfadd hll 1 2 3 4 5
@@ -39,7 +39,7 @@ start_server {tags {"hll"}} {
         set res
     } {5 10}
 
-    test {HyperLogLogs are promote from sparse to dense} {
+    xtest {HyperLogLogs are promote from sparse to dense} {
         r del hll
         r config set hll-sparse-max-bytes 3000
         set n 0
@@ -59,7 +59,7 @@ start_server {tags {"hll"}} {
         }
     }
 
-    test {HyperLogLog sparse encoding stress test} {
+    xtest {HyperLogLog sparse encoding stress test} {
         for {set x 0} {$x < 1000} {incr x} {
             r del hll1 hll2
             set numele [randomInt 100]
@@ -79,7 +79,7 @@ start_server {tags {"hll"}} {
         }
     }
 
-    test {Corrupted sparse HyperLogLogs are detected: Additionl at tail} {
+    xtest {Corrupted sparse HyperLogLogs are detected: Additionl at tail} {
         r del hll
         r pfadd hll a b c
         r append hll "hello"
@@ -88,7 +88,7 @@ start_server {tags {"hll"}} {
         set e
     } {*INVALIDOBJ*}
 
-    test {Corrupted sparse HyperLogLogs are detected: Broken magic} {
+    xtest {Corrupted sparse HyperLogLogs are detected: Broken magic} {
         r del hll
         r pfadd hll a b c
         r setrange hll 0 "0123"
@@ -97,7 +97,7 @@ start_server {tags {"hll"}} {
         set e
     } {*WRONGTYPE*}
 
-    test {Corrupted sparse HyperLogLogs are detected: Invalid encoding} {
+    xtest {Corrupted sparse HyperLogLogs are detected: Invalid encoding} {
         r del hll
         r pfadd hll a b c
         r setrange hll 4 "x"
@@ -106,7 +106,7 @@ start_server {tags {"hll"}} {
         set e
     } {*WRONGTYPE*}
 
-    test {Corrupted dense HyperLogLogs are detected: Wrong length} {
+    xtest {Corrupted dense HyperLogLogs are detected: Wrong length} {
         r del hll
         r pfadd hll a b c
         r setrange hll 4 "\x00"
@@ -115,7 +115,7 @@ start_server {tags {"hll"}} {
         set e
     } {*WRONGTYPE*}
 
-    test {PFADD, PFCOUNT, PFMERGE type checking works} {
+    xtest {PFADD, PFCOUNT, PFMERGE type checking works} {
         r set foo bar
         catch {r pfadd foo 1} e
         assert_match {*WRONGTYPE*} $e
@@ -127,7 +127,7 @@ start_server {tags {"hll"}} {
         assert_match {*WRONGTYPE*} $e
     }
 
-    test {PFMERGE results on the cardinality of union of sets} {
+    xtest {PFMERGE results on the cardinality of union of sets} {
         r del hll hll1 hll2 hll3
         r pfadd hll1 a b c
         r pfadd hll2 b c d
@@ -136,7 +136,7 @@ start_server {tags {"hll"}} {
         r pfcount hll
     } {5}
 
-    test {PFCOUNT multiple-keys merge returns cardinality of union} {
+    xtest {PFCOUNT multiple-keys merge returns cardinality of union} {
         r del hll1 hll2 hll3
         for {set x 1} {$x < 10000} {incr x} {
             # Force dense representation of hll2
@@ -151,13 +151,13 @@ start_server {tags {"hll"}} {
         }
     }
 
-    test {PFDEBUG GETREG returns the HyperLogLog raw registers} {
+    xtest {PFDEBUG GETREG returns the HyperLogLog raw registers} {
         r del hll
         r pfadd hll 1 2 3
         llength [r pfdebug getreg hll]
     } {16384}
 
-    test {PFADD / PFCOUNT cache invalidation works} {
+    xtest {PFADD / PFCOUNT cache invalidation works} {
         r del hll
         r pfadd hll a b c
         r pfcount hll

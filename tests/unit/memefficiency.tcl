@@ -29,7 +29,7 @@ start_server {tags {"memefficiency"}} {
         1024  0.75
         16384 0.82
     } {
-        test "Memory efficiency with values in range $size_range" {
+        xtest "Memory efficiency with values in range $size_range" {
             set efficiency [test_memory_efficiency $size_range]
             assert {$efficiency >= $expected_min_efficiency}
         }

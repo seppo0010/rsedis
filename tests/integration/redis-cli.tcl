@@ -39,7 +39,7 @@ start_server {tags {"cli"}} {
     proc test_interactive_cli {name code} {
         set ::env(FAKETTY) 1
         set fd [open_cli]
-        test "Interactive CLI: $name" $code
+        xtest "Interactive CLI: $name" $code
         close_cli $fd
         unset ::env(FAKETTY)
     }
@@ -85,13 +85,13 @@ start_server {tags {"cli"}} {
     }
 
     proc test_nontty_cli {name code} {
-        test "Non-interactive non-TTY CLI: $name" $code
+        xtest "Non-interactive non-TTY CLI: $name" $code
     }
 
     # Helpers to run tests where stdout is a tty (fake it)
     proc test_tty_cli {name code} {
         set ::env(FAKETTY) 1
-        test "Non-interactive TTY CLI: $name" $code
+        xtest "Non-interactive TTY CLI: $name" $code
         unset ::env(FAKETTY)
     }
 

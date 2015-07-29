@@ -5,25 +5,25 @@ source "../tests/includes/init-tests.tcl"
 
 # Create a cluster with 5 master and 10 slaves, so that we have 2
 # slaves for each master.
-test "Create a 5 nodes cluster" {
+xtest "Create a 5 nodes cluster" {
     create_cluster 5 10
 }
 
-test "Cluster is up" {
+xtest "Cluster is up" {
     assert_cluster_state ok
 }
 
-test "The first master has actually two slaves" {
+xtest "The first master has actually two slaves" {
     assert {[llength [lindex [R 0 role] 2]] == 2}
 }
 
-test {Slaves of #0 are instance #5 and #10 as expected} {
+xtest {Slaves of #0 are instance #5 and #10 as expected} {
     set port0 [get_instance_attrib redis 0 port]
     assert {[lindex [R 5 role] 2] == $port0}
     assert {[lindex [R 10 role] 2] == $port0}
 }
 
-test "Instance #5 and #10 synced with the master" {
+xtest "Instance #5 and #10 synced with the master" {
     wait_for_condition 1000 50 {
         [RI 5 master_link_status] eq {up} &&
         [RI 10 master_link_status] eq {up}
@@ -34,14 +34,14 @@ test "Instance #5 and #10 synced with the master" {
 
 set cluster [redis_cluster 127.0.0.1:[get_instance_attrib redis 0 port]]
 
-test "Slaves are both able to receive and acknowledge writes" {
+xtest "Slaves are both able to receive and acknowledge writes" {
     for {set j 0} {$j < 100} {incr j} {
         $cluster set $j $j
     }
     assert {[R 0 wait 2 60000] == 2}
 }
 
-test "Write data while slave #10 is paused and can't receive it" {
+xtest "Write data while slave #10 is paused and can't receive it" {
     # Stop the slave with a multi/exec transaction so that the master will
     # be killed as soon as it can accept writes again.
     R 10 multi
@@ -67,7 +67,7 @@ test "Write data while slave #10 is paused and can't receive it" {
     kill_instance redis 0
 }
 
-test "Wait for instance #5 (and not #10) to turn into a master" {
+xtest "Wait for instance #5 (and not #10) to turn into a master" {
     wait_for_condition 1000 50 {
         [RI 5 role] eq {master}
     } else {
@@ -75,15 +75,15 @@ test "Wait for instance #5 (and not #10) to turn into a master" {
     }
 }
 
-test "Wait for the node #10 to return alive before ending the test" {
+xtest "Wait for the node #10 to return alive before ending the test" {
     R 10 ping
 }
 
-test "Cluster should eventually be up again" {
+xtest "Cluster should eventually be up again" {
     assert_cluster_state ok
 }
 
-test "Node #10 should eventually replicate node #5" {
+xtest "Node #10 should eventually replicate node #5" {
     set port5 [get_instance_attrib redis 5 port]
     wait_for_condition 1000 50 {
         ([lindex [R 10 role] 2] == $port5) &&

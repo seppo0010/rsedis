@@ -7,13 +7,13 @@ start_server {tags {"quit"}} {
         set _ $cmd
     }
 
-    test "QUIT returns OK" {
+    xtest "QUIT returns OK" {
         reconnect
         assert_equal OK [r quit]
         assert_error * {r ping}
     }
 
-    test "Pipelined commands after QUIT must not be executed" {
+    xtest "Pipelined commands after QUIT must not be executed" {
         reconnect
         r write [format_command quit]
         r write [format_command set foo bar]
@@ -25,7 +25,7 @@ start_server {tags {"quit"}} {
         assert_equal {} [r get foo]
     }
 
-    test "Pipelined commands after QUIT that exceed read buffer size" {
+    xtest "Pipelined commands after QUIT that exceed read buffer size" {
         reconnect
         r write [format_command quit]
         r write [format_command set foo [string repeat "x" 1024]]

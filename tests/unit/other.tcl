@@ -6,7 +6,7 @@ start_server {tags {"other"}} {
         } {ok}
     }
 
-    test {SAVE - make sure there are all the types as values} {
+    xtest {SAVE - make sure there are all the types as values} {
         # Wait for a background saving in progress to terminate
         waitForBgsave r
         r lpush mysavelist hello
@@ -22,7 +22,7 @@ start_server {tags {"other"}} {
     tags {slow} {
         if {$::accurate} {set iterations 10000} else {set iterations 1000}
         foreach fuzztype {binary alpha compr} {
-            test "FUZZ stresser with data model $fuzztype" {
+            xtest "FUZZ stresser with data model $fuzztype" {
                 set err 0
                 for {set i 0} {$i < $iterations} {incr i} {
                     set fuzz [randstring 0 512 $fuzztype]
@@ -38,7 +38,7 @@ start_server {tags {"other"}} {
         }
     }
 
-    test {BGSAVE} {
+    xtest {BGSAVE} {
         waitForBgsave r
         r flushdb
         r save
@@ -49,7 +49,7 @@ start_server {tags {"other"}} {
         r get x
     } {10}
 
-    test {SELECT an out of range DB} {
+    xtest {SELECT an out of range DB} {
         catch {r select 1000000} err
         set _ $err
     } {*invalid*}
@@ -57,7 +57,7 @@ start_server {tags {"other"}} {
     tags {consistency} {
         if {![catch {package require sha1}]} {
             if {$::accurate} {set numops 10000} else {set numops 1000}
-            test {Check consistency of different data types after a reload} {
+            xtest {Check consistency of different data types after a reload} {
                 r flushdb
                 createComplexDataset r $numops
                 set dump [csvdump r]
@@ -82,7 +82,7 @@ start_server {tags {"other"}} {
                 }
             } {1}
 
-            test {Same dataset digest if saving/reloading as AOF?} {
+            xtest {Same dataset digest if saving/reloading as AOF?} {
                 r bgrewriteaof
                 waitForBgrewriteaof r
                 r debug loadaof
@@ -107,7 +107,7 @@ start_server {tags {"other"}} {
         }
     }
 
-    test {EXPIRES after a reload (snapshot + append only file rewrite)} {
+    xtest {EXPIRES after a reload (snapshot + append only file rewrite)} {
         r flushdb
         r set x 10
         r expire x 1000
@@ -123,7 +123,7 @@ start_server {tags {"other"}} {
         list $e1 $e2
     } {1 1}
 
-    test {EXPIRES after AOF reload (without rewrite)} {
+    xtest {EXPIRES after AOF reload (without rewrite)} {
         r flushdb
         r config set appendonly yes
         r set x somevalue
@@ -163,7 +163,7 @@ start_server {tags {"other"}} {
     }
 
     tags {protocol} {
-        test {PIPELINING stresser (also a regression for the old epoll bug)} {
+        xtest {PIPELINING stresser (also a regression for the old epoll bug)} {
             set fd2 [socket $::host $::port]
             fconfigure $fd2 -encoding binary -translation binary
             puts -nonewline $fd2 "SELECT 9\r\n"
@@ -193,12 +193,12 @@ start_server {tags {"other"}} {
         } {1}
     }
 
-    test {APPEND basics} {
+    xtest {APPEND basics} {
         list [r append foo bar] [r get foo] \
              [r append foo 100] [r get foo]
     } {3 bar 6 bar100}
 
-    test {APPEND basics, integer encoded values} {
+    xtest {APPEND basics, integer encoded values} {
         set res {}
         r del foo
         r append foo 1
@@ -209,7 +209,7 @@ start_server {tags {"other"}} {
         lappend res [r get foo]
     } {12 12}
 
-    test {APPEND fuzzing} {
+    xtest {APPEND fuzzing} {
         set err {}
         foreach type {binary alpha compr} {
             set buf {}
@@ -228,7 +228,7 @@ start_server {tags {"other"}} {
     } {}
 
     # Leave the user with a clean DB before to exit
-    test {FLUSHDB} {
+    xtest {FLUSHDB} {
         set aux {}
         r select 9
         r flushdb
@@ -238,7 +238,7 @@ start_server {tags {"other"}} {
         lappend aux [r dbsize]
     } {0 0}
 
-    test {Perform a final SAVE to leave a clean DB on disk} {
+    xtest {Perform a final SAVE to leave a clean DB on disk} {
         waitForBgsave r
         r save
     } {OK}

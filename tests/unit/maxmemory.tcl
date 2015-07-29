@@ -1,18 +1,18 @@
 start_server {tags {"maxmemory"}} {
-    test "Without maxmemory small integers are shared" {
+    xtest "Without maxmemory small integers are shared" {
         r config set maxmemory 0
         r set a 1
         assert {[r object refcount a] > 1}
     }
 
-    test "With maxmemory and non-LRU policy integers are still shared" {
+    xtest "With maxmemory and non-LRU policy integers are still shared" {
         r config set maxmemory 1073741824
         r config set maxmemory-policy allkeys-random
         r set a 1
         assert {[r object refcount a] > 1}
     }
 
-    test "With maxmemory and LRU policy integers are not shared" {
+    xtest "With maxmemory and LRU policy integers are not shared" {
         r config set maxmemory 1073741824
         r config set maxmemory-policy allkeys-lru
         r set a 1
@@ -26,7 +26,7 @@ start_server {tags {"maxmemory"}} {
     foreach policy {
         allkeys-random allkeys-lru volatile-lru volatile-random volatile-ttl
     } {
-        test "maxmemory - is the memory limit honoured? (policy $policy)" {
+        xtest "maxmemory - is the memory limit honoured? (policy $policy)" {
             # make sure to start with a blank instance
             r flushall
             # Get the current memory limit and calculate a new limit.
@@ -58,7 +58,7 @@ start_server {tags {"maxmemory"}} {
     foreach policy {
         allkeys-random allkeys-lru volatile-lru volatile-random volatile-ttl
     } {
-        test "maxmemory - only allkeys-* should remove non-volatile keys ($policy)" {
+        xtest "maxmemory - only allkeys-* should remove non-volatile keys ($policy)" {
             # make sure to start with a blank instance
             r flushall
             # Get the current memory limit and calculate a new limit.
@@ -100,7 +100,7 @@ start_server {tags {"maxmemory"}} {
     foreach policy {
         volatile-lru volatile-random volatile-ttl
     } {
-        test "maxmemory - policy $policy should only remove volatile keys." {
+        xtest "maxmemory - policy $policy should only remove volatile keys." {
             # make sure to start with a blank instance
             r flushall
             # Get the current memory limit and calculate a new limit.

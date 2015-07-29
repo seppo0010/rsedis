@@ -9,7 +9,7 @@ source "../tests/includes/init-tests.tcl"
 
 proc 02_test_slaves_replication {} {
     uplevel 1 {
-        test "Check that slaves replicate from current master" {
+        xtest "Check that slaves replicate from current master" {
             set master_port [RI $master_id tcp_port]
             foreach_redis_id id {
                 if {$id == $master_id} continue
@@ -27,7 +27,7 @@ proc 02_test_slaves_replication {} {
 
 proc 02_crash_and_failover {} {
     uplevel 1 {
-        test "Crash the master and force a failover" {
+        xtest "Crash the master and force a failover" {
             set old_port [RI $master_id tcp_port]
             set addr [S 0 SENTINEL GET-MASTER-ADDR-BY-NAME mymaster]
             assert {[lindex $addr 1] == $old_port}
@@ -50,7 +50,7 @@ proc 02_crash_and_failover {} {
 02_crash_and_failover
 02_test_slaves_replication
 
-test "Kill a slave instance" {
+xtest "Kill a slave instance" {
     foreach_redis_id id {
         if {$id == $master_id} continue
         set killed_slave_id $id
@@ -62,7 +62,7 @@ test "Kill a slave instance" {
 02_crash_and_failover
 02_test_slaves_replication
 
-test "Wait for failover to end" {
+xtest "Wait for failover to end" {
     set inprogress 1
     while {$inprogress} {
         set inprogress 0
@@ -75,7 +75,7 @@ test "Wait for failover to end" {
     }
 }
 
-test "Restart killed slave and test replication of slaves again..." {
+xtest "Restart killed slave and test replication of slaves again..." {
     restart_instance redis $killed_slave_id
 }
 

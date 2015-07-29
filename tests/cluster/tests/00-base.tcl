@@ -8,7 +8,7 @@ if {$::simulate_error} {
     }
 }
 
-test "Different nodes have different IDs" {
+xtest "Different nodes have different IDs" {
     set ids {}
     set numnodes 0
     foreach_redis_id id {
@@ -22,11 +22,11 @@ test "Different nodes have different IDs" {
     assert {$numids == $numnodes}
 }
 
-test "It is possible to perform slot allocation" {
+xtest "It is possible to perform slot allocation" {
     cluster_allocate_slots 5
 }
 
-test "After the join, every node gets a different config epoch" {
+xtest "After the join, every node gets a different config epoch" {
     set trynum 60
     while {[incr trynum -1] != 0} {
         # We check that this condition is true for *all* the nodes.
@@ -50,10 +50,10 @@ test "After the join, every node gets a different config epoch" {
     }
 }
 
-test "Nodes should report cluster_state is ok now" {
+xtest "Nodes should report cluster_state is ok now" {
     assert_cluster_state ok
 }
 
-test "It is possible to write and read from the cluster" {
+xtest "It is possible to write and read from the cluster" {
     cluster_write_test 0
 }
