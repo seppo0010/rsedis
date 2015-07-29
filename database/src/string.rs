@@ -94,8 +94,13 @@ impl ValueString {
         } as usize;
         let stop = match normalize_position(_stop, len) {
             Ok(i) => i,
-            Err(g) => if !g { return Vec::new(); } else { len }
+            Err(g) => if !g { return Vec::new(); } else { len - 1 }
         } as usize;
+
+        if stop < start {
+            return Vec::new();
+        }
+
         let mut v = Vec::with_capacity(stop - start + 1);
         v.extend(s[start..stop + 1].iter());
         v
