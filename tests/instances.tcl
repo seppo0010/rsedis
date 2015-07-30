@@ -63,7 +63,7 @@ proc spawn_instance {type base_port count {conf {}}} {
         # Create a directory for this instance.
         set dirname "${type}_${j}"
         lappend ::dirs $dirname
-        catch {exec rm -rf $dirname}
+        catch {file delete -force $dirname}
         file mkdir $dirname
 
         # Write the instance config file.
@@ -105,7 +105,7 @@ proc cleanup {} {
         catch {exec kill -9 $pid}
     }
     foreach dir $::dirs {
-        catch {exec rm -rf $dir}
+        catch {file delete -force $dir}
     }
 }
 
@@ -165,7 +165,7 @@ proc pause_on_error {} {
             if {[lindex $argv 1] ne {}} {set count [lindex $argv 1]}
             foreach_redis_id id {
                 puts "=== REDIS $id ===="
-                puts [exec tail -$count redis_$id/log.txt]
+                puts [tail $count redis_$id/log.txt]
                 puts "---------------------\n"
             }
         } elseif {$cmd eq {show-sentinel-logs}} {
@@ -173,7 +173,7 @@ proc pause_on_error {} {
             if {[lindex $argv 1] ne {}} {set count [lindex $argv 1]}
             foreach_sentinel_id id {
                 puts "=== SENTINEL $id ===="
-                puts [exec tail -$count sentinel_$id/log.txt]
+                puts [tail $count sentinel_$id/log.txt]
                 puts "---------------------\n"
             }
         } elseif {$cmd eq {ls}} {

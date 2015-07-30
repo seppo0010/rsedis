@@ -1,5 +1,7 @@
+source tests/support/util.tcl
+
 set server_path [tmpdir server.log]
-set system_name [string tolower [exec uname -s]]
+set system_name [string tolower [unames]]
 
 if {$system_name eq {linux} || $system_name eq {darwin}} {
     start_server [list overrides [list dir $server_path]] {
@@ -9,7 +11,7 @@ if {$system_name eq {linux} || $system_name eq {darwin}} {
             set pattern "*debugCommand*"
             set retry 10
             while {$retry} {
-                set result [exec tail -100 < [srv 0 stdout]]
+                set result [tailstr 100 < [srv 0 stdout]]
                 if {[string match $pattern $result]} {
                     break
                 }

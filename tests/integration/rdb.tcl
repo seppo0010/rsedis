@@ -1,7 +1,7 @@
 set server_path [tmpdir "server.rdb-encoding-test"]
 
 # Copy RDB with different encodings in server path
-exec cp tests/assets/encodings.rdb $server_path
+file copy tests/assets/encodings.rdb $server_path
 
 start_server [list overrides [list "dir" $server_path "dbfilename" "encodings.rdb"]] {
   xtest "RDB encoding loading test" {
@@ -69,7 +69,7 @@ if {!$isroot} {
         xtest {Server should not start if RDB file can't be open} {
             wait_for_condition 50 100 {
                 [string match {*Fatal error loading*} \
-                    [exec tail -n1 < [dict get $srv stdout]]]
+                    [tailstr 1 [dict get $srv stdout]]]
             } else {
                 fail "Server started even if RDB was unreadable!"
             }
@@ -93,7 +93,7 @@ start_server_and_kill_it [list "dir" $server_path] {
     xtest {Server should not start if RDB is corrupted} {
         wait_for_condition 50 100 {
             [string match {*RDB checksum*} \
-                [exec tail -n10 < [dict get $srv stdout]]]
+                [tailstr 10 [dict get $srv stdout]]]
         } else {
             fail "Server started even if RDB was corrupted!"
         }

@@ -1,3 +1,39 @@
+proc unames {} {
+    catch { return [exec uname -s] }
+    return "unknown uname -s"
+}
+
+proc unamea {} {
+    catch { return [exec uname -a] }
+    return "unknown uname -a"
+}
+
+proc head {n path} {
+    set fp [open $path r]
+    set data {}
+    for {set i 0} {$i < $n} {incr i} {
+        append data [gets $fp]
+    }
+    close $fp
+    return $data
+}
+
+proc cat {path} {
+    set fp [open $path r]
+    set data [read $fp]
+    close $fp
+    return $data
+}
+
+proc tailstr {n str} {
+    set arr [split $str "\n"]
+    return [join [lrange $arr end-$n+1 end] "\n"]
+}
+
+proc tail {n path} {
+    return [tailstr n [cat path]]
+}
+
 proc randstring {min max {type binary}} {
     set len [expr {$min+int(rand()*($max-$min+1))}]
     set output {}
@@ -28,7 +64,7 @@ proc zlistAlikeSort {a b} {
 # Return all log lines starting with the first line that contains a warning.
 # Generally, this will be an assertion error with a stack trace.
 proc warnings_from_file {filename} {
-    set lines [split [exec cat $filename] "\n"]
+    set lines [split [cat $filename] "\n"]
     set matched 0
     set logall 0
     set result {}

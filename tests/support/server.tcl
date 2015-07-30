@@ -6,7 +6,7 @@ proc start_server_error {config_file error} {
     set err {}
     append err "Cant' start the Redis server\n"
     append err "CONFIGURATION:"
-    append err [exec cat $config_file]
+    append err [cat $config_file]
     append err "\nERROR:"
     append err [string trim $error]
     send_data_packet $::test_server_fd err $err
@@ -35,7 +35,7 @@ proc kill_server config {
     # check for leaks
     if {![dict exists $config "skipleaks"]} {
         catch {
-            if {[string match {*Darwin*} [exec uname -a]]} {
+            if {[string match {*Darwin*} [unamea]]} {
                 tags {"leaks"} {
                     xtest "Check for memory leaks (pid $pid)" {
                         set output {0 leaks}
@@ -176,7 +176,7 @@ proc start_server {options {code undefined}} {
         }
     }
 
-    set data [split [exec cat "tests/assets/$baseconfig"] "\n"]
+    set data [split [cat "tests/assets/$baseconfig"] "\n"]
     set config {}
     foreach line $data {
         if {[string length $line] > 0 && [string index $line 0] ne "#"} {
@@ -240,14 +240,14 @@ proc start_server {options {code undefined}} {
 
     if {!$serverisup} {
         set err {}
-        append err [exec cat $stdout] "\n" [exec cat $stderr]
+        append err [cat $stdout] "\n" [cat $stderr]
         start_server_error $config_file $err
         return
     }
 
     # Wait for actual startup
     while {![info exists _pid]} {
-        regexp {PID:\s(\d+)} [exec cat $stdout] _ _pid
+        regexp {PID:\s(\d+)} [cat $stdout] _ _pid
         after 100
     }
 
@@ -269,14 +269,14 @@ proc start_server {options {code undefined}} {
     # if a block of code is supplied, we wait for the server to become
     # available, create a client object and kill the server afterwards
     if {$code ne "undefined"} {
-        set line [exec head -n1 $stdout]
+        set line [head 1 $stdout]
         if {[string match {*already in use*} $line]} {
             error_and_quit $config_file $line
         }
 
         while 1 {
             # check that the server actually started and is ready for connections
-            if {[exec grep "ready to accept" | wc -l < $stdout] > 0} {
+            if {[string first "ready to accept" [cat $stdout]] >= 0} {
                 break
             }
             after 10
