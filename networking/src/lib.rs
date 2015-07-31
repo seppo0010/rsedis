@@ -441,6 +441,17 @@ impl Server {
         }
     }
 
+    #[cfg(windows)]
+    fn reuse_address(&self, builder: &TcpBuilder) -> io::Result<()> {
+        Ok(())
+    }
+
+    #[cfg(not(windows))]
+    fn reuse_address(&self, builder: &TcpBuilder) -> io::Result<()> {
+        try!(builder.reuse_address(true));
+        Ok(())
+    }
+
     /// Join the listener threads.
     pub fn join(&mut self) {
         #![allow(unused_must_use)]
@@ -457,6 +468,8 @@ impl Server {
                 SocketAddr::V4(_) => TcpBuilder::new_v4(),
                 SocketAddr::V6(_) => TcpBuilder::new_v6(),
             });
+
+            try!(self.reuse_address(&builder));
             let listener = try!(try!(
                         builder.bind(addr))
                     .listen(tcp_backlog));
