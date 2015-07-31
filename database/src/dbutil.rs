@@ -55,8 +55,15 @@ pub fn usize_to_vec(i: usize) -> Vec<u8> {
 ///
 /// assert_eq!(vec_to_usize(&vec!['2' as u8, '0' as u8, '0' as u8]).unwrap(), 200);
 /// assert!(vec_to_usize(&vec!['a' as u8]).is_err());
+/// assert!(vec_to_usize(&b"01".to_vec()).is_err());
+/// assert!(vec_to_usize(&b"0".to_vec()).is_ok());
+/// assert!(vec_to_usize(&b"".to_vec()).is_err());
 /// ```
 pub fn vec_to_usize(data: &Vec<u8>) -> Result<usize, OperationError> {
+    // "01" should not be transformed into 1
+    if data.len() == 0 || (data.len() > 1 && data[0] as char == '0') {
+        return Err(OperationError::ValueError);
+    }
     let res = try!(from_utf8(&data));
     Ok(try!(res.parse::<usize>()))
 }
