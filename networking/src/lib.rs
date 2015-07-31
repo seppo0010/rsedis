@@ -1,6 +1,6 @@
 #![feature(duration)]
 #![feature(socket_timeout)]
-#![feature(tcp)]
+#![feature(tcp_extras)]
 #[cfg(unix)]extern crate libc;
 #[cfg(unix)]extern crate unix_socket;
 #[macro_use(log, sendlog)] extern crate logger;
