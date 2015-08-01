@@ -8,7 +8,7 @@ start_server {
 
     foreach {type large} [array get largevalue] {
         tags {"slow"} {
-            xtest "LTRIM stress testing - $type" {
+            test "LTRIM stress testing - $type" {
                 set mylist {}
                 set startlen 32
                 r del mylist
