@@ -499,11 +499,11 @@ fn incrbyfloat(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Resp
 }
 
 fn generic_push(parser: ParsedCommand, db: &mut Database, dbindex: usize, right: bool, create: bool) -> Response {
-    // TODO variadic
-    validate!(parser.argv.len() == 3, "Wrong number of parameters");
+    validate!(parser.argv.len() >= 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
-    let val = try_validate!(parser.get_vec(2), "Invalid value");
-    let r = {
+    let mut r = Response::Nil;
+    for i in 2..parser.argv.len() {
+        let val = try_validate!(parser.get_vec(i), "Invalid value");
         let el;
         if create {
             el = db.get_or_create(dbindex, &key);
@@ -513,11 +513,11 @@ fn generic_push(parser: ParsedCommand, db: &mut Database, dbindex: usize, right:
                 None => return Response::Integer(0),
             }
         }
-        match el.push(val, right) {
+        r = match el.push(val, right) {
             Ok(listsize) => Response::Integer(listsize as i64),
             Err(err) => Response::Error(err.to_string()),
         }
-    };
+    }
     db.key_updated(dbindex, &key);
     r
 }
