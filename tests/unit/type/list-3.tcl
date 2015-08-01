@@ -4,7 +4,7 @@ start_server {
         "list-max-ziplist-size" 16
     }
 } {
-    xtest {Explicit regression for a list bug} {
+    test {Explicit regression for a list bug} {
         set mylist {49376042582 {BkG2o\pIC]4YYJa9cJ4GWZalG[4tin;1D2whSkCOW`mX;SFXGyS8sedcff3fQI^tgPCC@^Nu1J6o]meM@Lko]t_jRyo<xSJ1oObDYd`ppZuW6P@fS278YaOx=s6lvdFlMbP0[SbkI^Kr\HBXtuFaA^mDx:yzS4a[skiiPWhT<nNfAf=aQVfclcuwDrfe;iVuKdNvB9kbfq>tK?tH[\EvWqS]b`o2OCtjg:?nUTwdjpcUm]y:pg5q24q7LlCOwQE^}}
         r del l
         r rpush l [lindex $mylist 0]
@@ -14,7 +14,7 @@ start_server {
     }
 
     tags {slow} {
-        xtest {ziplist implementation: value encoding and backlink} {
+        test {ziplist implementation: value encoding and backlink} {
             if {$::accurate} {set iterations 100} else {set iterations 10}
             for {set j 0} {$j < $iterations} {incr j} {
                 r del l
@@ -51,7 +51,7 @@ start_server {
             }
         }
 
-        xtest {ziplist implementation: encoding stress testing} {
+        test {ziplist implementation: encoding stress testing} {
             for {set j 0} {$j < 200} {incr j} {
                 r del l
                 set l {}
