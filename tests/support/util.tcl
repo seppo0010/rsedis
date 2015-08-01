@@ -22,6 +22,23 @@ proc kill {pid force} {
     }
 }
 
+proc pid_is_alive {pid} {
+    if {[string first "Windows" [unamea]] >= 0} {
+        set output [exec tasklist /FI "PID eq $pid"]
+        if {[string first "No tasks" $output] > -1} {
+            return 0
+        } else {
+            return 1
+        }
+    } else {
+        if {[catch {exec ps -p $pid} err]} {
+            return 0
+        } else {
+            return 1
+        }
+    }
+}
+
 proc head {n path} {
     set fp [open $path r]
     set data {}

@@ -82,11 +82,7 @@ proc kill_server config {
 
 proc is_alive config {
     set pid [dict get $config pid]
-    if {[catch {exec ps -p $pid} err]} {
-        return 0
-    } else {
-        return 1
-    }
+    return [pid_is_alive $pid]
 }
 
 proc ping_server {host port} {
