@@ -1,11 +1,25 @@
 proc unames {} {
     catch { return [exec uname -s] }
-    return "unknown uname -s"
+    return $::tcl_platform(os)
 }
 
 proc unamea {} {
     catch { return [exec uname -a] }
-    return "unknown uname -a"
+    return $::tcl_platform(os)
+}
+
+proc kill {pid force} {
+    if {[string first "Windows" [unamea]] >= 0} {
+        # For some reason, windows ignores the kill without /F
+        # "This process can only be terminated forcefully"
+        return [exec taskkill /PID $pid /F]
+    } else {
+        if {$force} {
+            return [exec kill -9 $pid]
+        } else {
+            return [exec kill $pid]
+        }
+    }
 }
 
 proc head {n path} {
@@ -405,5 +419,5 @@ proc start_write_load {host port seconds} {
 
 # Stop a process generating write load executed with start_write_load.
 proc stop_write_load {handle} {
-    catch {exec /bin/kill -9 $handle}
+    catch {kill $handle true}
 }

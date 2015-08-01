@@ -6,7 +6,7 @@ proc disabled {} {
 }
 
 proc stop_bg_complex_data {handle} {
-    catch {exec /bin/kill -9 $handle}
+    catch {kill $handle true}
 }
 
 start_server {tags {"repl"}} {

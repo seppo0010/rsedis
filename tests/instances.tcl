@@ -102,7 +102,7 @@ proc spawn_instance {type base_port count {conf {}}} {
 proc cleanup {} {
     puts "Cleaning up..."
     foreach pid $::pids {
-        catch {exec kill -9 $pid}
+        catch {kill $pid true}
     }
     foreach dir $::dirs {
         catch {file delete -force $dir}
@@ -396,7 +396,7 @@ proc kill_instance {type id} {
         error "You tried to kill $type $id twice."
     }
 
-    exec kill -9 $pid
+    kill $pid true
     set_instance_attrib $type $id pid -1
     set_instance_attrib $type $id link you_tried_to_talk_with_killed_instance
 

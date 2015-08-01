@@ -4,7 +4,7 @@ proc start_bg_complex_data {host port db ops} {
 }
 
 proc stop_bg_complex_data {handle} {
-    catch {exec /bin/kill -9 $handle}
+    catch {kill $handle true}
 }
 
 # Creates a master-slave pair and breaks the link continuously to force
