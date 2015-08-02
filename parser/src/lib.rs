@@ -226,7 +226,13 @@ fn parse_int(input: &[u8], len: usize) -> Result<(usize, usize), ParseError> {
     let mut argc = 0;
     while input[i] as char != '\r' {
         let c = input[i] as char;
-        if c < '0' || c > '9' {
+        if argc == 0 && c == '-' {
+            while input[i] as char != '\r' {
+                i += 1;
+            }
+            argc = 0;
+            break;
+        } else if c < '0' || c > '9' {
             return Err(ParseError::BadProtocol);
         }
         argc *= 10;
