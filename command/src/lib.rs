@@ -573,7 +573,7 @@ fn generic_rpoplpush(db: &mut Database, dbindex: usize, source: &Vec<u8>, destin
     match db.get(dbindex, destination) {
         Some(el) => match el.llen() {
             Ok(_) => (),
-            Err(_) => return Response::Error("Destination is not a list".to_owned()),
+            Err(_) => return Response::Error("WRONGTYPE Destination is not a list".to_owned()),
         },
         None => (),
     }
@@ -582,7 +582,7 @@ fn generic_rpoplpush(db: &mut Database, dbindex: usize, source: &Vec<u8>, destin
         let sourcelist = match db.get_mut(dbindex, source) {
             Some(sourcelist) => {
                 if sourcelist.llen().is_err() {
-                    return Response::Error("Source is not a list".to_owned());
+                    return Response::Error("WRONGTYPE Source is not a list".to_owned());
                 }
                 sourcelist
             },
