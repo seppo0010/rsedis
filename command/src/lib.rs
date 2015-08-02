@@ -1869,6 +1869,9 @@ pub fn command(
         _ => {},
     }
     if client.multi {
+        if command_name == "watch" || command_name == "unwatch" {
+            return Ok(Response::Error("ERR WATCH not allowed inside MULTI".to_owned()));
+        }
         client.multi_commands.push(parser.into_owned());
         return Ok(Response::Status("QUEUED".to_owned()));
     }
