@@ -333,7 +333,7 @@ start_server {
       r rpush list1 foo
 
       # FIXME: we allow new clients to execute in the middle of a brpoplpush chain
-      after 10
+      after 500
 
       assert_equal {foo} [r lrange list1 0 -1]
       assert_equal {} [r lrange list2 0 -1]
