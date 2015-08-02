@@ -158,7 +158,7 @@ start_server {
         }
     }
 
-    xtest "BLPOP, LPUSH + DEL should not awake blocked client" {
+    test "BLPOP, LPUSH + DEL should not awake blocked client" {
         set rd [redis_deferring_client]
         r del list
 
@@ -187,7 +187,7 @@ start_server {
         $rd read
     } {list b}
 
-    xtest "BLPOP with same key multiple times should work (issue #801)" {
+    test "BLPOP with same key multiple times should work (issue #801)" {
         set rd [redis_deferring_client]
         r del list1 list2
 
@@ -208,7 +208,7 @@ start_server {
         assert_equal [$rd read] {list2 b}
     }
 
-    xtest "MULTI/EXEC is isolated from the point of view of BLPOP" {
+    test "MULTI/EXEC is isolated from the point of view of BLPOP" {
         set rd [redis_deferring_client]
         r del list
         $rd blpop list 0
@@ -220,7 +220,7 @@ start_server {
         $rd read
     } {list c}
 
-    xtest "BLPOP with variadic LPUSH" {
+    test "BLPOP with variadic LPUSH" {
         set rd [redis_deferring_client]
         r del blist target
         if {$::valgrind} {after 100}
@@ -232,7 +232,7 @@ start_server {
         assert_equal foo [lindex [r lrange blist 0 -1] 0]
     }
 
-    xtest "BRPOPLPUSH with zero timeout should block indefinitely" {
+    test "BRPOPLPUSH with zero timeout should block indefinitely" {
         set rd [redis_deferring_client]
         r del blist target
         $rd brpoplpush blist target 0
@@ -242,7 +242,7 @@ start_server {
         assert_equal {foo} [r lrange target 0 -1]
     }
 
-    xtest "BRPOPLPUSH with a client BLPOPing the target list" {
+    test "BRPOPLPUSH with a client BLPOPing the target list" {
         set rd [redis_deferring_client]
         set rd2 [redis_deferring_client]
         r del blist target
@@ -255,7 +255,7 @@ start_server {
         assert_equal 0 [r exists target]
     }
 
-    xtest "BRPOPLPUSH with wrong source type" {
+    test "BRPOPLPUSH with wrong source type" {
         set rd [redis_deferring_client]
         r del blist target
         r set blist nolist
@@ -263,7 +263,7 @@ start_server {
         assert_error "WRONGTYPE*" {$rd read}
     }
 
-    xtest "BRPOPLPUSH with wrong destination type" {
+    test "BRPOPLPUSH with wrong destination type" {
         set rd [redis_deferring_client]
         r del blist target
         r set target nolist
@@ -281,7 +281,7 @@ start_server {
         assert_equal {foo} [r lrange blist 0 -1]
     }
 
-    xtest "BRPOPLPUSH maintains order of elements after failure" {
+    test "BRPOPLPUSH maintains order of elements after failure" {
         set rd [redis_deferring_client]
         r del blist target
         r set target nolist
@@ -291,7 +291,7 @@ start_server {
         r lrange blist 0 -1
     } {a b c}
 
-    xtest "BRPOPLPUSH with multiple blocked clients" {
+    test "BRPOPLPUSH with multiple blocked clients" {
         set rd1 [redis_deferring_client]
         set rd2 [redis_deferring_client]
         r del blist target1 target2
@@ -305,7 +305,7 @@ start_server {
         assert_equal {foo} [r lrange target2 0 -1]
     }
 
-    xtest "Linked BRPOPLPUSH" {
+    test "Linked BRPOPLPUSH" {
       set rd1 [redis_deferring_client]
       set rd2 [redis_deferring_client]
 
@@ -321,7 +321,7 @@ start_server {
       assert_equal {foo} [r lrange list3 0 -1]
     }
 
-    xtest "Circular BRPOPLPUSH" {
+    test "Circular BRPOPLPUSH" {
       set rd1 [redis_deferring_client]
       set rd2 [redis_deferring_client]
 
@@ -332,11 +332,14 @@ start_server {
 
       r rpush list1 foo
 
+      # FIXME: we allow new clients to execute in the middle of a brpoplpush chain
+      after 10
+
       assert_equal {foo} [r lrange list1 0 -1]
       assert_equal {} [r lrange list2 0 -1]
     }
 
-    xtest "Self-referential BRPOPLPUSH" {
+    test "Self-referential BRPOPLPUSH" {
       set rd [redis_deferring_client]
 
       r del blist
@@ -362,7 +365,7 @@ start_server {
         r exec
     } {foo bar {} {} {bar foo}}
 
-    xtest "PUSH resulting from BRPOPLPUSH affect WATCH" {
+    test "PUSH resulting from BRPOPLPUSH affect WATCH" {
         set blocked_client [redis_deferring_client]
         set watching_client [redis_deferring_client]
         r del srclist dstlist somekey
@@ -379,7 +382,7 @@ start_server {
         $watching_client read
     } {}
 
-    xtest "BRPOPLPUSH does not affect WATCH while still blocked" {
+    test "BRPOPLPUSH does not affect WATCH while still blocked" {
         set blocked_client [redis_deferring_client]
         set watching_client [redis_deferring_client]
         r del srclist dstlist somekey
@@ -397,7 +400,7 @@ start_server {
         $watching_client read
     } {somevalue}
 
-    xtest {BRPOPLPUSH timeout} {
+    test {BRPOPLPUSH timeout} {
       set rd [redis_deferring_client]
 
       $rd brpoplpush foo_list bar_list 1
@@ -429,7 +432,7 @@ start_server {
     } {foo aguacate}
 
     foreach {pop} {BLPOP BRPOP} {
-        xtest "$pop: with single empty list argument" {
+        test "$pop: with single empty list argument" {
             set rd [redis_deferring_client]
             r del blist1
             $rd $pop blist1 1
@@ -444,13 +447,13 @@ start_server {
             assert_error "ERR*is negative*" {$rd read}
         }
 
-        xtest "$pop: with non-integer timeout" {
+        test "$pop: with non-integer timeout" {
             set rd [redis_deferring_client]
             $rd $pop blist1 1.1
             assert_error "ERR*not an integer*" {$rd read}
         }
 
-        xtest "$pop: with zero timeout should block indefinitely" {
+        test "$pop: with zero timeout should block indefinitely" {
             # To test this, use a timeout of 0 and wait a second.
             # The blocking pop should still be waiting for a push.
             set rd [redis_deferring_client]
@@ -460,7 +463,7 @@ start_server {
             assert_equal {blist1 foo} [$rd read]
         }
 
-        xtest "$pop: second argument is not a list" {
+        test "$pop: second argument is not a list" {
             set rd [redis_deferring_client]
             r del blist1 blist2
             r set blist2 nolist
@@ -468,14 +471,14 @@ start_server {
             assert_error "WRONGTYPE*" {$rd read}
         }
 
-        xtest "$pop: timeout" {
+        test "$pop: timeout" {
             set rd [redis_deferring_client]
             r del blist1 blist2
             $rd $pop blist1 blist2 1
             assert_equal {} [$rd read]
         }
 
-        xtest "$pop: arguments are empty" {
+        test "$pop: arguments are empty" {
             set rd [redis_deferring_client]
             r del blist1 blist2
 
@@ -539,7 +542,7 @@ start_server {
         }
     }
 
-    xtest {LINSERT raise error on bad syntax} {
+    test {LINSERT raise error on bad syntax} {
         catch {[r linsert xlist aft3r aa 42]} e
         set e
     } {*ERR*syntax*error*}
@@ -663,7 +666,7 @@ start_server {
         assert_equal 0 [r exists dstlist]
     }
 
-    xtest {RPOPLPUSH against non list src key} {
+    test {RPOPLPUSH against non list src key} {
         r del srclist dstlist
         r set srclist x
         assert_error WRONGTYPE* {r rpoplpush srclist dstlist}
@@ -671,7 +674,7 @@ start_server {
         assert_equal 0 [r exists newlist]
     }
 
-    xtest {RPOPLPUSH against non list dst key} {
+    test {RPOPLPUSH against non list dst key} {
         create_list srclist {a b c d}
         r set dstlist x
         assert_error WRONGTYPE* {r rpoplpush srclist dstlist}
