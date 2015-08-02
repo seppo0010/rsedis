@@ -305,7 +305,7 @@ start_server {
         assert_equal {foo} [r lrange target2 0 -1]
     }
 
-    test "Linked BRPOPLPUSH" {
+    xtest "Linked BRPOPLPUSH" {
       set rd1 [redis_deferring_client]
       set rd2 [redis_deferring_client]
 
@@ -365,7 +365,7 @@ start_server {
         r exec
     } {foo bar {} {} {bar foo}}
 
-    test "PUSH resulting from BRPOPLPUSH affect WATCH" {
+    xtest "PUSH resulting from BRPOPLPUSH affect WATCH" {
         set blocked_client [redis_deferring_client]
         set watching_client [redis_deferring_client]
         r del srclist dstlist somekey
