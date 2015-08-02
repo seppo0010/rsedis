@@ -1798,7 +1798,9 @@ pub fn command(
         db: &mut Database,
         client: &mut Client,
         ) -> Result<Response, ResponseError> {
-    opt_validate!(parser.argv.len() > 0, "Not enough arguments");
+    if parser.argv.len() == 0 {
+        return Err(ResponseError::NoReply);
+    }
     let command_name = &*match db.mapped_command(&try_opt_validate!(parser.get_str(0), "Invalid command").to_ascii_lowercase()) {
         Some(c) => c,
         None => return Ok(Response::Error("unknown command".to_owned())),
@@ -1981,9 +1983,9 @@ mod test_command {
     fn nocommand() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
         let parser = ParsedCommand::new(b"", Vec::new());
-        let response = command(parser, &mut db, &mut Client::mock()).unwrap();
+        let response = command(parser, &mut db, &mut Client::mock()).unwrap_err();
         match response {
-            Response::Error(_) => {},
+            ResponseError::NoReply => {},
             _ => assert!(false),
         };
     }
