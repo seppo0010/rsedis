@@ -1,12 +1,9 @@
-#![feature(owned_ascii_ext)]
-
 #[macro_use(log)]
 extern crate logger;
 extern crate rand;
 extern crate time;
 extern crate util;
 
-use std::ascii::OwnedAsciiExt;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufRead;
@@ -183,9 +180,9 @@ impl Config {
                         let command = try!(from_utf8(&*args[1])).to_owned();
                         let newname = try!(from_utf8(&*args[2])).to_owned();
                         if newname.len() > 0 {
-                            self.rename_commands.insert(newname.into_ascii_lowercase(), Some(command.clone().into_ascii_lowercase()));
+                            self.rename_commands.insert(newname.to_lowercase(), Some(command.clone().to_lowercase()));
                         }
-                        self.rename_commands.insert(command.into_ascii_lowercase(), None);
+                        self.rename_commands.insert(command.to_lowercase(), None);
                     }
                 },
                 b"requirepass" => self.requirepass = Some(try!(read_string(args)).to_owned()),
