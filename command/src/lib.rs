@@ -169,6 +169,7 @@ fn setex(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate_arguments_exact!(parser, 4);
     let key = try_validate!(parser.get_vec(1), "ERR syntax error");
     let exp = try_validate!(parser.get_i64(2), "ERR syntax error");
+    validate!(exp >= 0, "ERR invalid expire time");
     let val = try_validate!(parser.get_vec(3), "ERR syntax error");
     match generic_set(db, dbindex, key, val, false, false, Some(exp * 1000)) {
         Ok(_) => Response::Status("OK".to_owned()),
@@ -180,6 +181,7 @@ fn psetex(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response 
     validate_arguments_exact!(parser, 4);
     let key = try_validate!(parser.get_vec(1), "ERR syntax error");
     let exp = try_validate!(parser.get_i64(2), "ERR syntax error");
+    validate!(exp >= 0, "ERR invalid expire time");
     let val = try_validate!(parser.get_vec(3), "ERR syntax error");
     match generic_set(db, dbindex, key, val, false, false, Some(exp)) {
         Ok(_) => Response::Status("OK".to_owned()),
