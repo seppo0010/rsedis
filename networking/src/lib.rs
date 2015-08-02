@@ -291,7 +291,10 @@ impl Client {
                     Err(err) => match err {
                         // if it's incomplete, keep adding to the buffer
                         ParseError::Incomplete => { continue; }
-                        // otherwise there was an error, probably a protocol error
+                        ParseError::BadProtocol(s) => {
+                            let _ = stream_tx.send(Some(Response::Error(s)));
+                            break;
+                        },
                         _ =>  {
                             sendlog!(sender, Verbose, "Protocol error from client: {:?}", err);
                             break;
