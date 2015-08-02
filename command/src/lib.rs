@@ -774,7 +774,7 @@ fn linsert(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response
     match &*before_str.to_ascii_lowercase() {
         "after" => before = false,
         "before" => before = true,
-        _ => return Response::Error("ERR Syntax error".to_owned()),
+        _ => return Response::Error("ERR syntax error".to_owned()),
     };
     let r = match db.get_mut(dbindex, &key) {
         Some(mut el) => match el.linsert(before, pivot, value) {
