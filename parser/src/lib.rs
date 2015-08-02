@@ -257,7 +257,7 @@ fn parse_int(input: &[u8], len: usize) -> Result<(usize, usize), ParseError> {
         return Err(ParseError::Incomplete);
     }
     if input[i] as char != '\n' {
-        return Err(ParseError::BadProtocol("expected \\r\\n separator".to_owned()));
+        return Err(ParseError::BadProtocol(format!("expected \\r\\n separator, got \\r{}", input[i] as char)));
     }
     return Ok((argc, i + 1));
 }
@@ -280,7 +280,7 @@ pub fn parse(input: &[u8]) -> Result<(ParsedCommand, usize), ParseError> {
     while input.len() > pos && input[pos] as char == '\r' {
         if pos + 1 < input.len() {
             if input[pos + 1] as char != '\n' {
-                return Err(ParseError::BadProtocol("expected \\r\\n separator".to_owned()));
+                return Err(ParseError::BadProtocol(format!("expected \\r\\n separator, got \\r{}", input[pos + 1] as char)));
             }
             pos += 2;
         } else {
@@ -291,7 +291,7 @@ pub fn parse(input: &[u8]) -> Result<(ParsedCommand, usize), ParseError> {
         return Err(ParseError::Incomplete);
     }
     if input[pos] as char != '*' {
-        return Err(ParseError::BadProtocol("expected *".to_owned()));
+        return Err(ParseError::BadProtocol(format!("expected '*', got '{}'", input[pos] as char)));
     }
     pos += 1;
     let len = input.len();
@@ -303,7 +303,7 @@ pub fn parse(input: &[u8]) -> Result<(ParsedCommand, usize), ParseError> {
     let mut argv = Vec::new();
     for i in 0..argc {
         if input[pos] as char != '$' {
-            return Err(ParseError::BadProtocol("expected $".to_owned()));
+            return Err(ParseError::BadProtocol(format!("expected '$', got '{}'", input[pos] as char)));
         }
         pos += 1;
         let (arglen, arglenlen) = try!(parse_int(&input[pos..len], len - pos));
