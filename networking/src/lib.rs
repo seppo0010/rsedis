@@ -309,6 +309,9 @@ impl Client {
             match command::command(parsed_command, &mut *db, &mut client) {
                 // received a response, send it to the client
                 Ok(response) => {
+                    // unlock the db; not sure why this is needed?
+                    // if removed, the database stays lock in bpop commands
+                    drop(db);
                     match stream_tx.send(Some(response)) {
                         Ok(_) => (),
                         Err(_) => error = true,
