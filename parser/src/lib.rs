@@ -228,7 +228,7 @@ impl<'a> ParsedCommand<'a> {
 /// Parses the length of the paramenter in the slice
 /// Upon success, it returns a tuple with the length of the argument and the
 /// length of the parsed length.
-fn parse_int(input: &[u8], len: usize) -> Result<(Option<usize>, usize), ParseError> {
+fn parse_int(input: &[u8], len: usize, name: &str) -> Result<(Option<usize>, usize), ParseError> {
     if input.len() == 0 {
         return Err(ParseError::Incomplete);
     }
@@ -244,7 +244,7 @@ fn parse_int(input: &[u8], len: usize) -> Result<(Option<usize>, usize), ParseEr
             argco = None;
             break;
         } else if c < '0' || c > '9' {
-            return Err(ParseError::BadProtocol("invalid length".to_owned()));
+            return Err(ParseError::BadProtocol(format!("invalid {} length", name)));
         }
         argc *= 10;
         argc += input[i] as usize - '0' as usize;
@@ -297,7 +297,7 @@ pub fn parse(input: &[u8]) -> Result<(ParsedCommand, usize), ParseError> {
     }
     pos += 1;
     let len = input.len();
-    let (argco, intlen) = try!(parse_int(&input[pos..len], len - pos));
+    let (argco, intlen) = try!(parse_int(&input[pos..len], len - pos, "multibulk"));
     let argc = match argco {
         Some(i) => i,
         None => 0,
@@ -312,7 +312,7 @@ pub fn parse(input: &[u8]) -> Result<(ParsedCommand, usize), ParseError> {
             return Err(ParseError::BadProtocol(format!("expected '$', got '{}'", input[pos] as char)));
         }
         pos += 1;
-        let (argleno, arglenlen) = try!(parse_int(&input[pos..len], len - pos));
+        let (argleno, arglenlen) = try!(parse_int(&input[pos..len], len - pos, "bulk"));
         let arglen = match argleno {
             Some(i) => i,
             None => return Err(ParseError::BadProtocol("invalid bulk length".to_owned())),
