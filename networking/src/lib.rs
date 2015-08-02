@@ -1,6 +1,5 @@
 #![feature(duration)]
 #![feature(socket_timeout)]
-#![feature(tcp_extras)]
 #[cfg(unix)]extern crate libc;
 #[cfg(unix)]extern crate unix_socket;
 #[macro_use(log, sendlog)] extern crate logger;
@@ -26,7 +25,7 @@ use std::thread;
 #[cfg(unix)] use libc::funcs::posix88::unistd::fork;
 #[cfg(unix)] use libc::funcs::c95::stdlib::exit;
 #[cfg(unix)] use libc::funcs::posix88::unistd::getpid;
-use net2::TcpBuilder;
+use net2::{TcpBuilder, TcpStreamExt};
 #[cfg(unix)] use unix_socket::{UnixStream, UnixListener};
 
 use config::Config;
@@ -67,9 +66,9 @@ impl Stream {
 
     /// Sets the keepalive timeout to the timeout specified.
     /// It fails silently for UNIX sockets.
-    fn set_keepalive(&self, seconds: Option<u32>) -> io::Result<()> {
+    fn set_keepalive(&self, duration: Option<Duration>) -> io::Result<()> {
         match *self {
-            Stream::Tcp(ref s) => s.set_keepalive(seconds),
+            Stream::Tcp(ref s) => TcpStreamExt::set_keepalive(s, duration),
             Stream::Unix(_) => Ok(()),
         }
     }
@@ -125,9 +124,9 @@ impl Stream {
 
     /// Sets the keepalive timeout to the timeout specified.
     /// It fails silently for UNIX sockets.
-    fn set_keepalive(&self, seconds: Option<u32>) -> io::Result<()> {
+    fn set_keepalive(&self, duration: Option<Duration>) -> io::Result<()> {
         match *self {
-            Stream::Tcp(ref s) => s.set_keepalive(seconds),
+            Stream::Tcp(ref s) => TcpStreamExt::set_keepalive(s, duration),
         }
     }
 
@@ -375,7 +374,7 @@ macro_rules! handle_listener {
                         };
                         thread::spawn(move || {
                             let mut client = Client::$t(stream, db1, id);
-                            client.stream.set_keepalive(if $tcp_keepalive > 0 { Some($tcp_keepalive) } else { None }).unwrap();
+                            client.stream.set_keepalive(if $tcp_keepalive > 0 { Some(Duration::from_secs($tcp_keepalive as u64)) } else { None }).unwrap();
                             client.stream.set_read_timeout(if $timeout > 0 { Some(Duration::new($timeout, 0)) } else { None }).unwrap();
                             client.stream.set_write_timeout(if $timeout > 0 { Some(Duration::new($timeout, 0)) } else { None }).unwrap();
                             client.run(mysender);
