@@ -1843,12 +1843,16 @@ pub fn command(
             client.auth = true;
             return Ok(Response::Status("OK".to_owned()));
         } else {
-            return Ok(Response::Error("wrong password".to_owned()))
+            return Ok(Response::Error(if db.config.requirepass.is_none() {
+                "ERR Client sent AUTH, but no password is set"
+            } else {
+                "ERR invalid password"
+            }.to_owned()));
         }
     }
 
     if !client.auth {
-        return Ok(Response::Error("require pass".to_owned()))
+        return Ok(Response::Error("NOAUTH Authentication required.".to_owned()))
     }
 
     // commands that are not executed inside MULTI
