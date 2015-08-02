@@ -620,7 +620,7 @@ fn brpoplpush(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Resul
 
     let source = try_opt_validate!(parser.get_vec(1), "Invalid source");
     let destination = try_opt_validate!(parser.get_vec(2), "Invalid destination");
-    let timeout = try_opt_validate!(parser.get_i64(3), "Invalid timeout");
+    let timeout = try_opt_validate!(parser.get_i64(3), "ERR timeout is not an integer");
     let time = mstime();
 
     let r = generic_rpoplpush(db, dbindex, &source, &destination);
@@ -694,7 +694,7 @@ fn generic_bpop(parser: ParsedCommand, db: &mut Database, dbindex: usize, right:
             None => keys.push(key),
         }
     }
-    let timeout = try_opt_validate!(parser.get_i64(parser.argv.len() - 1), "Invalid timeout");
+    let timeout = try_opt_validate!(parser.get_i64(parser.argv.len() - 1), "ERR timeout is not an integer");
 
     let (txkey, rxkey) = channel();
     let (txcommand, rxcommand) = channel();
