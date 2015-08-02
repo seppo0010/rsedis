@@ -260,36 +260,46 @@ fn parse_int(input: &[u8], len: usize) -> Result<(usize, usize), ParseError> {
 /// assert_eq!(parser.get_i64(2).unwrap(), 10);
 /// ```
 pub fn parse(input: &[u8]) -> Result<(ParsedCommand, usize), ParseError> {
-    if input.len() == 0 {
-        return Err(ParseError::Incomplete);
-    }
-    if input[0] as char != '*' {
-        return Err(ParseError::BadProtocol);
-    } else {
-        let mut pos = 1;
-        let len = input.len();
-        let (argc, intlen) = try!(parse_int(&input[pos..len], len - pos));
-        pos += intlen;
-        let mut argv = Vec::new();
-        for i in 0..argc {
-            if input[pos] as char != '$' {
+    let mut pos = 0;
+    while input.len() > pos && input[pos] as char == '\r' {
+        if pos + 1 < input.len() {
+            if input[pos + 1] as char != '\n' {
                 return Err(ParseError::BadProtocol);
             }
-            pos += 1;
-            let (arglen, arglenlen) = try!(parse_int(&input[pos..len], len - pos));
-            pos += arglenlen;
-            let arg = Argument {
-                pos: pos,
-                len: arglen,
-            };
-            argv.push(arg);
-            pos += arglen + 2;
-            if pos > len || (pos == len && i != argc - 1) {
-                return Err(ParseError::Incomplete);
-            }
+            pos += 2;
+        } else {
+            return Err(ParseError::Incomplete);
         }
-        Ok((ParsedCommand::new(input, argv), pos))
     }
+    if pos >= input.len() {
+        return Err(ParseError::Incomplete);
+    }
+    if input[pos] as char != '*' {
+        return Err(ParseError::BadProtocol);
+    }
+    pos += 1;
+    let len = input.len();
+    let (argc, intlen) = try!(parse_int(&input[pos..len], len - pos));
+    pos += intlen;
+    let mut argv = Vec::new();
+    for i in 0..argc {
+        if input[pos] as char != '$' {
+            return Err(ParseError::BadProtocol);
+        }
+        pos += 1;
+        let (arglen, arglenlen) = try!(parse_int(&input[pos..len], len - pos));
+        pos += arglenlen;
+        let arg = Argument {
+            pos: pos,
+            len: arglen,
+        };
+        argv.push(arg);
+        pos += arglen + 2;
+        if pos > len || (pos == len && i != argc - 1) {
+            return Err(ParseError::Incomplete);
+        }
+    }
+    Ok((ParsedCommand::new(input, argv), pos))
 }
 
 
@@ -415,6 +425,23 @@ mod test_parser {
         parser.written += message.len();
         parser.get_mut().extend(&*message.to_vec());
         parser.next().unwrap();
+    }
+
+    #[test]
+    fn parser_skip_blank_line() {
+        let mut parser = Parser::new();
+        {
+            let message = b"\r\n\r\n*1\r\n$3\r\nfoo\r\n";
+            parser.written += message.len();
+            let mut v = parser.get_mut();
+            v.extend(&*message.to_vec());
+        }
+
+        {
+            let command = parser.next().unwrap();
+            assert_eq!(command.argv.len(), 1);
+            assert_eq!(command.get_str(0).unwrap(), "foo");
+        }
     }
 
     #[test]
