@@ -317,6 +317,9 @@ pub fn parse(input: &[u8]) -> Result<(ParsedCommand, usize), ParseError> {
             Some(i) => i,
             None => return Err(ParseError::BadProtocol("invalid bulk length".to_owned())),
         };
+        if arglen > 512*1024*1024 {
+            return Err(ParseError::BadProtocol("invalid bulk length".to_owned()));
+        }
         pos += arglenlen;
         let arg = Argument {
             pos: pos,
