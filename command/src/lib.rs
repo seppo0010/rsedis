@@ -676,22 +676,23 @@ fn generic_bpop(parser: ParsedCommand, db: &mut Database, dbindex: usize, right:
     let mut keys = vec![];
     for i in 1..parser.argv.len() - 1 {
         let key = try_opt_validate!(parser.get_vec(i), "Invalid key");
-        match db.get_mut(dbindex, &key) {
+        let val = match db.get_mut(dbindex, &key) {
             Some(mut list) => match list.pop(right) {
-                Ok(el) => {
-                    match el {
-                        Some(val) => return Ok(Response::Array(vec![
-                                    Response::Data(key),
-                                    Response::Data(val),
-                                    ])),
-                        None => (),
-                    }
-                }
+                Ok(el) => el,
                 Err(err) => return Ok(Response::Error(err.to_string())),
             },
-            None => (),
+            None => None,
+        };
+        match val {
+            Some(val) => {
+                db.key_updated(dbindex, &key);
+                return Ok(Response::Array(vec![
+                        Response::Data(key),
+                        Response::Data(val),
+                        ]))
+            },
+            None => keys.push(key),
         }
-        keys.push(key);
     }
     let timeout = try_opt_validate!(parser.get_i64(parser.argv.len() - 1), "Invalid timeout");
 
