@@ -219,6 +219,9 @@ impl<'a> ParsedCommand<'a> {
 /// Upon success, it returns a tuple with the length of the argument and the
 /// length of the parsed length.
 fn parse_int(input: &[u8], len: usize) -> Result<(usize, usize), ParseError> {
+    if input.len() == 0 {
+        return Err(ParseError::Incomplete);
+    }
     let mut i = 0;
     let mut argc = 0;
     while input[i] as char != '\r' {
