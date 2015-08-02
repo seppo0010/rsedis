@@ -297,6 +297,9 @@ pub fn parse(input: &[u8]) -> Result<(ParsedCommand, usize), ParseError> {
     let len = input.len();
     let (argc, intlen) = try!(parse_int(&input[pos..len], len - pos));
     pos += intlen;
+    if argc > 1024 * 1024 {
+        return Err(ParseError::BadProtocol("invalid multibulk length".to_owned()));
+    }
     let mut argv = Vec::new();
     for i in 0..argc {
         if input[pos] as char != '$' {
