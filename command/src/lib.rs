@@ -983,22 +983,26 @@ fn spop(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate_arguments_gte!(parser, 2);
     validate_arguments_lte!(parser, 3);
     let key = try_validate!(parser.get_vec(1), "Invalid key");
-    let mut value = match db.get_mut(dbindex, &key) {
-        Some(el) => el,
-        None => return if parser.argv.len() == 2 { Response::Nil } else { Response::Array(vec![]) },
+    let r = {
+        let mut value = match db.get_mut(dbindex, &key) {
+            Some(el) => el,
+            None => return if parser.argv.len() == 2 { Response::Nil } else { Response::Array(vec![]) },
+        };
+        if parser.argv.len() == 2 {
+            match value.spop(1) {
+                Ok(els) => if els.len() > 0 { Response::Data(els[0].clone()) } else { Response::Nil },
+                Err(err) => Response::Error(err.to_string()),
+            }
+        } else {
+            let count = try_validate!(parser.get_i64(2), "Invalid count");
+            match value.spop(count as usize) {
+                Ok(els) => Response::Array(els.iter().map(|x| Response::Data(x.clone())).collect::<Vec<_>>()),
+                Err(err) => Response::Error(err.to_string()),
+            }
+        }
     };
-    if parser.argv.len() == 2 {
-        match value.spop(1) {
-            Ok(els) => if els.len() > 0 { Response::Data(els[0].clone()) } else { Response::Nil },
-            Err(err) => Response::Error(err.to_string()),
-        }
-    } else {
-        let count = try_validate!(parser.get_i64(2), "Invalid count");
-        match value.spop(count as usize) {
-            Ok(els) => Response::Array(els.iter().map(|x| Response::Data(x.clone())).collect::<Vec<_>>()),
-            Err(err) => Response::Error(err.to_string()),
-        }
-    }
+    db.key_updated(dbindex, &key);
+    r
 }
 
 fn smove(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
