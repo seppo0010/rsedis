@@ -253,7 +253,7 @@ impl Client {
         let mut this_command:Option<OwnedParsedCommand>;
         let mut next_command:Option<OwnedParsedCommand> = None;
         loop {
-            {
+            if next_command.is_none() {
                 parser.allocate();
                 let len = {
                     let pos = parser.written;
