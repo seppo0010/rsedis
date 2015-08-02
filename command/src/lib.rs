@@ -1809,10 +1809,10 @@ fn exec(db: &mut Database, client: &mut Client) -> Response {
         return Response::Error("ERR EXEC without MULTI".to_owned());
     }
     client.multi = false;
+    let c = replace(&mut client.multi_commands, vec![]);
     if !generic_unwatch(db, client.id, &mut client.watched_keys) {
         return Response::Nil;
     }
-    let c = replace(&mut client.multi_commands, vec![]);
     Response::Array(c.iter().map(|c| command(c.get_command(), db, client).unwrap()).collect())
 }
 
