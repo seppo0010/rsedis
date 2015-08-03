@@ -1620,16 +1620,27 @@ fn zinterstore(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Resp
     zinter_union_store(parser, db, dbindex, false)
 }
 
-fn ping(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
+fn ping(parser: ParsedCommand, client: &mut Client) -> Response {
     #![allow(unused_variables)]
     validate!(parser.argv.len() <= 2, format!("ERR wrong number of arguments for '{}' command", parser.get_str(0).unwrap()));
-    if parser.argv.len() == 2 {
-        match parser.get_vec(1) {
-            Ok(r) => Response::Data(r),
-            Err(err) => Response::Error(err.to_string()),
+    if client.subscriptions.len() > 0 {
+        if parser.argv.len() == 2 {
+            match parser.get_vec(1) {
+                Ok(r) => Response::Array(vec![Response::Data(b"pong".to_vec()), Response::Data(r)]),
+                Err(err) => Response::Error(err.to_string()),
+            }
+        } else {
+            Response::Array(vec![Response::Data(b"pong".to_vec()), Response::Data(vec![])])
         }
     } else {
-        Response::Status("PONG".to_owned())
+        if parser.argv.len() == 2 {
+            match parser.get_vec(1) {
+                Ok(r) => Response::Data(r),
+                Err(err) => Response::Error(err.to_string()),
+            }
+        } else {
+            Response::Status("PONG".to_owned())
+        }
     }
 }
 
@@ -1867,6 +1878,7 @@ pub fn command(
         "multi" => return Ok(multi(client)),
         "discard" => return Ok(discard(db, client)),
         "exec" => return Ok(exec(db, client)),
+        "ping" => return Ok(ping(parser, client)),
         _ => {},
     }
     if client.multi {
@@ -1917,7 +1929,6 @@ pub fn command(
         "decrby" => decrby(parser, db, dbindex),
         "incrbyfloat" => incrbyfloat(parser, db, dbindex),
         "exists" => exists(parser, db, dbindex),
-        "ping" => ping(parser, db, dbindex),
         "flushdb" => flushdb(parser, db, dbindex),
         "flushall" => flushall(parser, db, dbindex),
         "lpush" => lpush(parser, db, dbindex),
