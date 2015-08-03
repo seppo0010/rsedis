@@ -88,7 +88,7 @@ start_server {tags {"expire"}} {
         list $a $b
     } {somevalue {}}
 
-    test {PEXPIRE/PSETEX/PEXPIREAT can set sub-second expires} {
+    xtest {PEXPIRE/PSETEX/PEXPIREAT can set sub-second expires} {
         # This test is very likely to do a false positive if the
         # server is under pressure, so if it does not work give it a few more
         # chances.
