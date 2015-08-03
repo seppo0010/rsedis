@@ -1327,14 +1327,14 @@ fn zremrangebylex(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> R
     validate_arguments_exact!(parser, 4);
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let min = {
-        let m = try_validate!(parser.get_vec(2), "Invalid min");
+        let m = try_validate!(parser.get_vec(2), "ERR min or max not valid string range item");
         match get_vec_bound(m) {
             Ok(v) => v,
             Err(e) => return e,
         }
     };
     let max = {
-        let m = try_validate!(parser.get_vec(3), "Invalid max");
+        let m = try_validate!(parser.get_vec(3), "ERR min or max not valid string range item");
         match get_vec_bound(m) {
             Ok(v) => v,
             Err(e) => return e,
@@ -1456,14 +1456,24 @@ fn zrevrangebyscore(parser: ParsedCommand, db: &mut Database, dbindex: usize) ->
 
 fn get_vec_bound(_m: Vec<u8>) -> Result<Bound<Vec<u8>>, Response> {
     let mut m = _m;
-    if m.len() == 0 { return Err(Response::Error("Syntax error".to_string())); }
+    if m.len() == 0 { return Err(Response::Error("ERR min or max not valid string range item".to_string())); }
     // FIXME: unnecessary memory move?
     Ok(match m.remove(0) as char {
         '(' => Bound::Excluded(m),
         '[' => Bound::Included(m),
-        '-' => Bound::Unbounded,
-        '+' => Bound::Unbounded,
-        _ => return Err(Response::Error("Syntax error".to_string())),
+        '-' => {
+            if m.len() > 0 {
+                return Err(Response::Error("ERR min or max not valid string range item".to_string()));
+            }
+            Bound::Unbounded
+        },
+        '+' => {
+            if m.len() > 0 {
+                return Err(Response::Error("ERR min or max not valid string range item".to_string()));
+            }
+            Bound::Unbounded
+        },
+        _ => return Err(Response::Error("ERR min or max not valid string range item".to_string())),
     })
 }
 
@@ -1472,14 +1482,14 @@ fn generic_zrangebylex(parser: ParsedCommand, db: &mut Database, dbindex: usize,
     validate!(len == 4 || len == 7, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let min = {
-        let m = try_validate!(parser.get_vec(2), "Invalid min");
+        let m = try_validate!(parser.get_vec(2), "ERR min or max not valid string range item");
         match get_vec_bound(m) {
             Ok(v) => v,
             Err(e) => return e,
         }
     };
     let max = {
-        let m = try_validate!(parser.get_vec(3), "Invalid max");
+        let m = try_validate!(parser.get_vec(3), "ERR min or max not valid string range item");
         match get_vec_bound(m) {
             Ok(v) => v,
             Err(e) => return e,
@@ -1518,14 +1528,14 @@ fn zlexcount(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Respon
     validate_arguments_exact!(parser, 4);
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let min = {
-        let m = try_validate!(parser.get_vec(2), "Invalid min");
+        let m = try_validate!(parser.get_vec(2), "ERR min or max not valid string range item");
         match get_vec_bound(m) {
             Ok(v) => v,
             Err(e) => return e,
         }
     };
     let max = {
-        let m = try_validate!(parser.get_vec(3), "Invalid max");
+        let m = try_validate!(parser.get_vec(3), "ERR min or max not valid string range item");
         match get_vec_bound(m) {
             Ok(v) => v,
             Err(e) => return e,
