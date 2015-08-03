@@ -15,10 +15,12 @@ pub enum ValueString {
 
 impl ValueString {
     pub fn new(newvalue: Vec<u8>) -> Self {
-        if newvalue.len() < 32 { // ought to be enough!
-            if let Ok(utf8) = from_utf8(&*newvalue) {
-                if let Ok(i) = utf8.parse::<i64>() {
-                    return ValueString::Integer(i);
+        if newvalue.len() > 0 && newvalue.len() < 32 { // ought to be enough!
+            if newvalue[0] as char != '0' {
+                if let Ok(utf8) = from_utf8(&*newvalue) {
+                    if let Ok(i) = utf8.parse::<i64>() {
+                        return ValueString::Integer(i);
+                    }
                 }
             }
         }
