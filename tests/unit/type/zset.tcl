@@ -26,7 +26,7 @@ start_server {tags {"zset"}} {
             assert_encoding $encoding ztmp
         }
 
-        xtest "ZSET basic ZADD and score update - $encoding" {
+        test "ZSET basic ZADD and score update - $encoding" {
             r del ztmp
             r zadd ztmp 10 x
             r zadd ztmp 20 y
@@ -37,41 +37,41 @@ start_server {tags {"zset"}} {
             assert_equal {y x z} [r zrange ztmp 0 -1]
         }
 
-        xtest "ZSET element can't be set to NaN with ZADD - $encoding" {
+        test "ZSET element can't be set to NaN with ZADD - $encoding" {
             assert_error "*not*float*" {r zadd myzset nan abc}
         }
 
-        xtest "ZSET element can't be set to NaN with ZINCRBY" {
+        test "ZSET element can't be set to NaN with ZINCRBY" {
             assert_error "*not*float*" {r zadd myzset nan abc}
         }
 
-        xtest "ZADD with options syntax error with incomplete pair" {
+        test "ZADD with options syntax error with incomplete pair" {
             r del ztmp
             catch {r zadd ztmp xx 10 x 20} err
             set err
         } {ERR*}
 
-        xtest "ZADD XX option without key - $encoding" {
+        test "ZADD XX option without key - $encoding" {
             r del ztmp
             assert {[r zadd ztmp xx 10 x] == 0}
             assert {[r type ztmp] eq {none}}
         }
 
-        xtest "ZADD XX existing key - $encoding" {
+        test "ZADD XX existing key - $encoding" {
             r del ztmp
             r zadd ztmp 10 x
             assert {[r zadd ztmp xx 20 y] == 0}
             assert {[r zcard ztmp] == 1}
         }
 
-        xtest "ZADD XX returns the number of elements actually added" {
+        test "ZADD XX returns the number of elements actually added" {
             r del ztmp
             r zadd ztmp 10 x
             set retval [r zadd ztmp 10 x 20 y 30 z]
             assert {$retval == 2}
         }
 
-        xtest "ZADD XX updates existing elements score" {
+        test "ZADD XX updates existing elements score" {
             r del ztmp
             r zadd ztmp 10 x 20 y 30 z
             r zadd ztmp xx 5 foo 11 x 21 y 40 zap
@@ -80,19 +80,19 @@ start_server {tags {"zset"}} {
             assert {[r zscore ztmp y] == 21}
         }
 
-        xtest "ZADD XX and NX are not compatible" {
+        test "ZADD XX and NX are not compatible" {
             r del ztmp
             catch {r zadd ztmp xx nx 10 x} err
             set err
         } {ERR*}
 
-        xtest "ZADD NX with non exisitng key" {
+        test "ZADD NX with non exisitng key" {
             r del ztmp
             r zadd ztmp nx 10 x 20 y 30 z
             assert {[r zcard ztmp] == 3}
         }
 
-        xtest "ZADD NX only add new elements without updating old ones" {
+        test "ZADD NX only add new elements without updating old ones" {
             r del ztmp
             r zadd ztmp 10 x 20 y 30 z
             assert {[r zadd ztmp nx 11 x 21 y 100 a 200 b] == 2}
@@ -102,21 +102,21 @@ start_server {tags {"zset"}} {
             assert {[r zscore ztmp b] == 200}
         }
 
-        xtest "ZADD INCR works like ZINCRBY" {
+        test "ZADD INCR works like ZINCRBY" {
             r del ztmp
             r zadd ztmp 10 x 20 y 30 z
             r zadd ztmp INCR 15 x
             assert {[r zscore ztmp x] == 25}
         }
 
-        xtest "ZADD INCR works with a single score-elemenet pair" {
+        test "ZADD INCR works with a single score-elemenet pair" {
             r del ztmp
             r zadd ztmp 10 x 20 y 30 z
             catch {r zadd ztmp INCR 15 x 10 y} err
             set err
         } {ERR*}
 
-        xtest "ZADD CH option changes return value to all changed elements" {
+        test "ZADD CH option changes return value to all changed elements" {
             r del ztmp
             r zadd ztmp 10 x 20 y 30 z
             assert {[r zadd ztmp 11 x 21 y 30 z] == 0}
@@ -128,42 +128,42 @@ start_server {tags {"zset"}} {
             assert_error "*NaN*" {r zincrby myzset -inf abc}
         }
 
-        xtest {ZADD - Variadic version base case} {
+        test {ZADD - Variadic version base case} {
             r del myzset
             list [r zadd myzset 10 a 20 b 30 c] [r zrange myzset 0 -1 withscores]
         } {3 {a 10 b 20 c 30}}
 
-        xtest {ZADD - Return value is the number of actually added items} {
+        test {ZADD - Return value is the number of actually added items} {
             list [r zadd myzset 5 x 20 b 30 c] [r zrange myzset 0 -1 withscores]
         } {1 {x 5 a 10 b 20 c 30}}
 
-        xtest {ZADD - Variadic version does not add nothing on single parsing err} {
+        test {ZADD - Variadic version does not add nothing on single parsing err} {
             r del myzset
             catch {r zadd myzset 10 a 20 b 30.badscore c} e
             assert_match {*ERR*not*float*} $e
             r exists myzset
         } {0}
 
-        xtest {ZADD - Variadic version will raise error on missing arg} {
+        test {ZADD - Variadic version will raise error on missing arg} {
             r del myzset
             catch {r zadd myzset 10 a 20 b 30 c 40} e
             assert_match {*ERR*syntax*} $e
         }
 
-        xtest {ZINCRBY does not work variadic even if shares ZADD implementation} {
+        test {ZINCRBY does not work variadic even if shares ZADD implementation} {
             r del myzset
             catch {r zincrby myzset 10 a 20 b 30 c} e
             assert_match {*ERR*wrong*number*arg*} $e
         }
 
-        xtest "ZCARD basics - $encoding" {
+        test "ZCARD basics - $encoding" {
             r del ztmp
             r zadd ztmp 10 a 20 b 30 c
             assert_equal 3 [r zcard ztmp]
             assert_equal 0 [r zcard zdoesntexist]
         }
 
-        xtest "ZREM removes key after last element is removed" {
+        test "ZREM removes key after last element is removed" {
             r del ztmp
             r zadd ztmp 10 x
             r zadd ztmp 20 y
@@ -175,7 +175,7 @@ start_server {tags {"zset"}} {
             assert_equal 0 [r exists ztmp]
         }
 
-        xtest "ZREM variadic version" {
+        test "ZREM variadic version" {
             r del ztmp
             r zadd ztmp 10 a 20 b 30 c
             assert_equal 2 [r zrem ztmp x y a b k]
@@ -184,13 +184,13 @@ start_server {tags {"zset"}} {
             r exists ztmp
         } {0}
 
-        xtest "ZREM variadic version -- remove elements after key deletion" {
+        test "ZREM variadic version -- remove elements after key deletion" {
             r del ztmp
             r zadd ztmp 10 a 20 b 30 c
             r zrem ztmp a b c d e f g
         } {3}
 
-        xtest "ZRANGE basics - $encoding" {
+        test "ZRANGE basics - $encoding" {
             r del ztmp
             r zadd ztmp 1 a
             r zadd ztmp 2 b
@@ -220,7 +220,7 @@ start_server {tags {"zset"}} {
             assert_equal {a 1 b 2 c 3 d 4} [r zrange ztmp 0 -1 withscores]
         }
 
-        xtest "ZREVRANGE basics - $encoding" {
+        test "ZREVRANGE basics - $encoding" {
             r del ztmp
             r zadd ztmp 1 a
             r zadd ztmp 2 b
@@ -250,7 +250,7 @@ start_server {tags {"zset"}} {
             assert_equal {d 4 c 3 b 2 a 1} [r zrevrange ztmp 0 -1 withscores]
         }
 
-        xtest "ZRANK/ZREVRANK basics - $encoding" {
+        test "ZRANK/ZREVRANK basics - $encoding" {
             r del zranktmp
             r zadd zranktmp 10 x
             r zadd zranktmp 20 y
@@ -265,20 +265,20 @@ start_server {tags {"zset"}} {
             assert_equal "" [r zrevrank zranktmp foo]
         }
 
-        xtest "ZRANK - after deletion - $encoding" {
+        test "ZRANK - after deletion - $encoding" {
             r zrem zranktmp y
             assert_equal 0 [r zrank zranktmp x]
             assert_equal 1 [r zrank zranktmp z]
         }
 
-        xtest "ZINCRBY - can create a new sorted set - $encoding" {
+        test "ZINCRBY - can create a new sorted set - $encoding" {
             r del zset
             r zincrby zset 1 foo
             assert_equal {foo} [r zrange zset 0 -1]
             assert_equal 1 [r zscore zset foo]
         }
 
-        xtest "ZINCRBY - increment and decrement - $encoding" {
+        test "ZINCRBY - increment and decrement - $encoding" {
             r zincrby zset 2 foo
             r zincrby zset 1 bar
             assert_equal {bar foo} [r zrange zset 0 -1]
@@ -321,7 +321,7 @@ start_server {tags {"zset"}} {
             assert_equal {f}   [r zrevrangebyscore zset (+inf (4]
             assert_equal 2 [r zcount zset (0 (3]
 
-            # xtest empty ranges
+            # test empty ranges
             r zrem zset a
             r zrem zset g
 
@@ -348,7 +348,7 @@ start_server {tags {"zset"}} {
             assert_equal {} [r zrangebyscore zset (2.4 (2.6]
         }
 
-        xtest "ZRANGEBYSCORE with WITHSCORES" {
+        test "ZRANGEBYSCORE with WITHSCORES" {
             create_default_zset
             assert_equal {b 1 c 2 d 3} [r zrangebyscore zset 0 3 withscores]
             assert_equal {d 3 c 2 b 1} [r zrevrangebyscore zset 3 0 withscores]
