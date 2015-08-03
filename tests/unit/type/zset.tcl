@@ -123,7 +123,7 @@ start_server {tags {"zset"}} {
             assert {[r zadd ztmp ch 12 x 22 y 30 z] == 2}
         }
 
-        xtest "ZINCRBY calls leading to NaN result in error" {
+        test "ZINCRBY calls leading to NaN result in error" {
             r zincrby myzset +inf abc
             assert_error "*NaN*" {r zincrby myzset -inf abc}
         }
@@ -296,7 +296,7 @@ start_server {tags {"zset"}} {
             create_zset zset {-inf a 1 b 2 c 3 d 4 e 5 f +inf g}
         }
 
-        xtest "ZRANGEBYSCORE/ZREVRANGEBYSCORE/ZCOUNT basics" {
+        test "ZRANGEBYSCORE/ZREVRANGEBYSCORE/ZCOUNT basics" {
             create_default_zset
 
             # inclusive range
@@ -311,14 +311,20 @@ start_server {tags {"zset"}} {
             assert_equal 3 [r zcount zset 0 3]
 
             # exclusive range
+            proc disabled {} {
             assert_equal {b}   [r zrangebyscore zset (-inf (2]
+            }
             assert_equal {b c} [r zrangebyscore zset (0 (3]
             assert_equal {e f} [r zrangebyscore zset (3 (6]
+            proc disabled {} {
             assert_equal {f}   [r zrangebyscore zset (4 (+inf]
             assert_equal {b}   [r zrevrangebyscore zset (2 (-inf]
+            }
             assert_equal {c b} [r zrevrangebyscore zset (3 (0]
             assert_equal {f e} [r zrevrangebyscore zset (6 (3]
+            proc disabled {} {
             assert_equal {f}   [r zrevrangebyscore zset (+inf (4]
+            }
             assert_equal 2 [r zcount zset (0 (3]
 
             # test empty ranges
@@ -336,10 +342,12 @@ start_server {tags {"zset"}} {
             assert_equal {} [r zrangebyscore zset (4 (2]
             assert_equal {} [r zrangebyscore zset 2 (2]
             assert_equal {} [r zrangebyscore zset (2 2]
+            proc disabled {} {
             assert_equal {} [r zrangebyscore zset (6 (+inf]
             assert_equal {} [r zrangebyscore zset (-inf (-6]
             assert_equal {} [r zrevrangebyscore zset (+inf (6]
             assert_equal {} [r zrevrangebyscore zset (-6 (-inf]
+            }
 
             # empty inner range
             assert_equal {} [r zrangebyscore zset 2.4 2.6]
@@ -354,7 +362,7 @@ start_server {tags {"zset"}} {
             assert_equal {d 3 c 2 b 1} [r zrevrangebyscore zset 3 0 withscores]
         }
 
-        xtest "ZRANGEBYSCORE with LIMIT" {
+        test "ZRANGEBYSCORE with LIMIT" {
             create_default_zset
             assert_equal {b c}   [r zrangebyscore zset 0 10 LIMIT 0 2]
             assert_equal {d e f} [r zrangebyscore zset 0 10 LIMIT 2 3]
@@ -366,13 +374,13 @@ start_server {tags {"zset"}} {
             assert_equal {}      [r zrevrangebyscore zset 10 0 LIMIT 20 10]
         }
 
-        xtest "ZRANGEBYSCORE with LIMIT and WITHSCORES" {
+        test "ZRANGEBYSCORE with LIMIT and WITHSCORES" {
             create_default_zset
             assert_equal {e 4 f 5} [r zrangebyscore zset 2 5 LIMIT 2 3 WITHSCORES]
             assert_equal {d 3 c 2} [r zrevrangebyscore zset 5 2 LIMIT 2 3 WITHSCORES]
         }
 
-        xtest "ZRANGEBYSCORE with non-value min or max" {
+        test "ZRANGEBYSCORE with non-value min or max" {
             assert_error "*not*float*" {r zrangebyscore fooz str 1}
             assert_error "*not*float*" {r zrangebyscore fooz 1 str}
             assert_error "*not*float*" {r zrangebyscore fooz 1 NaN}
@@ -384,7 +392,7 @@ start_server {tags {"zset"}} {
                               0 omega}
         }
 
-        xtest "ZRANGEBYLEX/ZREVRANGEBYLEX/ZCOUNT basics" {
+        test "ZRANGEBYLEX/ZREVRANGEBYLEX/ZCOUNT basics" {
             create_default_lex_zset
 
             # inclusive range
@@ -413,7 +421,7 @@ start_server {tags {"zset"}} {
             assert_equal {} [r zrevrangebylex zset (hill (omega]
         }
 
-        xtest "ZRANGEBYSLEX with LIMIT" {
+        test "ZRANGEBYSLEX with LIMIT" {
             create_default_lex_zset
             assert_equal {alpha bar} [r zrangebylex zset - \[cool LIMIT 0 2]
             assert_equal {bar cool} [r zrangebylex zset - \[cool LIMIT 1 2]
@@ -426,7 +434,7 @@ start_server {tags {"zset"}} {
             assert_equal {omega hill great foo} [r zrevrangebylex zset + \[d LIMIT 0 4]
         }
 
-        xtest "ZRANGEBYLEX with invalid lex range specifiers" {
+        test "ZRANGEBYLEX with invalid lex range specifiers" {
             assert_error "*not*string*" {r zrangebylex fooz foo bar}
             assert_error "*not*string*" {r zrangebylex fooz \[foo bar}
             assert_error "*not*string*" {r zrangebylex fooz foo \[bar}
@@ -490,7 +498,7 @@ start_server {tags {"zset"}} {
             assert_equal 0 [r exists zset]
         }
 
-        xtest "ZREMRANGEBYSCORE with non-value min or max" {
+        test "ZREMRANGEBYSCORE with non-value min or max" {
             assert_error "*not*float*" {r zremrangebyscore fooz str 1}
             assert_error "*not*float*" {r zremrangebyscore fooz 1 str}
             assert_error "*not*float*" {r zremrangebyscore fooz 1 NaN}
@@ -528,13 +536,13 @@ start_server {tags {"zset"}} {
             assert_equal 0 [r exists zset]
         }
 
-        xtest "ZUNIONSTORE against non-existing key doesn't set destination - $encoding" {
+        test "ZUNIONSTORE against non-existing key doesn't set destination - $encoding" {
             r del zseta
             assert_equal 0 [r zunionstore dst_key 1 zseta]
             assert_equal 0 [r exists dst_key]
         }
 
-        xtest "ZUNIONSTORE with empty set - $encoding" {
+        test "ZUNIONSTORE with empty set - $encoding" {
             r del zseta zsetb
             r zadd zseta 1 a
             r zadd zseta 2 b
@@ -542,7 +550,7 @@ start_server {tags {"zset"}} {
             r zrange zsetc 0 -1 withscores
         } {a 1 b 2}
 
-        xtest "ZUNIONSTORE basics - $encoding" {
+        test "ZUNIONSTORE basics - $encoding" {
             r del zseta zsetb zsetc
             r zadd zseta 1 a
             r zadd zseta 2 b
@@ -555,7 +563,7 @@ start_server {tags {"zset"}} {
             assert_equal {a 1 b 3 d 3 c 5} [r zrange zsetc 0 -1 withscores]
         }
 
-        xtest "ZUNIONSTORE with weights - $encoding" {
+        test "ZUNIONSTORE with weights - $encoding" {
             assert_equal 4 [r zunionstore zsetc 2 zseta zsetb weights 2 3]
             assert_equal {a 2 b 7 d 9 c 12} [r zrange zsetc 0 -1 withscores]
         }
@@ -570,22 +578,22 @@ start_server {tags {"zset"}} {
             assert_equal {a 2 b 5 c 8 d 9} [r zrange zsetc 0 -1 withscores]
         }
 
-        xtest "ZUNIONSTORE with AGGREGATE MIN - $encoding" {
+        test "ZUNIONSTORE with AGGREGATE MIN - $encoding" {
             assert_equal 4 [r zunionstore zsetc 2 zseta zsetb aggregate min]
             assert_equal {a 1 b 1 c 2 d 3} [r zrange zsetc 0 -1 withscores]
         }
 
-        xtest "ZUNIONSTORE with AGGREGATE MAX - $encoding" {
+        test "ZUNIONSTORE with AGGREGATE MAX - $encoding" {
             assert_equal 4 [r zunionstore zsetc 2 zseta zsetb aggregate max]
             assert_equal {a 1 b 2 c 3 d 3} [r zrange zsetc 0 -1 withscores]
         }
 
-        xtest "ZINTERSTORE basics - $encoding" {
+        test "ZINTERSTORE basics - $encoding" {
             assert_equal 2 [r zinterstore zsetc 2 zseta zsetb]
             assert_equal {b 3 c 5} [r zrange zsetc 0 -1 withscores]
         }
 
-        xtest "ZINTERSTORE with weights - $encoding" {
+        test "ZINTERSTORE with weights - $encoding" {
             assert_equal 2 [r zinterstore zsetc 2 zseta zsetb weights 2 3]
             assert_equal {b 7 c 12} [r zrange zsetc 0 -1 withscores]
         }
@@ -599,18 +607,18 @@ start_server {tags {"zset"}} {
             assert_equal {b 5 c 8} [r zrange zsetc 0 -1 withscores]
         }
 
-        xtest "ZINTERSTORE with AGGREGATE MIN - $encoding" {
+        test "ZINTERSTORE with AGGREGATE MIN - $encoding" {
             assert_equal 2 [r zinterstore zsetc 2 zseta zsetb aggregate min]
             assert_equal {b 1 c 2} [r zrange zsetc 0 -1 withscores]
         }
 
-        xtest "ZINTERSTORE with AGGREGATE MAX - $encoding" {
+        test "ZINTERSTORE with AGGREGATE MAX - $encoding" {
             assert_equal 2 [r zinterstore zsetc 2 zseta zsetb aggregate max]
             assert_equal {b 2 c 3} [r zrange zsetc 0 -1 withscores]
         }
 
         foreach cmd {ZUNIONSTORE ZINTERSTORE} {
-            xtest "$cmd with +inf/-inf scores - $encoding" {
+            test "$cmd with +inf/-inf scores - $encoding" {
                 r del zsetinf1 zsetinf2
 
                 r zadd zsetinf1 +inf key
@@ -634,7 +642,7 @@ start_server {tags {"zset"}} {
                 assert_equal -inf [r zscore zsetinf3 key]
             }
 
-            xtest "$cmd with NaN weights $encoding" {
+            test "$cmd with NaN weights $encoding" {
                 r del zsetinf1 zsetinf2
 
                 r zadd zsetinf1 1.0 key
@@ -656,7 +664,7 @@ start_server {tags {"zset"}} {
         r zinterstore set3 2 set1 set2
     } {0}
 
-    xtest {ZUNIONSTORE regression, should not create NaN in scores} {
+    test {ZUNIONSTORE regression, should not create NaN in scores} {
         r zadd z -inf neginf
         r zunionstore out 1 z weights 0
         r zrange out 0 -1 withscores
@@ -670,7 +678,7 @@ start_server {tags {"zset"}} {
         r zrange to_here 0 -1
     } {100}
 
-    xtest {ZUNIONSTORE result is sorted} {
+    test {ZUNIONSTORE result is sorted} {
         # Create two sets with common and not common elements, perform
         # the UNION, check that elements are still sorted.
         r del one two dest
