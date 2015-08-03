@@ -540,7 +540,7 @@ impl Server {
     fn handle_unixsocket(&mut self) {
         let db = self.db.lock().unwrap();
         if db.config.unixsocket.is_some() {
-            writeln!(&mut std::io::stderr(), "Ignoring unixsocket in non unix environment\n");
+            let _ = writeln!(&mut std::io::stderr(), "Ignoring unixsocket in non unix environment\n");
         }
     }
 
