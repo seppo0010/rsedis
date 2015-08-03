@@ -1,5 +1,5 @@
 start_server {tags {"multi"}} {
-    xtest {MUTLI / EXEC basics} {
+    test {MUTLI / EXEC basics} {
         r del mylist
         r rpush mylist a
         r rpush mylist b
@@ -11,7 +11,7 @@ start_server {tags {"multi"}} {
         list $v1 $v2 $v3
     } {QUEUED QUEUED {{a b c} PONG}}
 
-    xtest {DISCARD} {
+    test {DISCARD} {
         r del mylist
         r rpush mylist a
         r rpush mylist b
@@ -23,7 +23,7 @@ start_server {tags {"multi"}} {
         list $v1 $v2 $v3
     } {QUEUED OK {a b c}}
 
-    xtest {Nested MULTI are not allowed} {
+    test {Nested MULTI are not allowed} {
         set err {}
         r multi
         catch {[r multi]} err
@@ -31,14 +31,14 @@ start_server {tags {"multi"}} {
         set _ $err
     } {*ERR MULTI*}
 
-    xtest {MULTI where commands alter argc/argv} {
+    test {MULTI where commands alter argc/argv} {
         r sadd myset a
         r multi
         r spop myset
         list [r exec] [r exists myset]
     } {a 0}
 
-    xtest {WATCH inside MULTI is not allowed} {
+    test {WATCH inside MULTI is not allowed} {
         set err {}
         r multi
         catch {[r watch x]} err
@@ -85,7 +85,7 @@ start_server {tags {"multi"}} {
         r ping
     } {PONG}
 
-    xtest {EXEC works on WATCHed key not modified} {
+    test {EXEC works on WATCHed key not modified} {
         r watch x y z
         r watch k
         r multi
@@ -93,7 +93,7 @@ start_server {tags {"multi"}} {
         r exec
     } {PONG}
 
-    xtest {EXEC fail on WATCHed key modified (1 key of 1 watched)} {
+    test {EXEC fail on WATCHed key modified (1 key of 1 watched)} {
         r set x 30
         r watch x
         r set x 40
@@ -102,7 +102,7 @@ start_server {tags {"multi"}} {
         r exec
     } {}
 
-    xtest {EXEC fail on WATCHed key modified (1 key of 5 watched)} {
+    test {EXEC fail on WATCHed key modified (1 key of 5 watched)} {
         r set x 30
         r watch a b x k z
         r set x 40
@@ -121,7 +121,7 @@ start_server {tags {"multi"}} {
         r exec
     } {}
 
-    xtest {After successful EXEC key is no longer watched} {
+    test {After successful EXEC key is no longer watched} {
         r set x 30
         r watch x
         r multi
@@ -133,7 +133,7 @@ start_server {tags {"multi"}} {
         r exec
     } {PONG}
 
-    xtest {After failed EXEC key is no longer watched} {
+    test {After failed EXEC key is no longer watched} {
         r set x 30
         r watch x
         r set x 40
@@ -146,7 +146,7 @@ start_server {tags {"multi"}} {
         r exec
     } {PONG}
 
-    xtest {It is possible to UNWATCH} {
+    test {It is possible to UNWATCH} {
         r set x 30
         r watch x
         r set x 40
@@ -156,11 +156,11 @@ start_server {tags {"multi"}} {
         r exec
     } {PONG}
 
-    xtest {UNWATCH when there is nothing watched works as expected} {
+    test {UNWATCH when there is nothing watched works as expected} {
         r unwatch
     } {OK}
 
-    xtest {FLUSHALL is able to touch the watched keys} {
+    test {FLUSHALL is able to touch the watched keys} {
         r set x 30
         r watch x
         r flushall
@@ -169,7 +169,7 @@ start_server {tags {"multi"}} {
         r exec
     } {}
 
-    xtest {FLUSHALL does not touch non affected keys} {
+    test {FLUSHALL does not touch non affected keys} {
         r del x
         r watch x
         r flushall
@@ -178,7 +178,7 @@ start_server {tags {"multi"}} {
         r exec
     } {PONG}
 
-    xtest {FLUSHDB is able to touch the watched keys} {
+    test {FLUSHDB is able to touch the watched keys} {
         r set x 30
         r watch x
         r flushdb
@@ -187,7 +187,7 @@ start_server {tags {"multi"}} {
         r exec
     } {}
 
-    xtest {FLUSHDB does not touch non affected keys} {
+    test {FLUSHDB does not touch non affected keys} {
         r del x
         r watch x
         r flushdb
@@ -196,7 +196,7 @@ start_server {tags {"multi"}} {
         r exec
     } {PONG}
 
-    xtest {WATCH is able to remember the DB a key belongs to} {
+    test {WATCH is able to remember the DB a key belongs to} {
         r select 5
         r set x 30
         r watch x
@@ -211,7 +211,7 @@ start_server {tags {"multi"}} {
         set res
     } {PONG}
 
-    xtest {WATCH will consider touched keys target of EXPIRE} {
+    test {WATCH will consider touched keys target of EXPIRE} {
         r del x
         r set x foo
         r watch x
@@ -221,7 +221,7 @@ start_server {tags {"multi"}} {
         r exec
     } {}
 
-    xtest {WATCH will not consider touched expired keys} {
+    test {WATCH will not consider touched expired keys} {
         r del x
         r set x foo
         r expire x 1
@@ -232,7 +232,7 @@ start_server {tags {"multi"}} {
         r exec
     } {PONG}
 
-    xtest {DISCARD should clear the WATCH dirty flag on the client} {
+    test {DISCARD should clear the WATCH dirty flag on the client} {
         r watch x
         r set x 10
         r multi
@@ -242,7 +242,7 @@ start_server {tags {"multi"}} {
         r exec
     } {11}
 
-    xtest {DISCARD should UNWATCH all the keys} {
+    test {DISCARD should UNWATCH all the keys} {
         r watch x
         r set x 10
         r multi
