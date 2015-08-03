@@ -293,7 +293,7 @@ impl ValueSortedSet {
             },
             match normalize_position(- start - 1, len) {
                 Ok(i) => i,
-                Err(g) => if !g { return (1, 0); } else { len },
+                Err(g) => if !g { return (1, 0); } else { len - 1 },
             })
         } else {
             (match normalize_position(start, len) {
@@ -302,7 +302,7 @@ impl ValueSortedSet {
             },
             match normalize_position(stop, len) {
                 Ok(i) => i,
-                Err(g) => if !g { return (1, 0); } else { len },
+                Err(g) => if !g { return (1, 0); } else { len - 1 },
             })
         }
     }
