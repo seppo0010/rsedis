@@ -1600,33 +1600,33 @@ fn zinter_union_store(parser: ParsedCommand, db: &mut Database, dbindex: usize, 
         let mut weights = None;
         let mut aggregate = zset::Aggregate::Sum;
         if pos < parser.argv.len() {
-            let arg = try_validate!(parser.get_str(pos), "Syntax error");
+            let arg = try_validate!(parser.get_str(pos), "syntax error");
             if arg.to_ascii_lowercase() == "weights" {
                 pos += 1;
                 validate!(parser.argv.len() >= pos + numkeys, "Wrong number of parameters");
                 let mut w = Vec::with_capacity(numkeys);
                 for i in 0..numkeys {
-                    w.push(try_validate!(parser.get_f64(pos + i), "Syntax error"));
+                    w.push(try_validate!(parser.get_f64(pos + i), "ERR weight value is not a float"));
                 }
                 weights = Some(w);
                 pos += numkeys;
             }
         };
         if pos < parser.argv.len() {
-            let arg = try_validate!(parser.get_str(pos), "Syntax error");
+            let arg = try_validate!(parser.get_str(pos), "syntax error");
             if arg.to_ascii_lowercase() == "aggregate" {
                 pos += 1;
                 validate!(parser.argv.len() != pos, "Wrong number of parameters");
-                aggregate = match &*try_validate!(parser.get_str(pos), "Syntax error").to_ascii_lowercase() {
+                aggregate = match &*try_validate!(parser.get_str(pos), "syntax error").to_ascii_lowercase() {
                     "sum" => zset::Aggregate::Sum,
                     "max" => zset::Aggregate::Max,
                     "min" => zset::Aggregate::Min,
-                    _ => return Response::Error("Syntax error".to_string()),
+                    _ => return Response::Error("syntax error".to_string()),
                 };
                 pos += 1;
             }
         };
-        validate!(pos == parser.argv.len(), "Syntax error");
+        validate!(pos == parser.argv.len(), "syntax error");
         let n = Value::Nil;
         match if union { n.zunion(&zsets, weights, aggregate) } else { n.zinter(&zsets, weights, aggregate) } {
             Ok(v) => v,
