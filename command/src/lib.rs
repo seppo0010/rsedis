@@ -1213,7 +1213,7 @@ fn zadd(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     {
         let el = db.get_or_create(dbindex, &key);
         for _ in 0..((len - i) / 2) {
-            let score = try_validate!(parser.get_f64(i), "Invalid score");
+            let score = try_validate!(parser.get_f64(i), "ERR value is not a valid float");
             let val = try_validate!(parser.get_vec(i + 1), "Invalid value");
             match el.zadd(score, val, nx, xx, ch, incr) {
                 Ok(added) => if added { count += 1 },
@@ -1263,7 +1263,7 @@ fn zincrby(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let newscore = {
         let el = db.get_or_create(dbindex, &key);
-        let score = try_validate!(parser.get_f64(2), "Invalid score");
+        let score = try_validate!(parser.get_f64(2), "ERR value is not a valid float");
         let member = try_validate!(parser.get_vec(3), "Invalid member");
         match el.zincrby(score, member) {
             Ok(score) => score,
