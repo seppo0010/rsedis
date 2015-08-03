@@ -141,9 +141,17 @@ impl<'a> ParsedCommand<'a> {
             return Ok(Bound::Unbounded);
         }
         if s.starts_with("(") {
-            return Ok(Bound::Excluded(try!(s[1..].parse::<f64>())));
+            let f = try!(s[1..].parse::<f64>());
+            if f.is_nan() {
+                return Err(ParseError::InvalidArgument);
+            }
+            return Ok(Bound::Excluded(f));
         }
-        return Ok(Bound::Included(try!(s.parse::<f64>())));
+        let f = try!(s.parse::<f64>());
+        if f.is_nan() {
+            return Err(ParseError::InvalidArgument);
+        }
+        return Ok(Bound::Included(f));
     }
 
     // TODO: get<T>
@@ -165,7 +173,11 @@ impl<'a> ParsedCommand<'a> {
         if s == "-inf" {
             return Ok(NEG_INFINITY);
         }
-        return Ok(try!(s.parse::<f64>()));
+        let f = try!(s.parse::<f64>());
+        if f.is_nan() {
+            return Err(ParseError::InvalidArgument);
+        }
+        return Ok(f);
     }
 
     /// Gets an i64 from a parameter
