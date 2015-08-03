@@ -101,7 +101,7 @@ impl ValueSortedSet {
         ValueSortedSet::Data(skiplist, hmap)
     }
 
-    pub fn zadd(&mut self, s: f64, el: Vec<u8>, nx: bool, xx: bool, ch: bool, incr: bool) -> Result<bool, OperationError> {
+    pub fn zadd(&mut self, s: f64, el: Vec<u8>, nx: bool, xx: bool, ch: bool, incr: bool, zero_on_nan: bool) -> Result<bool, OperationError> {
         match *self {
             ValueSortedSet::Data(ref mut skiplist, ref mut hmap) => {
                 let mut score = s.clone();
@@ -117,12 +117,19 @@ impl ValueSortedSet {
                     if ch && !incr && val == &s {
                         return Ok(false);
                     }
-                    skiplist.remove(&SortedSetMember::new(val.clone(), el.clone()));
                     if incr {
                         score += val.clone();
-                        if score.is_nan() {
-                            return Err(OperationError::NotANumberError);
-                        }
+                    }
+                    if score.is_nan() && !zero_on_nan {
+                        return Err(OperationError::NotANumberError);
+                    }
+                    skiplist.remove(&SortedSetMember::new(val.clone(), el.clone()));
+                }
+                if score.is_nan() {
+                    if zero_on_nan {
+                        score = 0.0;
+                    } else {
+                        return Err(OperationError::NotANumberError);
                     }
                 }
                 skiplist.insert(SortedSetMember::new(score.clone(), el.clone()));
@@ -470,14 +477,14 @@ impl ValueSortedSet {
             };
             for (k, v) in hm {
                 match aggregate {
-                    Aggregate::Sum => { let _ = self.zadd(weight * v.clone(), k.clone(), false, false, false, true); },
+                    Aggregate::Sum => { let _ = self.zadd(weight * v.clone(), k.clone(), false, false, false, true, true); },
                     Aggregate::Max => {
                         let s = match self.zscore(&k) {
                             Some(s) => s,
                             None => NEG_INFINITY,
                         };
                         if s < v * weight {
-                            let _ = self.zadd(v * weight, k.clone(), false, false, false, false);
+                            let _ = self.zadd(v * weight, k.clone(), false, false, false, false, true);
                         }
                     },
                     Aggregate::Min => {
@@ -486,7 +493,7 @@ impl ValueSortedSet {
                             None => INFINITY,
                         };
                         if s > v * weight {
-                            let _ = self.zadd(v * weight, k.clone(), false, false, false, false);
+                            let _ = self.zadd(v * weight, k.clone(), false, false, false, false, true);
                         }
                     },
                 }
@@ -535,7 +542,7 @@ impl ValueSortedSet {
                 }
             }
 
-            let _ = self.zadd(score, k.clone(), false, false, false, false);
+            let _ = self.zadd(score, k.clone(), false, false, false, false, true);
         }
     }
 
@@ -584,8 +591,8 @@ impl ValueSortedSet {
 fn dump_zset() {
     let mut v = vec![];
     let mut zset = ValueSortedSet::new();
-    zset.zadd(1.0, b"a".to_vec(), false, false, false, false);
-    zset.zadd(2.0, b"b".to_vec(), false, false, false, false);
+    zset.zadd(1.0, b"a".to_vec(), false, false, false, false, false).unwrap();
+    zset.zadd(2.0, b"b".to_vec(), false, false, false, false, false).unwrap();
     zset.dump(&mut v).unwrap();
     assert!(v == b"\x03\x02\x01b\x012\x01a\x011\x07\x00".to_vec() ||
             v == b"\x03\x02\x01a\x011\x01b\x012\x07\x00".to_vec());
@@ -594,10 +601,10 @@ fn dump_zset() {
 #[test]
 fn zremrangebyscore() {
     let mut zset = ValueSortedSet::new();
-    zset.zadd(1.0, b"a".to_vec(), false, false, false, false);
-    zset.zadd(2.0, b"b".to_vec(), false, false, false, false);
-    zset.zadd(3.0, b"c".to_vec(), false, false, false, false);
-    zset.zadd(4.0, b"d".to_vec(), false, false, false, false);
+    zset.zadd(1.0, b"a".to_vec(), false, false, false, false, false).unwrap();
+    zset.zadd(2.0, b"b".to_vec(), false, false, false, false, false).unwrap();
+    zset.zadd(3.0, b"c".to_vec(), false, false, false, false, false).unwrap();
+    zset.zadd(4.0, b"d".to_vec(), false, false, false, false, false).unwrap();
     assert_eq!(zset.zremrangebyscore(Bound::Included(2.0), Bound::Excluded(4.0)), 2);
     assert_eq!(zset.zrank(b"a".to_vec()).unwrap(), 0);
     assert_eq!(zset.zrank(b"c".to_vec()), None);
@@ -609,10 +616,10 @@ fn zremrangebyscore() {
 #[test]
 fn zremrangebylex() {
     let mut zset = ValueSortedSet::new();
-    zset.zadd(0.0, vec![1], false, false, false, false);
-    zset.zadd(0.0, vec![2], false, false, false, false);
-    zset.zadd(0.0, vec![3], false, false, false, false);
-    zset.zadd(0.0, vec![4], false, false, false, false);
+    zset.zadd(0.0, vec![1], false, false, false, false, false).unwrap();
+    zset.zadd(0.0, vec![2], false, false, false, false, false).unwrap();
+    zset.zadd(0.0, vec![3], false, false, false, false, false).unwrap();
+    zset.zadd(0.0, vec![4], false, false, false, false, false).unwrap();
     assert_eq!(zset.zremrangebylex(Bound::Included(vec![2]), Bound::Excluded(vec![4])), 2);
     assert_eq!(zset.zrank(vec![1]).unwrap(), 0);
     assert_eq!(zset.zrank(vec![2]), None);
@@ -624,10 +631,10 @@ fn zremrangebylex() {
 #[test]
 fn zremrangebyrank() {
     let mut zset = ValueSortedSet::new();
-    zset.zadd(1.0, b"a".to_vec(), false, false, false, false);
-    zset.zadd(2.0, b"b".to_vec(), false, false, false, false);
-    zset.zadd(3.0, b"c".to_vec(), false, false, false, false);
-    zset.zadd(4.0, b"d".to_vec(), false, false, false, false);
+    zset.zadd(1.0, b"a".to_vec(), false, false, false, false, false).unwrap();
+    zset.zadd(2.0, b"b".to_vec(), false, false, false, false, false).unwrap();
+    zset.zadd(3.0, b"c".to_vec(), false, false, false, false, false).unwrap();
+    zset.zadd(4.0, b"d".to_vec(), false, false, false, false, false).unwrap();
     assert_eq!(zset.zremrangebyrank(1, -2), 2);
     assert_eq!(zset.zrank(b"a".to_vec()).unwrap(), 0);
     assert_eq!(zset.zrank(b"c".to_vec()), None);

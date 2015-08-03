@@ -1015,11 +1015,11 @@ impl Value {
                     return Ok(false);
                 }
                 let mut value = ValueSortedSet::new();
-                let r = try!(value.zadd(s, el, nx, xx, ch, incr));
+                let r = try!(value.zadd(s, el, nx, xx, ch, incr, false));
                 *self = Value::SortedSet(value);
                 Ok(r)
             },
-            Value::SortedSet(ref mut value) => value.zadd(s, el, nx, xx, ch, incr),
+            Value::SortedSet(ref mut value) => value.zadd(s, el, nx, xx, ch, incr, false),
             _ => Err(OperationError::WrongTypeError),
         }
     }
