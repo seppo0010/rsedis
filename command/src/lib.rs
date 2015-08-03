@@ -1884,7 +1884,6 @@ pub fn command(
         "multi" => return Ok(multi(client)),
         "discard" => return Ok(discard(db, client)),
         "exec" => return Ok(exec(db, client)),
-        "ping" => return Ok(ping(parser, client)),
         _ => {},
     }
     if client.multi {
@@ -1935,6 +1934,7 @@ pub fn command(
         "decrby" => decrby(parser, db, dbindex),
         "incrbyfloat" => incrbyfloat(parser, db, dbindex),
         "exists" => exists(parser, db, dbindex),
+        "ping" => return Ok(ping(parser, client)),
         "flushdb" => flushdb(parser, db, dbindex),
         "flushall" => flushall(parser, db, dbindex),
         "lpush" => lpush(parser, db, dbindex),
