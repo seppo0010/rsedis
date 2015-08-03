@@ -358,7 +358,7 @@ impl ValueSortedSet {
             let len = skiplist.len();
             let mut c = count;
             if c + offset > len {
-                c = len - offset;
+                c = if len > offset { len - offset } else { 0 };
             }
             for member in skiplist.range(m1, m2).rev().skip(offset).take(c) {
                 r.push(member.get_vec().clone());
