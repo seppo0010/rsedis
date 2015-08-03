@@ -1816,12 +1816,13 @@ fn exec(db: &mut Database, client: &mut Client) -> Response {
     Response::Array(c.iter().map(|c| command(c.get_command(), db, client).unwrap()).collect())
 }
 
-fn discard(client: &mut Client) -> Response {
+fn discard(db: &mut Database, client: &mut Client) -> Response {
     if !client.multi {
         Response::Error("ERR DISCARD without MULTI".to_owned())
     } else {
         client.multi = false;
         client.multi_commands = vec![];
+        generic_unwatch(db, client.id, &mut client.watched_keys);
         Response::Status("OK".to_owned())
     }
 }
@@ -1864,7 +1865,7 @@ pub fn command(
     // commands that are not executed inside MULTI
     match command_name {
         "multi" => return Ok(multi(client)),
-        "discard" => return Ok(discard(client)),
+        "discard" => return Ok(discard(db, client)),
         "exec" => return Ok(exec(db, client)),
         _ => {},
     }
