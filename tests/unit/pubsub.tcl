@@ -47,7 +47,7 @@ start_server {tags {"pubsub"}} {
         __consume_subscribe_messages $client punsubscribe $channels
     }
 
-    xtest "Pub/Sub PING" {
+    test "Pub/Sub PING" {
         set rd1 [redis_deferring_client]
         subscribe $rd1 somechannel
         # While subscribed to non-zero channels PING works in Pub/Sub mode.
@@ -63,7 +63,7 @@ start_server {tags {"pubsub"}} {
         list $reply1 $reply2 $reply3
     } {{pong {}} {pong foo} PONG}
 
-    xtest "PUBLISH/SUBSCRIBE basics" {
+    test "PUBLISH/SUBSCRIBE basics" {
         set rd1 [redis_deferring_client]
 
         # subscribe to two channels
@@ -88,7 +88,7 @@ start_server {tags {"pubsub"}} {
         $rd1 close
     }
 
-    xtest "PUBLISH/SUBSCRIBE with two clients" {
+    test "PUBLISH/SUBSCRIBE with two clients" {
         set rd1 [redis_deferring_client]
         set rd2 [redis_deferring_client]
 
