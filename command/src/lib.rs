@@ -1204,6 +1204,9 @@ fn zadd(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
         }
     }
 
+    if xx && nx {
+        return Response::Error("ERR cannot use XX and NX".to_owned());
+    }
     if (len - i) % 2 != 0 {
         return Response::Error("ERR syntax error".to_owned());
     }
