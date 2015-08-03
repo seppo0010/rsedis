@@ -49,7 +49,7 @@ start_server {tags {"other"}} {
         r get x
     } {10}
 
-    xtest {SELECT an out of range DB} {
+    test {SELECT an out of range DB} {
         catch {r select 1000000} err
         set _ $err
     } {*invalid*}

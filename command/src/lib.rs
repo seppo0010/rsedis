@@ -1880,7 +1880,7 @@ pub fn command(
         opt_validate!(parser.argv.len() == 2, "Wrong number of parameters");
         let dbindex = try_opt_validate!(parser.get_i64(1), "Invalid dbindex") as usize;
         if dbindex > db.config.databases as usize {
-            return Ok(Response::Error("dbindex out of range".to_owned()));
+            return Ok(Response::Error("ERR invalid DB index".to_owned()));
         }
         client.dbindex = dbindex;
         return Ok(Response::Status("OK".to_owned()));
