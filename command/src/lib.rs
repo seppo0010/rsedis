@@ -1311,8 +1311,8 @@ fn zrem(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
 fn zremrangebyscore(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate_arguments_exact!(parser, 4);
     let key = try_validate!(parser.get_vec(1), "Invalid key");
-    let min = try_validate!(parser.get_f64_bound(2), "Invalid min");
-    let max = try_validate!(parser.get_f64_bound(3), "Invalid max");
+    let min = try_validate!(parser.get_f64_bound(2), "ERR min or max is not a float");
+    let max = try_validate!(parser.get_f64_bound(3), "ERR min or max is not a float");
     let el = match db.get_mut(dbindex, &key) {
         Some(e) => e,
         None => return Response::Integer(0),
@@ -1368,8 +1368,8 @@ fn zremrangebyrank(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> 
 fn zcount(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate_arguments_exact!(parser, 4);
     let key = try_validate!(parser.get_vec(1), "Invalid key");
-    let min = try_validate!(parser.get_f64_bound(2), "Invalid min");
-    let max = try_validate!(parser.get_f64_bound(3), "Invalid max");
+    let min = try_validate!(parser.get_f64_bound(2), "ERR min or max is not a float");
+    let max = try_validate!(parser.get_f64_bound(3), "ERR min or max is not a float");
     let el = match db.get(dbindex, &key) {
         Some(e) => e,
         None => return Response::Integer(0),
@@ -1413,8 +1413,8 @@ fn generic_zrangebyscore(parser: ParsedCommand, db: &mut Database, dbindex: usiz
     let len = parser.argv.len();
     validate!(len >= 4, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
-    let min = try_validate!(parser.get_f64_bound(2), "Invalid min");
-    let max = try_validate!(parser.get_f64_bound(3), "Invalid max");
+    let min = try_validate!(parser.get_f64_bound(2), "ERR min or max is not a float");
+    let max = try_validate!(parser.get_f64_bound(3), "ERR min or max is not a float");
 
     let mut offset = 0;
     let mut count = usize::MAX;
