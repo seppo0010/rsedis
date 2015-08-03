@@ -193,12 +193,12 @@ start_server {tags {"other"}} {
         } {1}
     }
 
-    xtest {APPEND basics} {
+    test {APPEND basics} {
         list [r append foo bar] [r get foo] \
              [r append foo 100] [r get foo]
     } {3 bar 6 bar100}
 
-    xtest {APPEND basics, integer encoded values} {
+    test {APPEND basics, integer encoded values} {
         set res {}
         r del foo
         r append foo 1
@@ -209,7 +209,7 @@ start_server {tags {"other"}} {
         lappend res [r get foo]
     } {12 12}
 
-    xtest {APPEND fuzzing} {
+    test {APPEND fuzzing} {
         set err {}
         foreach type {binary alpha compr} {
             set buf {}
@@ -228,7 +228,7 @@ start_server {tags {"other"}} {
     } {}
 
     # Leave the user with a clean DB before to exit
-    xtest {FLUSHDB} {
+    test {FLUSHDB} {
         set aux {}
         r select 9
         r flushdb
