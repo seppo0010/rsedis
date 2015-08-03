@@ -1668,6 +1668,7 @@ impl Database {
 
     /// Sets a key expiration time, in milliseconds.
     pub fn set_msexpiration(&mut self, index: usize, key: Vec<u8>, msexpiration: i64) {
+        self.key_updated(index, &key);
         self.data_expiration_ms[index].insert(key, msexpiration);
     }
 
