@@ -1204,6 +1204,10 @@ fn zadd(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
         }
     }
 
+    if (len - i) % 2 != 0 {
+        return Response::Error("ERR syntax error".to_owned());
+    }
+
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let mut count = 0;
     {
