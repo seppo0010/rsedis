@@ -447,7 +447,7 @@ impl Server {
     }
 
     #[cfg(windows)]
-    fn reuse_address(&self, builder: &TcpBuilder) -> io::Result<()> {
+    fn reuse_address(&self, _: &TcpBuilder) -> io::Result<()> {
         Ok(())
     }
 
