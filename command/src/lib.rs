@@ -1595,7 +1595,7 @@ fn zinter_union_store(parser: ParsedCommand, db: &mut Database, dbindex: usize, 
             n as usize
         };
         let nil = Value::Nil;
-        let zsets = get_values!(3, 2 + numkeys, parser, db, dbindex, &nil);
+        let zsets = get_values!(3, 3 + numkeys, parser, db, dbindex, &nil);
         let mut pos = 3 + numkeys;
         let mut weights = None;
         let mut aggregate = zset::Aggregate::Sum;
@@ -3168,6 +3168,14 @@ mod test_command {
     }
 
     #[test]
+    fn zunionstore_command_short2() {
+        let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
+        assert_eq!(command(parser!(b"zadd key1 1 a 2 b 3 c"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(3));
+        assert_eq!(command(parser!(b"zadd key2 4 d 5 e"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(2));
+        assert_eq!(command(parser!(b"zunionstore key 2 key1 key2"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(5));
+    }
+
+    #[test]
     fn zunionstore_command_weights() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
         assert_eq!(command(parser!(b"zadd key1 1 a 2 b 3 c"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(3));
@@ -3201,7 +3209,7 @@ mod test_command {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
         assert_eq!(command(parser!(b"zadd key1 1 a 2 b 3 c"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(3));
         assert_eq!(command(parser!(b"zadd key2 3 c 4 d 5 e"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(3));
-        assert_eq!(command(parser!(b"zinterstore key 3 key1 key2 key3"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(1));
+        assert_eq!(command(parser!(b"zinterstore key 2 key1 key2"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(1));
     }
 
     #[test]
@@ -3219,9 +3227,9 @@ mod test_command {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
         assert_eq!(command(parser!(b"zadd key1 1 a 2 b 3 c"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(3));
         assert_eq!(command(parser!(b"zadd key2 9 c 4 d 5 e"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(3));
-        assert_eq!(command(parser!(b"zinterstore key 3 key1 key2 key3 aggregate max"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(1));
+        assert_eq!(command(parser!(b"zinterstore key 2 key1 key2 aggregate max"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(1));
         assert_eq!(command(parser!(b"zscore key c"), &mut db, &mut Client::mock()).unwrap(), Response::Data(b"9".to_vec()));
-        assert_eq!(command(parser!(b"zinterstore key 3 key1 key2 key3 aggregate min"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(1));
+        assert_eq!(command(parser!(b"zinterstore key 2 key1 key2 aggregate min"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(1));
         assert_eq!(command(parser!(b"zscore key c"), &mut db, &mut Client::mock()).unwrap(), Response::Data(b"3".to_vec()));
     }
 
@@ -3230,7 +3238,7 @@ mod test_command {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
         assert_eq!(command(parser!(b"zadd key1 1 a 2 b 3 c"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(3));
         assert_eq!(command(parser!(b"zadd key2 3 c 4 d 5 e"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(3));
-        assert_eq!(command(parser!(b"zinterstore key 3 key1 key2 key3 weights 1 2 3 aggregate max"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(1));
+        assert_eq!(command(parser!(b"zinterstore key 2 key1 key2 weights 1 2 aggregate max"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(1));
         assert_eq!(command(parser!(b"zscore key c"), &mut db, &mut Client::mock()).unwrap(), Response::Data(b"6".to_vec()));
     }
 
