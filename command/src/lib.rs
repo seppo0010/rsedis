@@ -1218,10 +1218,13 @@ fn zadd(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
 
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let mut count = 0;
+    for j in 0..((len - i) / 2) {
+        validate!(parser.get_f64(i + j * 2).is_ok(), "ERR value is not a valid float");
+    }
     {
         let el = db.get_or_create(dbindex, &key);
         for _ in 0..((len - i) / 2) {
-            let score = try_validate!(parser.get_f64(i), "ERR value is not a valid float");
+            let score = parser.get_f64(i).unwrap();
             let val = try_validate!(parser.get_vec(i + 1), "Invalid value");
             match el.zadd(score, val, nx, xx, ch, incr) {
                 Ok(added) => if added { count += 1 },
