@@ -3,6 +3,7 @@ extern crate util;
 
 use std::collections::Bound;
 use std::error::Error;
+use std::f64::{INFINITY, NEG_INFINITY};
 use std::fmt;
 use std::iter;
 use std::num::{ParseIntError,ParseFloatError};
@@ -158,6 +159,12 @@ impl<'a> ParsedCommand<'a> {
     /// ```
     pub fn get_f64(&self, pos: usize) -> Result<f64, ParseError> {
         let s = try!(self.get_str(pos));
+        if s == "+inf" || s == "inf" {
+            return Ok(INFINITY);
+        }
+        if s == "-inf" {
+            return Ok(NEG_INFINITY);
+        }
         return Ok(try!(s.parse::<f64>()));
     }
 
