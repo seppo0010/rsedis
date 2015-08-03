@@ -1672,15 +1672,21 @@ fn unsubscribe(
         sender: &Sender<Option<PubsubEvent>>
         ) -> Result<Response, ResponseError> {
     #![allow(unused_must_use)]
-    opt_validate!(parser.argv.len() >= 2, "Wrong number of parameters");
-    for i in 1..parser.argv.len() {
-        let channel_name = try_opt_validate!(parser.get_vec(i), "Invalid channel");
-        match subscriptions.remove(&channel_name) {
-            Some(subscriber_id) => {
-                db.unsubscribe(channel_name.clone(), subscriber_id);
-                sender.send(Some(PubsubEvent::Unsubscription(channel_name, pattern_subscriptions_len + subscriptions.len())));
-            },
-            None => (),
+    if parser.argv.len() == 1 {
+        for (channel_name, subscriber_id) in subscriptions.drain() {
+            db.unsubscribe(channel_name.clone(), subscriber_id);
+            sender.send(Some(PubsubEvent::Unsubscription(channel_name, pattern_subscriptions_len)));
+        }
+    } else {
+        for i in 1..parser.argv.len() {
+            let channel_name = try_opt_validate!(parser.get_vec(i), "Invalid channel");
+            match subscriptions.remove(&channel_name) {
+                Some(subscriber_id) => {
+                    db.unsubscribe(channel_name.clone(), subscriber_id);
+                    sender.send(Some(PubsubEvent::Unsubscription(channel_name, pattern_subscriptions_len + subscriptions.len())));
+                },
+                None => (),
+            }
         }
     }
     Err(ResponseError::NoReply)
