@@ -1683,6 +1683,13 @@ impl Database {
 
     /// Removes all keys in a database.
     pub fn clear(&mut self, index: usize) {
+        // FIXME: remove clone
+        let keys = self.watched_keys[index].keys().cloned().collect::<HashSet<_>>();
+        for key in keys {
+            if self.data[index].remove(&key).is_some() {
+                self.key_updated(index, &key);
+            }
+        }
         self.data[index].clear();
         self.data_expiration_ms[index].clear();
     }
@@ -1933,7 +1940,7 @@ impl Database {
     /// ```
     pub fn clearall(&mut self) {
         for index in 0..(self.config.databases as usize) {
-            self.data[index].clear();
+            self.clear(index);
         }
     }
 
