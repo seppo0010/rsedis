@@ -1015,11 +1015,11 @@ impl Value {
                     return Ok(false);
                 }
                 let mut value = ValueSortedSet::new();
-                let r = value.zadd(s, el, nx, xx, ch, incr);
+                let r = try!(value.zadd(s, el, nx, xx, ch, incr));
                 *self = Value::SortedSet(value);
                 Ok(r)
             },
-            Value::SortedSet(ref mut value) => Ok(value.zadd(s, el, nx, xx, ch, incr)),
+            Value::SortedSet(ref mut value) => value.zadd(s, el, nx, xx, ch, incr),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -1083,7 +1083,7 @@ impl Value {
                     Err(err) => Err(err),
                 }
             },
-            Value::SortedSet(ref mut value) => Ok(value.zincrby(increment, member)),
+            Value::SortedSet(ref mut value) => value.zincrby(increment, member),
             _ => Err(OperationError::WrongTypeError),
         }
     }

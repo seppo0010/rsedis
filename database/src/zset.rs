@@ -9,6 +9,7 @@ use std::f64::{INFINITY, NEG_INFINITY, NAN};
 use skiplist::OrderedSkipList;
 
 use dbutil::normalize_position;
+use error::OperationError;
 use rdbutil::constants::*;
 use rdbutil::{encode_slice_u8, encode_len};
 
@@ -100,33 +101,36 @@ impl ValueSortedSet {
         ValueSortedSet::Data(skiplist, hmap)
     }
 
-    pub fn zadd(&mut self, s: f64, el: Vec<u8>, nx: bool, xx: bool, ch: bool, incr: bool) -> bool {
+    pub fn zadd(&mut self, s: f64, el: Vec<u8>, nx: bool, xx: bool, ch: bool, incr: bool) -> Result<bool, OperationError> {
         match *self {
             ValueSortedSet::Data(ref mut skiplist, ref mut hmap) => {
                 let mut score = s.clone();
                 let contains = hmap.contains_key(&el);
                 if contains && nx {
-                    return false;
+                    return Ok(false);
                 }
                 if !contains && xx {
-                    return false;
+                    return Ok(false);
                 }
                 if contains {
                     let val = hmap.get(&el).unwrap();
                     if ch && !incr && val == &s {
-                        return false;
+                        return Ok(false);
                     }
                     skiplist.remove(&SortedSetMember::new(val.clone(), el.clone()));
                     if incr {
                         score += val.clone();
+                        if score.is_nan() {
+                            return Err(OperationError::NotANumberError);
+                        }
                     }
                 }
                 skiplist.insert(SortedSetMember::new(score.clone(), el.clone()));
                 hmap.insert(el, score);
                 if ch {
-                    true
+                    Ok(true)
                 } else {
-                    !contains
+                    Ok(!contains)
                 }
             },
         }
@@ -144,7 +148,7 @@ impl ValueSortedSet {
         }
     }
 
-    pub fn zincrby(&mut self, increment: f64, member: Vec<u8>) -> f64 {
+    pub fn zincrby(&mut self, increment: f64, member: Vec<u8>) -> Result<f64, OperationError> {
         match *self {
             ValueSortedSet::Data(ref mut skiplist, ref mut hmap) => {
                 let mut val = match hmap.get(&member) {
@@ -155,9 +159,12 @@ impl ValueSortedSet {
                     None => 0.0,
                 };
                 val += increment;
+                if val.is_nan() {
+                    return Err(OperationError::NotANumberError);
+                }
                 skiplist.insert(SortedSetMember::new(val.clone(), member.clone()));
                 hmap.insert(member, val.clone());
-                val
+                Ok(val)
             },
         }
     }
@@ -463,14 +470,14 @@ impl ValueSortedSet {
             };
             for (k, v) in hm {
                 match aggregate {
-                    Aggregate::Sum => { self.zadd(weight * v.clone(), k.clone(), false, false, false, true); },
+                    Aggregate::Sum => { let _ = self.zadd(weight * v.clone(), k.clone(), false, false, false, true); },
                     Aggregate::Max => {
                         let s = match self.zscore(&k) {
                             Some(s) => s,
                             None => NEG_INFINITY,
                         };
                         if s < v * weight {
-                            self.zadd(v * weight, k.clone(), false, false, false, false);
+                            let _ = self.zadd(v * weight, k.clone(), false, false, false, false);
                         }
                     },
                     Aggregate::Min => {
@@ -479,7 +486,7 @@ impl ValueSortedSet {
                             None => INFINITY,
                         };
                         if s > v * weight {
-                            self.zadd(v * weight, k.clone(), false, false, false, false);
+                            let _ = self.zadd(v * weight, k.clone(), false, false, false, false);
                         }
                     },
                 }
@@ -528,7 +535,7 @@ impl ValueSortedSet {
                 }
             }
 
-            self.zadd(score, k.clone(), false, false, false, false);
+            let _ = self.zadd(score, k.clone(), false, false, false, false);
         }
     }
 

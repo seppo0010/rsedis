@@ -7,6 +7,7 @@ use std::str::Utf8Error;
 #[derive(Debug)]
 pub enum OperationError {
     OverflowError,
+    NotANumberError,
     ValueError,
     UnknownKeyError,
     WrongTypeError,
@@ -24,6 +25,7 @@ impl Error for OperationError {
     fn description(&self) -> &str {
         match *self {
             OperationError::WrongTypeError => "WRONGTYPE Operation against a key holding the wrong kind of value",
+            OperationError::NotANumberError => "ERR resulting score is not a number (NaN)",
             _ => "ERR",
         }
     }
