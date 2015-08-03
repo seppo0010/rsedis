@@ -255,7 +255,8 @@ fn dump(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
 fn generic_expire(db: &mut Database, dbindex: usize, key: Vec<u8>, msexpiration: i64) -> Response {
     Response::Integer(match db.get(dbindex, &key) {
         Some(_) => {
-            db.set_msexpiration(dbindex, key, msexpiration);
+            db.set_msexpiration(dbindex, key.clone(), msexpiration);
+            db.key_updated(dbindex, &key);
             1
         },
         None => 0,
@@ -323,10 +324,12 @@ fn pttl(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
 fn persist(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate_arguments_exact!(parser, 2);
     let key = try_validate!(parser.get_vec(1), "Invalid key");
-    Response::Integer(match db.remove_msexpiration(dbindex, &key) {
+    let r = Response::Integer(match db.remove_msexpiration(dbindex, &key) {
         Some(_) => 1,
         None => 0,
-    })
+    });
+    db.key_updated(dbindex, &key);
+    r
 }
 
 fn dbtype(parser: ParsedCommand, db: &Database, dbindex: usize) -> Response {
@@ -444,10 +447,12 @@ fn setbit(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response 
     validate!(index >= 0 && index < 4 * 1024 * 1024 * 1024, "ERR bit offset is not an integer or out of range");
     let value = try_validate!(parser.get_i64(3), "ERR bit is not an integer or out of range");
     validate!(value == 0 || value == 1, "ERR bit is not an integer or out of range");
-    match db.get_or_create(dbindex, &key).setbit(index as usize, value == 1) {
+    let r = match db.get_or_create(dbindex, &key).setbit(index as usize, value == 1) {
         Ok(s) => Response::Integer(if s { 1 } else { 0 }),
         Err(e) => Response::Error(e.to_string()),
-    }
+    };
+    db.key_updated(dbindex, &key);
+    r
 }
 
 fn getbit(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
@@ -1313,14 +1318,20 @@ fn zremrangebyscore(parser: ParsedCommand, db: &mut Database, dbindex: usize) ->
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let min = try_validate!(parser.get_f64_bound(2), "ERR min or max is not a float");
     let max = try_validate!(parser.get_f64_bound(3), "ERR min or max is not a float");
-    let el = match db.get_mut(dbindex, &key) {
-        Some(e) => e,
-        None => return Response::Integer(0),
+    let c = {
+        let el = match db.get_mut(dbindex, &key) {
+            Some(e) => e,
+            None => return Response::Integer(0),
+        };
+        match el.zremrangebyscore(min, max) {
+            Ok(c) => c as i64,
+            Err(err) => return Response::Error(err.to_string()),
+        }
     };
-    match el.zremrangebyscore(min, max) {
-        Ok(c) => Response::Integer(c as i64),
-        Err(err) => Response::Error(err.to_string()),
+    if c > 0 {
+        db.key_updated(dbindex, &key);
     }
+    Response::Integer(c)
 }
 
 fn zremrangebylex(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
@@ -1340,14 +1351,20 @@ fn zremrangebylex(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> R
             Err(e) => return e,
         }
     };
-    let el = match db.get_mut(dbindex, &key) {
-        Some(e) => e,
-        None => return Response::Integer(0),
+    let c = {
+        let el = match db.get_mut(dbindex, &key) {
+            Some(e) => e,
+            None => return Response::Integer(0),
+        };
+        match el.zremrangebylex(min, max) {
+            Ok(c) => c as i64,
+            Err(err) => return Response::Error(err.to_string()),
+        }
     };
-    match el.zremrangebylex(min, max) {
-        Ok(c) => Response::Integer(c as i64),
-        Err(err) => Response::Error(err.to_string()),
+    if c > 0 {
+        db.key_updated(dbindex, &key);
     }
+    Response::Integer(c)
 }
 
 fn zremrangebyrank(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
@@ -1355,14 +1372,20 @@ fn zremrangebyrank(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> 
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let start = try_validate!(parser.get_i64(2), "Invalid start");
     let stop = try_validate!(parser.get_i64(3), "Invalid stop");
-    let el = match db.get_mut(dbindex, &key) {
-        Some(e) => e,
-        None => return Response::Integer(0),
+    let c = {
+        let el = match db.get_mut(dbindex, &key) {
+            Some(e) => e,
+            None => return Response::Integer(0),
+        };
+        match el.zremrangebyrank(start, stop) {
+            Ok(c) => c as i64,
+            Err(err) => return Response::Error(err.to_string()),
+        }
     };
-    match el.zremrangebyrank(start, stop) {
-        Ok(c) => Response::Integer(c as i64),
-        Err(err) => Response::Error(err.to_string()),
+    if c > 0 {
+        db.key_updated(dbindex, &key);
     }
+    Response::Integer(c)
 }
 
 fn zcount(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
