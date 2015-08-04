@@ -348,6 +348,17 @@ impl Client {
                 break;
             }
         }
+
+        {
+            let mut db = match self.db.lock() {
+                Ok(db) => db,
+                Err(_) => return,
+            };
+
+            for (channel_name, subscriber_id) in client.subscriptions.into_iter() {
+                db.unsubscribe(channel_name.clone(), subscriber_id);
+            }
+        }
     }
 }
 
