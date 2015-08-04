@@ -8,7 +8,7 @@ use std::str::Utf8Error;
 pub enum OperationError {
     OverflowError,
     NotANumberError,
-    ValueError,
+    ValueError(String),
     UnknownKeyError,
     WrongTypeError,
     OutOfBoundsError,
@@ -26,21 +26,22 @@ impl Error for OperationError {
         match *self {
             OperationError::WrongTypeError => "WRONGTYPE Operation against a key holding the wrong kind of value",
             OperationError::NotANumberError => "ERR resulting score is not a number (NaN)",
+            OperationError::ValueError(ref s) => &*s,
             _ => "ERR",
         }
     }
 }
 
 impl From<Utf8Error> for OperationError {
-    fn from(_: Utf8Error) -> OperationError { OperationError::ValueError }
+    fn from(_: Utf8Error) -> OperationError { OperationError::ValueError("ERR value is not a string".to_owned()) }
 }
 
 impl From<ParseIntError> for OperationError {
-    fn from(_: ParseIntError) -> OperationError { OperationError::ValueError }
+    fn from(_: ParseIntError) -> OperationError { OperationError::ValueError("ERR value is not a integer".to_owned()) }
 }
 
 impl From<ParseFloatError> for OperationError {
-    fn from(_: ParseFloatError) -> OperationError { OperationError::ValueError }
+    fn from(_: ParseFloatError) -> OperationError { OperationError::ValueError("ERR value is not a float".to_owned()) }
 }
 
 impl From<io::Error> for OperationError {

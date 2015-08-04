@@ -13,18 +13,38 @@ pub enum ValueString {
     Data(Vec<u8>),
 }
 
-impl ValueString {
-    pub fn new(newvalue: Vec<u8>) -> Self {
-        if newvalue.len() > 0 && newvalue.len() < 32 { // ought to be enough!
-            if newvalue[0] as char != '0' {
-                if let Ok(utf8) = from_utf8(&*newvalue) {
-                    if let Ok(i) = utf8.parse::<i64>() {
-                        return ValueString::Integer(i);
-                    }
+fn to_i64(newvalue: &Vec<u8>) -> Option<i64> {
+    if newvalue.len() > 0 && newvalue.len() < 32 { // ought to be enough!
+        if newvalue[0] as char != '0' && newvalue[0] as char != ' ' {
+            if let Ok(utf8) = from_utf8(&*newvalue) {
+                if let Ok(i) = utf8.parse::<i64>() {
+                    return Some(i);
                 }
             }
         }
-        return ValueString::Data(newvalue);
+    }
+    return None;
+}
+
+fn to_f64(newvalue: &Vec<u8>) -> Option<f64> {
+    if newvalue.len() > 0 && newvalue.len() < 32 { // ought to be enough!
+        if newvalue[0] as char != '0' && newvalue[0] as char != ' ' {
+            if let Ok(utf8) = from_utf8(&*newvalue) {
+                if let Ok(f) = utf8.parse::<f64>() {
+                    return Some(f);
+                }
+            }
+        }
+    }
+    return None;
+}
+
+impl ValueString {
+    pub fn new(newvalue: Vec<u8>) -> Self {
+        match to_i64(&newvalue) {
+            Some(i) => ValueString::Integer(i),
+            None => ValueString::Data(newvalue),
+        }
     }
 
     pub fn to_vec(&self) -> Vec<u8> {
@@ -55,11 +75,10 @@ impl ValueString {
         let val = match *self {
             ValueString::Integer(i) => i,
             ValueString::Data(ref data) => {
-                if data.len() > 32 {
-                    return Err(OperationError::OverflowError);
+                match to_i64(data) {
+                    Some(i) => i,
+                    None => return Err(OperationError::ValueError("ERR value is not a valid integer".to_owned())),
                 }
-                let res = try!(from_utf8(&data));
-                try!(res.parse::<i64>())
             },
         };
         let newval = try!(val.checked_add(incr).ok_or(OperationError::OverflowError));
@@ -71,11 +90,10 @@ impl ValueString {
         let val = match *self {
             ValueString::Integer(i) => i as f64,
             ValueString::Data(ref data) => {
-                if data.len() > 32 {
-                    return Err(OperationError::OverflowError);
+                match to_f64(data) {
+                    Some(f) => f,
+                    None => return Err(OperationError::ValueError("ERR value is not a valid float".to_owned())),
                 }
-                let res = try!(from_utf8(&data));
-                try!(res.parse::<f64>())
             },
         };
         let newval = val + incr;
