@@ -1726,11 +1726,14 @@ fn unsubscribe(
         pattern_subscriptions_len: usize,
         sender: &Sender<Option<PubsubEvent>>
         ) -> Result<Response, ResponseError> {
-    #![allow(unused_must_use)]
     if parser.argv.len() == 1 {
-        for (channel_name, subscriber_id) in subscriptions.drain() {
-            db.unsubscribe(channel_name.clone(), subscriber_id);
-            sender.send(Some(PubsubEvent::Unsubscription(channel_name, pattern_subscriptions_len)));
+        if subscriptions.len() == 0 {
+            let _ = sender.send(Some(PubsubEvent::Unsubscription(vec![], pattern_subscriptions_len)));
+        } else {
+            for (channel_name, subscriber_id) in subscriptions.drain() {
+                db.unsubscribe(channel_name.clone(), subscriber_id);
+                let _ = sender.send(Some(PubsubEvent::Unsubscription(channel_name, pattern_subscriptions_len)));
+            }
         }
     } else {
         for i in 1..parser.argv.len() {
@@ -1739,7 +1742,7 @@ fn unsubscribe(
                 Some(subscriber_id) => { db.unsubscribe(channel_name.clone(), subscriber_id); },
                 None => (),
             }
-            sender.send(Some(PubsubEvent::Unsubscription(channel_name, pattern_subscriptions_len + subscriptions.len())));
+            let _ = sender.send(Some(PubsubEvent::Unsubscription(channel_name, pattern_subscriptions_len + subscriptions.len())));
         }
     }
     Err(ResponseError::NoReply)
@@ -1772,19 +1775,27 @@ fn punsubscribe(
         pattern_subscriptions: &mut HashMap<Vec<u8>, usize>,
         sender: &Sender<Option<PubsubEvent>>
         ) -> Result<Response, ResponseError> {
-    #![allow(unused_must_use)]
-    opt_validate!(parser.argv.len() >= 2, "Wrong number of parameters");
-    for i in 1..parser.argv.len() {
-        let pattern = try_opt_validate!(parser.get_vec(i), "Invalid channel");
-        match pattern_subscriptions.remove(&pattern) {
-            Some(subscriber_id) => {
+    if parser.argv.len() == 1 {
+        if pattern_subscriptions.len() == 0 {
+            let _ = sender.send(Some(PubsubEvent::PatternUnsubscription(vec![], subscriptions_len)));
+        } else {
+            for (pattern, subscriber_id) in pattern_subscriptions.drain() {
                 db.punsubscribe(pattern.clone(), subscriber_id);
-                sender.send(Some(PubsubEvent::PatternUnsubscription(pattern, subscriptions_len + pattern_subscriptions.len())));
-            },
-            None => (),
+                let _ = sender.send(Some(PubsubEvent::PatternUnsubscription(pattern, subscriptions_len)));
+            }
+        }
+    } else {
+        for i in 1..parser.argv.len() {
+            let pattern = try_opt_validate!(parser.get_vec(i), "Invalid pattern");
+            match pattern_subscriptions.remove(&pattern) {
+                Some(subscriber_id) => { db.punsubscribe(pattern.clone(), subscriber_id); },
+                None => (),
+            }
+            let _ = sender.send(Some(PubsubEvent::PatternUnsubscription(pattern, subscriptions_len + pattern_subscriptions.len())));
         }
     }
-    Err(ResponseError::NoReply)}
+    Err(ResponseError::NoReply)
+}
 
 fn publish(parser: ParsedCommand, db: &mut Database) -> Response {
     validate_arguments_exact!(parser, 3);
