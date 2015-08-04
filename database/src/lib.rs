@@ -2389,8 +2389,8 @@ mod test_command {
 
         let key = vec![1u8];
         let value = vec![1u8, 2, 3, 4];
-        assert!(database.get_or_create(0, &key).set(value).is_ok());
-        assert!(database.get_or_create(0, &key).set(Vec::new()).is_ok());
+        assert!(database.get_or_create(0, &key).push(value, true).is_ok());
+        assert!(database.get_or_create(0, &key).pop(true).is_ok());
         assert!(!database.get(0, &key).is_none());
         database.key_updated(0, &key);
         assert!(database.get(0, &key).is_none());
