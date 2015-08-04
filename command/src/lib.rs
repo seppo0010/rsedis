@@ -1707,8 +1707,10 @@ fn subscribe(
     opt_validate!(parser.argv.len() >= 2, "Wrong number of parameters");
     for i in 1..parser.argv.len() {
         let channel_name = try_opt_validate!(parser.get_vec(i), "Invalid channel");
-        let subscriber_id = db.subscribe(channel_name.clone(), sender.clone());
-        subscriptions.insert(channel_name.clone(), subscriber_id);
+        if !subscriptions.contains_key(&channel_name) {
+            let subscriber_id = db.subscribe(channel_name.clone(), sender.clone());
+            subscriptions.insert(channel_name.clone(), subscriber_id);
+        }
         match sender.send(Some(PubsubEvent::Subscription(channel_name.clone(), pattern_subscriptions_len + subscriptions.len()))) {
             Ok(_) => None,
             Err(_) => subscriptions.remove(&channel_name),
