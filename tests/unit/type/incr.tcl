@@ -1,55 +1,55 @@
 start_server {tags {"incr"}} {
-    xtest {INCR against non existing key} {
+    test {INCR against non existing key} {
         set res {}
         append res [r incr novar]
         append res [r get novar]
     } {11}
 
-    xtest {INCR against key created by incr itself} {
+    test {INCR against key created by incr itself} {
         r incr novar
     } {2}
 
-    xtest {INCR against key originally set with SET} {
+    test {INCR against key originally set with SET} {
         r set novar 100
         r incr novar
     } {101}
 
-    xtest {INCR over 32bit value} {
+    test {INCR over 32bit value} {
         r set novar 17179869184
         r incr novar
     } {17179869185}
 
-    xtest {INCRBY over 32bit value with over 32bit increment} {
+    test {INCRBY over 32bit value with over 32bit increment} {
         r set novar 17179869184
         r incrby novar 17179869184
     } {34359738368}
 
-    xtest {INCR fails against key with spaces (left)} {
+    test {INCR fails against key with spaces (left)} {
         r set novar "    11"
         catch {r incr novar} err
         format $err
     } {ERR*}
 
-    xtest {INCR fails against key with spaces (right)} {
+    test {INCR fails against key with spaces (right)} {
         r set novar "11    "
         catch {r incr novar} err
         format $err
     } {ERR*}
 
-    xtest {INCR fails against key with spaces (both)} {
+    test {INCR fails against key with spaces (both)} {
         r set novar "    11    "
         catch {r incr novar} err
         format $err
     } {ERR*}
 
-    xtest {INCR fails against a key holding a list} {
+    test {INCR fails against a key holding a list} {
         r rpush mylist 1
         catch {r incr mylist} err
         r rpop mylist
         format $err
     } {WRONGTYPE*}
 
-    xtest {DECRBY over 32bit value with over 32bit increment, negative res} {
+    test {DECRBY over 32bit value with over 32bit increment, negative res} {
         r set novar 17179869184
         r decrby novar 17179869185
     } {-1}
@@ -77,7 +77,7 @@ start_server {tags {"incr"}} {
         assert {$old eq $new}
     }
 
-    xtest {INCRBYFLOAT against non existing key} {
+    test {INCRBYFLOAT against non existing key} {
         r del novar
         list    [roundFloat [r incrbyfloat novar 1]] \
                 [roundFloat [r get novar]] \
@@ -85,43 +85,43 @@ start_server {tags {"incr"}} {
                 [roundFloat [r get novar]]
     } {1 1 1.25 1.25}
 
-    xtest {INCRBYFLOAT against key originally set with SET} {
+    test {INCRBYFLOAT against key originally set with SET} {
         r set novar 1.5
         roundFloat [r incrbyfloat novar 1.5]
     } {3}
 
-    xtest {INCRBYFLOAT over 32bit value} {
+    test {INCRBYFLOAT over 32bit value} {
         r set novar 17179869184
         r incrbyfloat novar 1.5
     } {17179869185.5}
 
-    xtest {INCRBYFLOAT over 32bit value with over 32bit increment} {
+    test {INCRBYFLOAT over 32bit value with over 32bit increment} {
         r set novar 17179869184
         r incrbyfloat novar 17179869184
     } {34359738368}
 
-    xtest {INCRBYFLOAT fails against key with spaces (left)} {
+    test {INCRBYFLOAT fails against key with spaces (left)} {
         set err {}
         r set novar "    11"
         catch {r incrbyfloat novar 1.0} err
         format $err
     } {ERR*valid*}
 
-    xtest {INCRBYFLOAT fails against key with spaces (right)} {
+    test {INCRBYFLOAT fails against key with spaces (right)} {
         set err {}
         r set novar "11    "
         catch {r incrbyfloat novar 1.0} err
         format $err
     } {ERR*valid*}
 
-    xtest {INCRBYFLOAT fails against key with spaces (both)} {
+    test {INCRBYFLOAT fails against key with spaces (both)} {
         set err {}
         r set novar " 11 "
         catch {r incrbyfloat novar 1.0} err
         format $err
     } {ERR*valid*}
 
-    xtest {INCRBYFLOAT fails against a key holding a list} {
+    test {INCRBYFLOAT fails against a key holding a list} {
         r del mylist
         set err {}
         r rpush mylist 1
@@ -140,7 +140,7 @@ start_server {tags {"incr"}} {
         # perform divisions.
     } {ERR*would produce*}
 
-    xtest {INCRBYFLOAT decrement} {
+    test {INCRBYFLOAT decrement} {
         r set foo 1
         roundFloat [r incrbyfloat foo -1.1]
     } {-0.1}
