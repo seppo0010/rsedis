@@ -154,7 +154,7 @@ pub struct Logger {
     /// To change the Level target, send `(None, Some(Level), None)`
     /// To log a message send `(None, Some(Level), Some(String))` where the
     /// level is the message level
-    tx: Sender<(Option<Output>, Option<Level>, Option<String>, Option<Option<Box<syslog::Writer>>>)>,
+    tx: Sender<(Option<Output>, Option<Level>, Option<String>, Option<Option<Box<syslog::Logger>>>)>,
 }
 
 #[derive(Clone)]
@@ -172,11 +172,11 @@ impl Logger {
     /// Creates a new `Logger` for a given `Output` and severity `Level`.
     #[cfg(unix)]
     fn create(level: Level, output: Output) -> Logger {
-        let (tx, rx) = channel::<(Option<Output>, Option<Level>, Option<String>, Option<Option<Box<syslog::Writer>>>)>();
+        let (tx, rx) = channel::<(Option<Output>, Option<Level>, Option<String>, Option<Option<Box<syslog::Logger>>>)>();
         {
             let mut level = level;
             let mut output = output;
-            let mut syslog_writer:Option<Box<syslog::Writer>> = None;
+            let mut syslog_writer:Option<Box<syslog::Logger>> = None;
             thread::spawn(move || {
                 loop {
                     let (_output, _level, _msg, _syslog_writer) = match rx.recv() {
@@ -329,8 +329,8 @@ impl Logger {
 
     /// Enables syslog.
     #[cfg(unix)]
-    pub fn set_syslog(&mut self, ident: &String, facility: &String) {
-        let w = syslog::init(ident.clone(), match &*(&*facility.clone()).to_ascii_lowercase() {
+    pub fn set_syslog(&mut self, _: &String, facility: &String) {
+        let w = syslog::unix(match &*(&*facility.clone()).to_ascii_lowercase() {
             "local0" => syslog::Facility::LOG_LOCAL0,
             "local1" => syslog::Facility::LOG_LOCAL1,
             "local2" => syslog::Facility::LOG_LOCAL2,
@@ -340,7 +340,7 @@ impl Logger {
             "local6" => syslog::Facility::LOG_LOCAL6,
             "local7" => syslog::Facility::LOG_LOCAL7,
             _ => syslog::Facility::LOG_USER,
-        }, ident.clone()).unwrap();
+        }).unwrap();
         self.tx.send((None, None, None, Some(Some(w)))).unwrap();
     }
 

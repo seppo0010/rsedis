@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = ["Sebastian Waisbrot <seppo0010@gmail.com>"]
 
 [target.x86_64-unknown-linux-gnu.dependencies]
-syslog = "1.0.4"
+syslog = "~2.1.0"
 
 [target.x86_64-apple-darwin.dependencies]
-syslog = "1.0.4"
+syslog = "~2.1.0"
