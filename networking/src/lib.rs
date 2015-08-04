@@ -252,7 +252,8 @@ impl Client {
         let mut this_command:Option<OwnedParsedCommand>;
         let mut next_command:Option<OwnedParsedCommand> = None;
         loop {
-            if next_command.is_none() {
+            // FIXME: is_incomplete parses the command a second time
+            if next_command.is_none() && parser.is_incomplete() {
                 parser.allocate();
                 let len = {
                     let pos = parser.written;

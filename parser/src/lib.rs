@@ -47,6 +47,13 @@ pub enum ParseError {
 }
 
 impl ParseError {
+    pub fn is_incomplete(&self) -> bool {
+        match *self {
+            ParseError::Incomplete => true,
+            _ => false,
+        }
+    }
+
     fn response_string(&self) -> String {
         match *self {
             ParseError::Incomplete => "Incomplete data".to_owned(),
@@ -327,6 +334,9 @@ pub fn parse(input: &[u8]) -> Result<(ParsedCommand, usize), ParseError> {
     }
     let mut argv = Vec::new();
     for i in 0..argc {
+        if input.len() == pos {
+            return Err(ParseError::Incomplete);
+        }
         if input[pos] as char != '$' {
             return Err(ParseError::BadProtocol(format!("expected '$', got '{}'", input[pos] as char)));
         }
@@ -392,6 +402,14 @@ impl Parser {
 
     pub fn get_mut(&mut self) -> &mut Vec<u8> {
         &mut self.data
+    }
+
+    pub fn is_incomplete(&self) -> bool {
+        let data = &(&*self.data)[self.position..self.written];
+        match parse(data) {
+            Ok(_) => false,
+            Err(e) => e.is_incomplete(),
+        }
     }
 
     pub fn next(&mut self) -> Result<ParsedCommand, ParseError> {
