@@ -103,7 +103,7 @@ start_server {tags {"pubsub"}} {
         $rd2 close
     }
 
-    xtest "PUBLISH/SUBSCRIBE after UNSUBSCRIBE without arguments" {
+    test "PUBLISH/SUBSCRIBE after UNSUBSCRIBE without arguments" {
         set rd1 [redis_deferring_client]
         assert_equal {1 2 3} [subscribe $rd1 {chan1 chan2 chan3}]
         unsubscribe $rd1
@@ -115,7 +115,7 @@ start_server {tags {"pubsub"}} {
         $rd1 close
     }
 
-    xtest "SUBSCRIBE to one channel more than once" {
+    test "SUBSCRIBE to one channel more than once" {
         set rd1 [redis_deferring_client]
         assert_equal {1 1 1} [subscribe $rd1 {chan1 chan1 chan1}]
         assert_equal 1 [r publish chan1 hello]
@@ -125,7 +125,7 @@ start_server {tags {"pubsub"}} {
         $rd1 close
     }
 
-    xtest "UNSUBSCRIBE from non-subscribed channels" {
+    test "UNSUBSCRIBE from non-subscribed channels" {
         set rd1 [redis_deferring_client]
         assert_equal {0 0 0} [unsubscribe $rd1 {foo bar quux}]
 
@@ -133,7 +133,7 @@ start_server {tags {"pubsub"}} {
         $rd1 close
     }
 
-    xtest "PUBLISH/PSUBSCRIBE basics" {
+    test "PUBLISH/PSUBSCRIBE basics" {
         set rd1 [redis_deferring_client]
 
         # subscribe to two patterns
@@ -161,7 +161,7 @@ start_server {tags {"pubsub"}} {
         $rd1 close
     }
 
-    xtest "PUBLISH/PSUBSCRIBE with two clients" {
+    test "PUBLISH/PSUBSCRIBE with two clients" {
         set rd1 [redis_deferring_client]
         set rd2 [redis_deferring_client]
 
@@ -176,7 +176,7 @@ start_server {tags {"pubsub"}} {
         $rd2 close
     }
 
-    xtest "PUBLISH/PSUBSCRIBE after PUNSUBSCRIBE without arguments" {
+    test "PUBLISH/PSUBSCRIBE after PUNSUBSCRIBE without arguments" {
         set rd1 [redis_deferring_client]
         assert_equal {1 2 3} [psubscribe $rd1 {chan1.* chan2.* chan3.*}]
         punsubscribe $rd1
@@ -188,7 +188,7 @@ start_server {tags {"pubsub"}} {
         $rd1 close
     }
 
-    xtest "PUNSUBSCRIBE from non-subscribed channels" {
+    test "PUNSUBSCRIBE from non-subscribed channels" {
         set rd1 [redis_deferring_client]
         assert_equal {0 0 0} [punsubscribe $rd1 {foo.* bar.* quux.*}]
 
@@ -200,7 +200,7 @@ start_server {tags {"pubsub"}} {
         r pubsub numsub abc def
     } {abc 0 def 0}
 
-    xtest "Mix SUBSCRIBE and PSUBSCRIBE" {
+    test "Mix SUBSCRIBE and PSUBSCRIBE" {
         set rd1 [redis_deferring_client]
         assert_equal {1} [subscribe $rd1 {foo.bar}]
         assert_equal {2} [psubscribe $rd1 {foo.*}]
@@ -213,7 +213,7 @@ start_server {tags {"pubsub"}} {
         $rd1 close
     }
 
-    xtest "PUNSUBSCRIBE and UNSUBSCRIBE should always reply" {
+    test "PUNSUBSCRIBE and UNSUBSCRIBE should always reply" {
         # Make sure we are not subscribed to any channel at all.
         r punsubscribe
         r unsubscribe
