@@ -429,6 +429,9 @@ fn setrange(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Respons
     };
     let value = try_validate!(parser.get_vec(3), "Invalid value");
     let r = {
+        if db.get(dbindex, &key).is_none() && value.len() == 0 {
+            return Response::Integer(0);
+        }
         let oldval = db.get_or_create(dbindex, &key);
         validate!(index + value.len() <= 512*1024*1024, "ERR string exceeds maximum allowed size (512MB)");
         match oldval.setrange(index, value) {
