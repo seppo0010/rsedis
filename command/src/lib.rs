@@ -2061,7 +2061,7 @@ pub fn command(
         "psubscribe"   => return psubscribe(  parser, db, client.subscriptions.len(), &mut client.pattern_subscriptions, &client.pubsub_sender),
         "punsubscribe" => return punsubscribe(parser, db, client.subscriptions.len(), &mut client.pattern_subscriptions, &client.pubsub_sender),
         "publish" => publish(parser, db),
-        cmd => Response::Error(format!("Unknown command \"{}\"", cmd).to_owned()),
+        cmd => Response::Error(format!("ERR unknown command \"{}\"", cmd).to_owned()),
     });
 }
 
