@@ -1483,7 +1483,7 @@ impl Value {
     pub fn is_empty(&self) -> bool {
         match *self {
             Value::Nil => true,
-            Value::String(ref s) => s.strlen() == 0,
+            Value::String(_) => false,
             Value::List(ref l) => l.llen() == 0,
             Value::Set(ref s) => s.scard() == 0,
             Value::SortedSet(ref s) => s.zcard() == 0,
