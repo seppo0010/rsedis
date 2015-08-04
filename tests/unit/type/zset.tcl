@@ -442,7 +442,7 @@ start_server {tags {"zset"}} {
             assert_error "*not*string*" {r zrangebylex fooz -x \[bar}
         }
 
-        xtest "ZREMRANGEBYSCORE basics" {
+        test "ZREMRANGEBYSCORE basics" {
             proc remrangebyscore {min max} {
                 create_zset zset {1 a 2 b 3 c 4 d 5 e}
                 assert_equal 1 [r exists zset]
@@ -504,7 +504,7 @@ start_server {tags {"zset"}} {
             assert_error "*not*float*" {r zremrangebyscore fooz 1 NaN}
         }
 
-        xtest "ZREMRANGEBYRANK basics" {
+        test "ZREMRANGEBYRANK basics" {
             proc remrangebyrank {min max} {
                 create_zset zset {1 a 2 b 3 c 4 d 5 e}
                 assert_equal 1 [r exists zset]
