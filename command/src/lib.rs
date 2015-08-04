@@ -1736,12 +1736,10 @@ fn unsubscribe(
         for i in 1..parser.argv.len() {
             let channel_name = try_opt_validate!(parser.get_vec(i), "Invalid channel");
             match subscriptions.remove(&channel_name) {
-                Some(subscriber_id) => {
-                    db.unsubscribe(channel_name.clone(), subscriber_id);
-                    sender.send(Some(PubsubEvent::Unsubscription(channel_name, pattern_subscriptions_len + subscriptions.len())));
-                },
+                Some(subscriber_id) => { db.unsubscribe(channel_name.clone(), subscriber_id); },
                 None => (),
             }
+            sender.send(Some(PubsubEvent::Unsubscription(channel_name, pattern_subscriptions_len + subscriptions.len())));
         }
     }
     Err(ResponseError::NoReply)
