@@ -67,22 +67,22 @@ start_server {tags {"pubsub"}} {
         set rd1 [redis_deferring_client]
 
         # subscribe to two channels
-        assert_equal {1 2} [subscribe $rd1 {chan1 chan2}]
-        assert_equal 1 [r publish chan1 hello]
-        assert_equal 1 [r publish chan2 world]
-        assert_equal {message chan1 hello} [$rd1 read]
-        assert_equal {message chan2 world} [$rd1 read]
+        assert_equal {1 2} [subscribe $rd1 {achan1 achan2}]
+        assert_equal 1 [r publish achan1 hello]
+        assert_equal 1 [r publish achan2 world]
+        assert_equal {message achan1 hello} [$rd1 read]
+        assert_equal {message achan2 world} [$rd1 read]
 
         # unsubscribe from one of the channels
-        unsubscribe $rd1 {chan1}
-        assert_equal 0 [r publish chan1 hello]
-        assert_equal 1 [r publish chan2 world]
-        assert_equal {message chan2 world} [$rd1 read]
+        unsubscribe $rd1 {achan1}
+        assert_equal 0 [r publish achan1 hello]
+        assert_equal 1 [r publish achan2 world]
+        assert_equal {message achan2 world} [$rd1 read]
 
         # unsubscribe from the remaining channel
-        unsubscribe $rd1 {chan2}
-        assert_equal 0 [r publish chan1 hello]
-        assert_equal 0 [r publish chan2 world]
+        unsubscribe $rd1 {achan2}
+        assert_equal 0 [r publish achan1 hello]
+        assert_equal 0 [r publish achan2 world]
 
         # clean up clients
         $rd1 close
@@ -92,11 +92,11 @@ start_server {tags {"pubsub"}} {
         set rd1 [redis_deferring_client]
         set rd2 [redis_deferring_client]
 
-        assert_equal {1} [subscribe $rd1 {chan1}]
-        assert_equal {1} [subscribe $rd2 {chan1}]
-        assert_equal 2 [r publish chan1 hello]
-        assert_equal {message chan1 hello} [$rd1 read]
-        assert_equal {message chan1 hello} [$rd2 read]
+        assert_equal {1} [subscribe $rd1 {bchan1}]
+        assert_equal {1} [subscribe $rd2 {bchan1}]
+        assert_equal 2 [r publish bchan1 hello]
+        assert_equal {message bchan1 hello} [$rd1 read]
+        assert_equal {message bchan1 hello} [$rd2 read]
 
         # clean up clients
         $rd1 close
@@ -105,11 +105,11 @@ start_server {tags {"pubsub"}} {
 
     test "PUBLISH/SUBSCRIBE after UNSUBSCRIBE without arguments" {
         set rd1 [redis_deferring_client]
-        assert_equal {1 2 3} [subscribe $rd1 {chan1 chan2 chan3}]
+        assert_equal {1 2 3} [subscribe $rd1 {cchan1 cchan2 cchan3}]
         unsubscribe $rd1
-        assert_equal 0 [r publish chan1 hello]
-        assert_equal 0 [r publish chan2 hello]
-        assert_equal 0 [r publish chan3 hello]
+        assert_equal 0 [r publish cchan1 hello]
+        assert_equal 0 [r publish cchan2 hello]
+        assert_equal 0 [r publish cchan3 hello]
 
         # clean up clients
         $rd1 close
@@ -117,9 +117,9 @@ start_server {tags {"pubsub"}} {
 
     test "SUBSCRIBE to one channel more than once" {
         set rd1 [redis_deferring_client]
-        assert_equal {1 1 1} [subscribe $rd1 {chan1 chan1 chan1}]
-        assert_equal 1 [r publish chan1 hello]
-        assert_equal {message chan1 hello} [$rd1 read]
+        assert_equal {1 1 1} [subscribe $rd1 {dchan1 dchan1 dchan1}]
+        assert_equal 1 [r publish dchan1 hello]
+        assert_equal {message dchan1 hello} [$rd1 read]
 
         # clean up clients
         $rd1 close
@@ -178,11 +178,11 @@ start_server {tags {"pubsub"}} {
 
     test "PUBLISH/PSUBSCRIBE after PUNSUBSCRIBE without arguments" {
         set rd1 [redis_deferring_client]
-        assert_equal {1 2 3} [psubscribe $rd1 {chan1.* chan2.* chan3.*}]
+        assert_equal {1 2 3} [psubscribe $rd1 {echan1.* echan2.* echan3.*}]
         punsubscribe $rd1
-        assert_equal 0 [r publish chan1.hi hello]
-        assert_equal 0 [r publish chan2.hi hello]
-        assert_equal 0 [r publish chan3.hi hello]
+        assert_equal 0 [r publish echan1.hi hello]
+        assert_equal 0 [r publish echan2.hi hello]
+        assert_equal 0 [r publish echan3.hi hello]
 
         # clean up clients
         $rd1 close
