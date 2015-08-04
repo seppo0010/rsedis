@@ -72,9 +72,9 @@ impl PubsubEvent {
         match *self {
             PubsubEvent::Message(ref channel, ref pattern, ref message) => match *pattern {
                 Some(ref pattern) => Response::Array(vec![
-                        Response::Data(b"message".to_vec()),
-                        Response::Data(channel.clone()),
+                        Response::Data(b"pmessage".to_vec()),
                         Response::Data(pattern.clone()),
+                        Response::Data(channel.clone()),
                         Response::Data(message.clone()),
                         ]),
                 None => Response::Array(vec![
