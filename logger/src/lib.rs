@@ -196,7 +196,7 @@ impl Logger {
                                 }
                             };
                             if let Some(ref mut w) = syslog_writer {
-                                match w.send(match lvl {
+                                match w.send_3164(match lvl {
                                     Level::Debug => syslog::Severity::LOG_DEBUG,
                                     Level::Verbose => syslog::Severity::LOG_INFO,
                                     Level::Notice => syslog::Severity::LOG_NOTICE,
@@ -329,8 +329,8 @@ impl Logger {
 
     /// Enables syslog.
     #[cfg(unix)]
-    pub fn set_syslog(&mut self, _: &String, facility: &String) {
-        let w = syslog::unix(match &*(&*facility.clone()).to_ascii_lowercase() {
+    pub fn set_syslog(&mut self, ident: &String, facility: &String) {
+        let mut w = syslog::unix(match &*(&*facility.clone()).to_ascii_lowercase() {
             "local0" => syslog::Facility::LOG_LOCAL0,
             "local1" => syslog::Facility::LOG_LOCAL1,
             "local2" => syslog::Facility::LOG_LOCAL2,
@@ -341,6 +341,7 @@ impl Logger {
             "local7" => syslog::Facility::LOG_LOCAL7,
             _ => syslog::Facility::LOG_USER,
         }).unwrap();
+        w.set_process_name(ident.clone());
         self.tx.send((None, None, None, Some(Some(w)))).unwrap();
     }
 
