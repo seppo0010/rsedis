@@ -248,5 +248,5 @@
     - [ ] hll-sparse-max-bytes
     - [x] activerehashing
     - [ ] client-output-buffer-limit
-    - [ ] hz
+    - [x] hz
     - [ ] aof-rewrite-incremental-fsync
