@@ -522,9 +522,22 @@ impl Server {
                     continue;
                 }
             }
-
         }
+
         self.handle_unixsocket();
+
+        {
+            let dblock = self.db.clone();
+            thread::spawn(move || {
+                loop {
+                    let mut db = dblock.lock().unwrap();
+                    let hz = db.config.hz.clone();
+                    db.active_expire_cycle(10);
+                    drop(db);
+                    thread::sleep_ms(10000 / hz);
+                }
+            });
+        }
     }
 
     #[cfg(unix)]

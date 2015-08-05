@@ -38,6 +38,7 @@ pub struct Config {
     pub syslog_enabled: bool,
     pub syslog_ident: String,
     pub syslog_facility: String,
+    pub hz: u32,
 }
 
 #[derive(Debug)]
@@ -94,6 +95,7 @@ impl Config {
             syslog_enabled: false,
             syslog_ident: "rsedis".to_owned(),
             syslog_facility: "local0".to_owned(),
+            hz: 10,
         }
     }
 
@@ -117,6 +119,7 @@ impl Config {
             syslog_enabled: false,
             syslog_ident: "rsedis".to_owned(),
             syslog_facility: "local0".to_owned(),
+            hz: 10,
         }
     }
 
@@ -190,6 +193,7 @@ impl Config {
                 b"syslog-enabled" => self.syslog_enabled = try!(read_bool(args)),
                 b"syslog-ident" => self.syslog_ident = try!(read_string(args)).to_owned(),
                 b"syslog-facility" => self.syslog_facility = try!(read_string(args)).to_owned(),
+                b"hz" => self.hz = try!(read_parse(args)),
                 b"include" => if args.len() != 2 {
                     return Err(ConfigError::InvalidFormat)
                 } else {
