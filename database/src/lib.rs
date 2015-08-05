@@ -40,6 +40,8 @@ use set::ValueSet;
 use string::ValueString;
 use zset::ValueSortedSet;
 
+const ACTIVE_EXPIRE_CYCLE_LOOKUPS_PER_LOOP:usize = 20;
+
 /// Any value storable in the database
 #[derive(PartialEq, Debug)]
 pub enum Value {
@@ -1518,6 +1520,8 @@ pub struct Database {
     key_subscribers: Vec<RehashingHashMap<Vec<u8>, HashMap<usize, Sender<bool>>>>,
     /// A unique identifier counter to assign to clients
     subscriber_id: usize,
+    /// Which database to try to run the active expire cycle next
+    active_expire_cycle_db: usize,
 }
 
 pub struct Iter<'a> {
@@ -1529,6 +1533,16 @@ impl<'a> Iterator for Iter<'a> {
 
     #[inline] fn next(&mut self) -> Option<(&'a Vec<u8>, &'a Value)> { self.inner.next() }
     #[inline] fn size_hint(&self) -> (usize, Option<usize>) { self.inner.size_hint()  }
+}
+
+macro_rules! random_key {
+    ($dict: expr) => ({
+        let ref dict = $dict;
+        let len = dict.len();
+        let pos = rand::random::<usize>() % len;
+        // FIXME: remove clone
+        dict.keys().skip(pos).take(1).next().unwrap().clone()
+    })
 }
 
 impl Database {
@@ -1559,6 +1573,7 @@ impl Database {
             key_subscribers: key_subscribers,
             subscriber_id: 0,
             watched_keys: watched_keys,
+            active_expire_cycle_db: 0,
         }
     }
 
@@ -1988,6 +2003,55 @@ impl Database {
             }
         }
         responses
+    }
+
+    /// Tries to remove items that are already expired.
+    pub fn active_expire_cycle(&mut self, duration_ms: i64) {
+        let num_dbs = self.data.len();
+        let dbs_per_call = num_dbs;
+        let start = mstime();
+        let mut iteration = 0;
+
+        for _ in 0..dbs_per_call {
+            let dbindex = self.active_expire_cycle_db;
+
+            self.active_expire_cycle_db += 1;
+            if self.active_expire_cycle_db == num_dbs {
+                self.active_expire_cycle_db = 0;
+            }
+
+            loop {
+                let mut num = self.data_expiration_ms.len();
+                if num == 0 {
+                    break;
+                }
+
+                if num > ACTIVE_EXPIRE_CYCLE_LOOKUPS_PER_LOOP {
+                    num = ACTIVE_EXPIRE_CYCLE_LOOKUPS_PER_LOOP;
+                }
+
+                let mut expired = 0;
+                while num > 0 && self.data_expiration_ms[dbindex].len() > 0 {
+                    num -= 1;
+                    let key = random_key!(self.data_expiration_ms[dbindex]);
+                    if self.get_mut(dbindex, &key).is_none() {
+                        expired += 1;
+                    }
+                }
+
+                iteration += 1;
+                if (iteration & 16) == 0 {
+                    let elapsed = mstime() - start;
+                    if elapsed > duration_ms {
+                        return;
+                    }
+                }
+
+                if expired <= ACTIVE_EXPIRE_CYCLE_LOOKUPS_PER_LOOP / 4 {
+                    break;
+                }
+            }
+        }
     }
 }
 
@@ -3354,5 +3418,36 @@ mod test_command {
         database.key_unwatch(0, &vec![1], 31);
         assert!(database.key_watch_verify(0, &vec![1], 32));
         assert!(!database.key_watch_verify(0, &vec![1], 31));
+    }
+
+    #[test]
+    fn active_expire() {
+        let config = Config::new(Logger::new(Level::Warning));
+        let mut database = Database::new(config);
+        let key = vec![1u8];
+        let value = vec![1u8, 2, 3, 4];
+        assert!(database.get_or_create(0, &key).set(value).is_ok());
+        database.set_msexpiration(0, key.clone(), mstime());
+        assert_eq!(database.dbsize(0), 1);
+        database.active_expire_cycle(0);
+        assert_eq!(database.dbsize(0), 0);
+    }
+
+    #[test]
+    fn active_expire2() {
+        let config = Config::new(Logger::new(Level::Warning));
+        let mut database = Database::new(config);
+        let key1 = vec![1u8];
+        let key2 = vec![2u8];
+        let key3 = vec![3u8];
+        let value = vec![1u8, 2, 3, 4];
+        assert!(database.get_or_create(0, &key1).set(value.clone()).is_ok());
+        assert!(database.get_or_create(0, &key2).set(value.clone()).is_ok());
+        assert!(database.get_or_create(0, &key3).set(value.clone()).is_ok());
+        database.set_msexpiration(0, key1.clone(), mstime());
+        database.set_msexpiration(0, key2.clone(), mstime() + 1000);
+        assert_eq!(database.dbsize(0), 3);
+        database.active_expire_cycle(100);
+        assert_eq!(database.dbsize(0), 2);
     }
 }
