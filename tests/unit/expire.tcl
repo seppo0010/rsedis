@@ -146,7 +146,7 @@ start_server {tags {"expire"}} {
         list [r ttl x] [r pttl x]
     } {-2 -2}
 
-    xtest {Redis should actively expire keys incrementally} {
+    test {Redis should actively expire keys incrementally} {
         r flushdb
         r psetex key1 500 a
         r psetex key2 500 a
