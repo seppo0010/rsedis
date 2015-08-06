@@ -154,8 +154,8 @@ start_server {tags {"expire"}} {
         set size1 [r dbsize]
         # Redis expires random keys ten times every second so we are
         # fairly sure that all the three keys should be evicted after
-        # one second.
-        after 1000
+        # five second.
+        after 5000
         set size2 [r dbsize]
         list $size1 $size2
     } {3 0}

@@ -178,6 +178,8 @@ pub struct Server {
     listener_threads: Vec<thread::JoinHandle<()>>,
     /// An incremental id for new clients
     pub next_id: Arc<Mutex<usize>>,
+    /// Sender to signal hz thread to stop
+    hz_stop: Option<Sender<()>>,
 }
 
 impl Client {
@@ -408,6 +410,7 @@ impl Server {
             listener_channels: Vec::new(),
             listener_threads: Vec::new(),
             next_id: Arc::new(Mutex::new(0)),
+            hz_stop: None,
         }
     }
 
@@ -527,9 +530,11 @@ impl Server {
         self.handle_unixsocket();
 
         {
+            let (hz_stop_tx, hz_stop_rx) = channel();
+            self.hz_stop = Some(hz_stop_tx);
             let dblock = self.db.clone();
             thread::spawn(move || {
-                loop {
+                while hz_stop_rx.try_recv().is_err() {
                     let mut db = dblock.lock().unwrap();
                     let hz = db.config.hz.clone();
                     db.active_expire_cycle(10);
@@ -581,6 +586,10 @@ impl Server {
                     TcpStream::connect(addrs);
                 }
             }
+        }
+        match self.hz_stop {
+            Some(ref t) => { let _ = t.send(()); },
+            None => (),
         }
         self.join();
     }
