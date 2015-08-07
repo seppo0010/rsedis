@@ -458,14 +458,17 @@ fn setbit(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response 
     r
 }
 
-fn getbit(parser: ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
+fn getbit(parser: ParsedCommand, db: &Database, dbindex: usize) -> Response {
     validate_arguments_exact!(parser, 3);
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let index = try_validate!(parser.get_i64(2), "Invalid index");
     validate!(index >= 0, "Invalid index");
-    match db.get_or_create(dbindex, &key).getbit(index as usize) {
-        Ok(s) => Response::Integer(if s { 1 } else { 0 }),
-        Err(e) => Response::Error(e.to_string()),
+    match db.get(dbindex, &key){
+        Some(v) => match v.getbit(index as usize) {
+            Ok(s) => Response::Integer(if s { 1 } else { 0 }),
+            Err(e) => Response::Error(e.to_string()),
+        },
+        None => Response::Integer(0),
     }
 }
 
