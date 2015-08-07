@@ -29,7 +29,7 @@ use net2::{TcpBuilder, TcpStreamExt};
 #[cfg(unix)] use unix_socket::{UnixStream, UnixListener};
 
 use config::Config;
-use database::{Database, PubsubEvent};
+use database::Database;
 use logger::Level;
 use parser::{OwnedParsedCommand, Parser, ParseError};
 use response::{Response, ResponseError};
@@ -221,23 +221,6 @@ impl Client {
         });
     }
 
-    /// Creates a thread that sends responses for every pubsub event received
-    fn create_pubsub_thread(&self, tx: Sender<Option<Response>>, pubsub_rx: Receiver<Option<PubsubEvent>>) {
-        #![allow(unused_must_use)]
-        thread::spawn(move || {
-            loop {
-                match pubsub_rx.recv() {
-                    Ok(m) => match m {
-                        Some(msg) => tx.send(Some(msg.as_response())),
-                        None => break,
-                    },
-                    Err(_) => break,
-                };
-            }
-            tx.send(None);
-        });
-    }
-
     /// Runs all clients commands. The function loops until the client
     /// disconnects.
     pub fn run(&mut self, sender: Sender<(Level, String)>) {
@@ -245,10 +228,7 @@ impl Client {
         let (stream_tx, rx) = channel::<Option<Response>>();
         self.create_writer_thread(sender.clone(), rx);
 
-        let (pubsub_tx, pubsub_rx) = channel::<Option<PubsubEvent>>();
-        self.create_pubsub_thread(stream_tx.clone(), pubsub_rx);
-
-        let mut client = command::Client::new(pubsub_tx, self.id, stream_tx.clone());
+        let mut client = command::Client::new(stream_tx.clone(), self.id);
         let mut parser = Parser::new();
 
         let mut this_command:Option<OwnedParsedCommand>;
@@ -347,7 +327,7 @@ impl Client {
             if error {
                 // kill threads
                 stream_tx.send(None);
-                client.pubsub_sender.send(None);
+                client.rawsender.send(None);
                 break;
             }
         }

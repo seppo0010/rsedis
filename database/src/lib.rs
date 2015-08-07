@@ -1511,10 +1511,10 @@ pub struct Database {
     watched_keys: Vec<HashMap<Vec<u8>, HashSet<usize>>>,
     /// Maps a channel to a list of pubsub events listeners.
     /// The `usize` key is used as a client identifier.
-    subscribers: HashMap<Vec<u8>, HashMap<usize, Sender<Option<PubsubEvent>>>>,
+    subscribers: HashMap<Vec<u8>, HashMap<usize, Sender<Option<Response>>>>,
     /// Maps a pattern to a list of pubsub events listeners.
     /// The `usize` key is used as a client identifier.
-    pattern_subscribers: HashMap<Vec<u8>, HashMap<usize, Sender<Option<PubsubEvent>>>>,
+    pattern_subscribers: HashMap<Vec<u8>, HashMap<usize, Sender<Option<Response>>>>,
     /// Maps a pattern to a list of key listeners. When a key is modified a message
     /// with `true` is published.
     /// The `usize` key is used as a client identifier.
@@ -1831,10 +1831,10 @@ impl Database {
     ///     vec![1],
     ///     None,
     ///     vec![0, 1, 2, 3],
-    /// ));
+    /// ).as_response());
     /// assert_eq!(rx.try_recv().unwrap_err(), TryRecvError::Empty);
     /// ```
-    pub fn subscribe(&mut self, channel: Vec<u8>, sender: Sender<Option<PubsubEvent>>) -> usize {
+    pub fn subscribe(&mut self, channel: Vec<u8>, sender: Sender<Option<Response>>) -> usize {
         self.ensure_channel(&channel);
         let mut channelsubscribers = self.subscribers.get_mut(&channel).unwrap();
         let subscriber_id = self.subscriber_id;
@@ -1893,10 +1893,10 @@ impl Database {
     ///     b"foobarbaz".to_vec(),
     ///     Some(b"foo*baz".to_vec()),
     ///     vec![0, 1, 2, 3],
-    /// ));
+    /// ).as_response());
     /// assert_eq!(rx.try_recv().unwrap_err(), TryRecvError::Empty);
     /// ```
-    pub fn psubscribe(&mut self, pattern: Vec<u8>, sender: Sender<Option<PubsubEvent>>) -> usize {
+    pub fn psubscribe(&mut self, pattern: Vec<u8>, sender: Sender<Option<Response>>) -> usize {
         self.pensure_channel(&pattern);
         let mut channelsubscribers = self.pattern_subscribers.get_mut(&pattern).unwrap();
         let subscriber_id = self.subscriber_id;
@@ -1922,7 +1922,7 @@ impl Database {
         match self.subscribers.get(channel_name) {
             Some(channels) => {
                 for (_, channel) in channels {
-                    match channel.send(Some(PubsubEvent::Message(channel_name.clone(), None, message.clone()))) {
+                    match channel.send(Some(PubsubEvent::Message(channel_name.clone(), None, message.clone()).as_response())) {
                         Ok(_) => c += 1,
                         Err(_) => (),
                     }
@@ -1933,7 +1933,7 @@ impl Database {
         for (pattern, channels) in self.pattern_subscribers.iter() {
             if glob_match(&pattern, &channel_name, false) {
                 for (_, channel) in channels {
-                    match channel.send(Some(PubsubEvent::Message(channel_name.clone(), Some(pattern.clone()), message.clone()))) {
+                    match channel.send(Some(PubsubEvent::Message(channel_name.clone(), Some(pattern.clone()), message.clone()).as_response())) {
                         Ok(_) => c += 1,
                         Err(_) => (),
                     }
@@ -3300,7 +3300,7 @@ mod test_command {
         let (tx, rx) = channel();
         database.subscribe(channel_name.clone(), tx);
         database.publish(&channel_name, &message);
-        assert_eq!(rx.recv().unwrap(), Some(PubsubEvent::Message(channel_name, None, message)));
+        assert_eq!(rx.recv().unwrap(), Some(PubsubEvent::Message(channel_name, None, message).as_response()));
     }
 
     #[test]
@@ -3325,7 +3325,7 @@ mod test_command {
         let (tx, rx) = channel();
         database.psubscribe(channel_name.clone(), tx);
         database.publish(&channel_name, &message);
-        assert_eq!(rx.recv().unwrap(), Some(PubsubEvent::Message(channel_name.clone(), Some(channel_name.clone()), message)));
+        assert_eq!(rx.recv().unwrap(), Some(PubsubEvent::Message(channel_name.clone(), Some(channel_name.clone()), message).as_response()));
     }
 
     #[test]
@@ -3472,9 +3472,9 @@ mod test_command {
         let (tx, rx) = channel();
         database.monitor_add(tx.clone());
         database.monitor_add(tx.clone());
-        database.log_command(vec![1]);
-        assert_eq!(rx.try_recv().unwrap(), vec![1]);
-        assert_eq!(rx.try_recv().unwrap(), vec![1]);
+        database.log_command("1".to_owned());
+        assert_eq!(rx.try_recv().unwrap(), "1".to_owned());
+        assert_eq!(rx.try_recv().unwrap(), "1".to_owned());
         assert!(rx.try_recv().is_err())
     }
 }

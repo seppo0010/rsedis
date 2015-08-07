@@ -1708,7 +1708,7 @@ fn subscribe(
         db: &mut Database,
         subscriptions: &mut HashMap<Vec<u8>, usize>,
         pattern_subscriptions_len: usize,
-        sender: &Sender<Option<PubsubEvent>>
+        sender: &Sender<Option<Response>>
         ) -> Result<Response, ResponseError> {
     opt_validate!(parser.argv.len() >= 2, "Wrong number of parameters");
     for i in 1..parser.argv.len() {
@@ -1717,7 +1717,7 @@ fn subscribe(
             let subscriber_id = db.subscribe(channel_name.clone(), sender.clone());
             subscriptions.insert(channel_name.clone(), subscriber_id);
         }
-        match sender.send(Some(PubsubEvent::Subscription(channel_name.clone(), pattern_subscriptions_len + subscriptions.len()))) {
+        match sender.send(Some(PubsubEvent::Subscription(channel_name.clone(), pattern_subscriptions_len + subscriptions.len()).as_response())) {
             Ok(_) => None,
             Err(_) => subscriptions.remove(&channel_name),
         };
@@ -1730,15 +1730,15 @@ fn unsubscribe(
         db: &mut Database,
         subscriptions: &mut HashMap<Vec<u8>, usize>,
         pattern_subscriptions_len: usize,
-        sender: &Sender<Option<PubsubEvent>>
+        sender: &Sender<Option<Response>>
         ) -> Result<Response, ResponseError> {
     if parser.argv.len() == 1 {
         if subscriptions.len() == 0 {
-            let _ = sender.send(Some(PubsubEvent::Unsubscription(vec![], pattern_subscriptions_len)));
+            let _ = sender.send(Some(PubsubEvent::Unsubscription(vec![], pattern_subscriptions_len).as_response()));
         } else {
             for (channel_name, subscriber_id) in subscriptions.drain() {
                 db.unsubscribe(channel_name.clone(), subscriber_id);
-                let _ = sender.send(Some(PubsubEvent::Unsubscription(channel_name, pattern_subscriptions_len)));
+                let _ = sender.send(Some(PubsubEvent::Unsubscription(channel_name, pattern_subscriptions_len).as_response()));
             }
         }
     } else {
@@ -1748,7 +1748,7 @@ fn unsubscribe(
                 Some(subscriber_id) => { db.unsubscribe(channel_name.clone(), subscriber_id); },
                 None => (),
             }
-            let _ = sender.send(Some(PubsubEvent::Unsubscription(channel_name, pattern_subscriptions_len + subscriptions.len())));
+            let _ = sender.send(Some(PubsubEvent::Unsubscription(channel_name, pattern_subscriptions_len + subscriptions.len()).as_response()));
         }
     }
     Err(ResponseError::NoReply)
@@ -1759,14 +1759,14 @@ fn psubscribe(
         db: &mut Database,
         subscriptions_len: usize,
         pattern_subscriptions: &mut HashMap<Vec<u8>, usize>,
-        sender: &Sender<Option<PubsubEvent>>
+        sender: &Sender<Option<Response>>
         ) -> Result<Response, ResponseError> {
     opt_validate!(parser.argv.len() >= 2, "Wrong number of parameters");
     for i in 1..parser.argv.len() {
         let pattern = try_opt_validate!(parser.get_vec(i), "Invalid channel");
         let subscriber_id = db.psubscribe(pattern.clone(), sender.clone());
         pattern_subscriptions.insert(pattern.clone(), subscriber_id);
-        match sender.send(Some(PubsubEvent::PatternSubscription(pattern.clone(), subscriptions_len + pattern_subscriptions.len()))) {
+        match sender.send(Some(PubsubEvent::PatternSubscription(pattern.clone(), subscriptions_len + pattern_subscriptions.len()).as_response())) {
             Ok(_) => None,
             Err(_) => pattern_subscriptions.remove(&pattern),
         };
@@ -1779,15 +1779,15 @@ fn punsubscribe(
         db: &mut Database,
         subscriptions_len: usize,
         pattern_subscriptions: &mut HashMap<Vec<u8>, usize>,
-        sender: &Sender<Option<PubsubEvent>>
+        sender: &Sender<Option<Response>>
         ) -> Result<Response, ResponseError> {
     if parser.argv.len() == 1 {
         if pattern_subscriptions.len() == 0 {
-            let _ = sender.send(Some(PubsubEvent::PatternUnsubscription(vec![], subscriptions_len)));
+            let _ = sender.send(Some(PubsubEvent::PatternUnsubscription(vec![], subscriptions_len).as_response()));
         } else {
             for (pattern, subscriber_id) in pattern_subscriptions.drain() {
                 db.punsubscribe(pattern.clone(), subscriber_id);
-                let _ = sender.send(Some(PubsubEvent::PatternUnsubscription(pattern, subscriptions_len)));
+                let _ = sender.send(Some(PubsubEvent::PatternUnsubscription(pattern, subscriptions_len).as_response()));
             }
         }
     } else {
@@ -1797,7 +1797,7 @@ fn punsubscribe(
                 Some(subscriber_id) => { db.punsubscribe(pattern.clone(), subscriber_id); },
                 None => (),
             }
-            let _ = sender.send(Some(PubsubEvent::PatternUnsubscription(pattern, subscriptions_len + pattern_subscriptions.len())));
+            let _ = sender.send(Some(PubsubEvent::PatternUnsubscription(pattern, subscriptions_len + pattern_subscriptions.len()).as_response()));
         }
     }
     Err(ResponseError::NoReply)
@@ -1835,7 +1835,6 @@ pub struct Client {
     pub auth: bool,
     pub subscriptions: HashMap<Vec<u8>, usize>,
     pub pattern_subscriptions: HashMap<Vec<u8>, usize>,
-    pub pubsub_sender: Sender<Option<PubsubEvent>>,
     pub multi: bool,
     pub multi_commands: Vec<OwnedParsedCommand>,
     pub watched_keys: HashSet<(usize, Vec<u8>)>,
@@ -1845,16 +1844,15 @@ pub struct Client {
 
 impl Client {
     pub fn mock() -> Self {
-        Self::new(channel().0, 0, channel().0)
+        Self::new(channel().0, 0)
     }
 
-    pub fn new(sender: Sender<Option<PubsubEvent>>, id: usize, rawsender: Sender<Option<Response>>) -> Self {
+    pub fn new(rawsender: Sender<Option<Response>>, id: usize) -> Self {
         Client {
             dbindex: 0,
             auth: false,
             subscriptions: HashMap::new(),
             pattern_subscriptions: HashMap::new(),
-            pubsub_sender: sender,
             multi: false,
             multi_commands: Vec::new(),
             id: id,
@@ -2086,10 +2084,10 @@ pub fn command(
         "keys" => keys(parser, db, dbindex),
         "watch" => watch(parser, db, dbindex, client.id, &mut client.watched_keys),
         "unwatch" => unwatch(parser, db, client.id, &mut client.watched_keys),
-        "subscribe"    => return subscribe(   parser, db, &mut client.subscriptions, client.pattern_subscriptions.len(), &client.pubsub_sender),
-        "unsubscribe"  => return unsubscribe( parser, db, &mut client.subscriptions, client.pattern_subscriptions.len(), &client.pubsub_sender),
-        "psubscribe"   => return psubscribe(  parser, db, client.subscriptions.len(), &mut client.pattern_subscriptions, &client.pubsub_sender),
-        "punsubscribe" => return punsubscribe(parser, db, client.subscriptions.len(), &mut client.pattern_subscriptions, &client.pubsub_sender),
+        "subscribe"    => return subscribe(   parser, db, &mut client.subscriptions, client.pattern_subscriptions.len(), &client.rawsender),
+        "unsubscribe"  => return unsubscribe( parser, db, &mut client.subscriptions, client.pattern_subscriptions.len(), &client.rawsender),
+        "psubscribe"   => return psubscribe(  parser, db, client.subscriptions.len(), &mut client.pattern_subscriptions, &client.rawsender),
+        "punsubscribe" => return punsubscribe(parser, db, client.subscriptions.len(), &mut client.pattern_subscriptions, &client.rawsender),
         "publish" => publish(parser, db),
         "monitor" => monitor(parser, db, client.rawsender.clone()),
         cmd => Response::Error(format!("ERR unknown command \"{}\"", cmd).to_owned()),
@@ -3350,26 +3348,26 @@ mod test_command {
     fn subscribe_publish_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
         let (tx, rx) = channel();
-        let mut client = Client::new(tx, 0, channel().0);
+        let mut client = Client::new(tx, 0);
         assert!(command(parser!(b"subscribe channel"), &mut db, &mut client).is_err());
         assert_eq!(command(parser!(b"publish channel hello-world"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(1));
         assert!(command(parser!(b"unsubscribe channel"), &mut db, &mut client).is_err());
 
-        assert_eq!(rx.try_recv().unwrap().unwrap().as_response(),
+        assert_eq!(rx.try_recv().unwrap().unwrap(),
                 Response::Array(vec![
                     Response::Data(b"subscribe".to_vec()),
                     Response::Data(b"channel".to_vec()),
                     Response::Integer(1),
                     ])
             );
-        assert_eq!(rx.try_recv().unwrap().unwrap().as_response(),
+        assert_eq!(rx.try_recv().unwrap().unwrap(),
                 Response::Array(vec![
                     Response::Data(b"message".to_vec()),
                     Response::Data(b"channel".to_vec()),
                     Response::Data(b"hello-world".to_vec()),
                     ])
             );
-        assert_eq!(rx.try_recv().unwrap().unwrap().as_response(),
+        assert_eq!(rx.try_recv().unwrap().unwrap(),
                 Response::Array(vec![
                     Response::Data(b"unsubscribe".to_vec()),
                     Response::Data(b"channel".to_vec()),
@@ -3512,10 +3510,10 @@ mod test_command {
     fn monitor() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
         let (tx, rx) = channel();
-        let mut client1 = Client::new(channel().0, 0, tx);
+        let mut client1 = Client::new(tx, 0);
         let mut client2 = Client::mock();
         assert_eq!(command(parser!(b"monitor"), &mut db, &mut client1).unwrap(), Response::Status("OK".to_owned()));
         assert_eq!(command(parser!(b"get key"), &mut db, &mut client2).unwrap(), Response::Nil);
-        assert_eq!(rx.try_recv().unwrap(), Some(Response::Status("\"get\" \"key\" ".to_owned())));
+        assert_eq!(rx.recv().unwrap(), Some(Response::Status("\"get\" \"key\" ".to_owned())));
     }
 }
