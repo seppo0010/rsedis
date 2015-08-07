@@ -248,7 +248,7 @@ impl Client {
         let (pubsub_tx, pubsub_rx) = channel::<Option<PubsubEvent>>();
         self.create_pubsub_thread(stream_tx.clone(), pubsub_rx);
 
-        let mut client = command::Client::new(pubsub_tx, self.id);
+        let mut client = command::Client::new(pubsub_tx, self.id, stream_tx.clone());
         let mut parser = Parser::new();
 
         let mut this_command:Option<OwnedParsedCommand>;

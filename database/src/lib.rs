@@ -1524,7 +1524,7 @@ pub struct Database {
     /// Which database to try to run the active expire cycle next
     active_expire_cycle_db: usize,
     /// Clients who are monitoring commands.
-    monitor_senders: Vec<Sender<Vec<u8>>>
+    monitor_senders: Vec<Sender<String>>
 }
 
 pub struct Iter<'a> {
@@ -2058,11 +2058,11 @@ impl Database {
         }
     }
 
-    pub fn monitor_add(&mut self, sender: Sender<Vec<u8>>) {
+    pub fn monitor_add(&mut self, sender: Sender<String>) {
         self.monitor_senders.push(sender);
     }
 
-    pub fn log_command(&mut self, command: Vec<u8>) {
+    pub fn log_command(&mut self, command: String) {
         // FIXME: unnecessary free/alloc?
         let tmp = self.monitor_senders.drain(RangeFull).filter(|s| s.send(command.clone()).is_ok()).collect::<Vec<_>>();
         self.monitor_senders = tmp;

@@ -21,7 +21,6 @@ pub struct Argument {
 }
 
 /// A protocol parser
-#[derive(Debug)]
 pub struct ParsedCommand<'a> {
     /// The data itself
     data: &'a[u8],
@@ -248,6 +247,16 @@ impl<'a> ParsedCommand<'a> {
 
     pub fn into_owned(self) -> OwnedParsedCommand {
         OwnedParsedCommand::new(Vec::from(self.data), self.argv)
+    }
+}
+
+impl<'a> fmt::Debug for ParsedCommand<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        for a in self.argv.iter() {
+            try!(format_repr(f, &self.data[a.pos..(a.pos + a.len)]));
+            try!(f.write_str(" "));
+        }
+        Ok(())
     }
 }
 

@@ -121,7 +121,7 @@
     - [x] flushall
     - [ ] sort
     - [ ] info
-    - [ ] monitor
+    - [x] monitor
     - [x] ttl
     - [x] pttl
     - [x] persist

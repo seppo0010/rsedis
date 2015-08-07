@@ -1810,6 +1810,25 @@ fn publish(parser: ParsedCommand, db: &mut Database) -> Response {
     Response::Integer(db.publish(&channel_name, &message) as i64)
 }
 
+fn monitor(parser: ParsedCommand, db: &mut Database, rawsender: Sender<Option<Response>>) -> Response {
+    validate_arguments_exact!(parser, 1);
+    let (tx, rx) = channel();
+    db.monitor_add(tx);
+    thread::spawn(move || {
+        loop {
+            let r = match rx.recv() {
+                Ok(r) => r,
+                Err(_) => break,
+            };
+            match rawsender.send(Some(Response::Status(r))) {
+                Ok(_) => (),
+                Err(_) => break,
+            }
+        }
+    });
+    Response::Status("OK".to_owned())
+}
+
 /// Client state that exceeds the lifetime of a command
 pub struct Client {
     pub dbindex: usize,
@@ -1821,14 +1840,15 @@ pub struct Client {
     pub multi_commands: Vec<OwnedParsedCommand>,
     pub watched_keys: HashSet<(usize, Vec<u8>)>,
     pub id: usize,
+    pub rawsender: Sender<Option<Response>>,
 }
 
 impl Client {
     pub fn mock() -> Self {
-        Self::new(channel().0, 0)
+        Self::new(channel().0, 0, channel().0)
     }
 
-    pub fn new(sender: Sender<Option<PubsubEvent>>, id: usize) -> Self {
+    pub fn new(sender: Sender<Option<PubsubEvent>>, id: usize, rawsender: Sender<Option<Response>>) -> Self {
         Client {
             dbindex: 0,
             auth: false,
@@ -1839,6 +1859,7 @@ impl Client {
             multi_commands: Vec::new(),
             id: id,
             watched_keys: HashSet::new(),
+            rawsender: rawsender,
         }
     }
 }
@@ -1919,6 +1940,9 @@ pub fn command(
         db: &mut Database,
         client: &mut Client,
         ) -> Result<Response, ResponseError> {
+    // TODO: only log if there's anyone listening
+    db.log_command(format!("{:?}", parser));
+
     if parser.argv.len() == 0 {
         return Err(ResponseError::NoReply);
     }
@@ -2067,6 +2091,7 @@ pub fn command(
         "psubscribe"   => return psubscribe(  parser, db, client.subscriptions.len(), &mut client.pattern_subscriptions, &client.pubsub_sender),
         "punsubscribe" => return punsubscribe(parser, db, client.subscriptions.len(), &mut client.pattern_subscriptions, &client.pubsub_sender),
         "publish" => publish(parser, db),
+        "monitor" => monitor(parser, db, client.rawsender.clone()),
         cmd => Response::Error(format!("ERR unknown command \"{}\"", cmd).to_owned()),
     });
 }
@@ -3325,7 +3350,7 @@ mod test_command {
     fn subscribe_publish_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
         let (tx, rx) = channel();
-        let mut client = Client::new(tx, 0);
+        let mut client = Client::new(tx, 0, channel().0);
         assert!(command(parser!(b"subscribe channel"), &mut db, &mut client).is_err());
         assert_eq!(command(parser!(b"publish channel hello-world"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(1));
         assert!(command(parser!(b"unsubscribe channel"), &mut db, &mut client).is_err());
@@ -3481,5 +3506,16 @@ mod test_command {
         assert_eq!(command(parser!(b"EXEC"), &mut db, &mut client).unwrap(), Response::Array(vec![
                     Response::Data(b"1".to_vec()),
                     ]));
+    }
+
+    #[test]
+    fn monitor() {
+        let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
+        let (tx, rx) = channel();
+        let mut client1 = Client::new(channel().0, 0, tx);
+        let mut client2 = Client::mock();
+        assert_eq!(command(parser!(b"monitor"), &mut db, &mut client1).unwrap(), Response::Status("OK".to_owned()));
+        assert_eq!(command(parser!(b"get key"), &mut db, &mut client2).unwrap(), Response::Nil);
+        assert_eq!(rx.try_recv().unwrap(), Some(Response::Status("\"get\" \"key\" ".to_owned())));
     }
 }
