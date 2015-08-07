@@ -23,6 +23,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::io::Write;
 use std::iter::FromIterator;
+use std::ops::RangeFull;
 use std::sync::mpsc::{Sender, channel};
 
 use config::Config;
@@ -1522,6 +1523,8 @@ pub struct Database {
     subscriber_id: usize,
     /// Which database to try to run the active expire cycle next
     active_expire_cycle_db: usize,
+    /// Clients who are monitoring commands.
+    monitor_senders: Vec<Sender<Vec<u8>>>
 }
 
 pub struct Iter<'a> {
@@ -1574,6 +1577,7 @@ impl Database {
             subscriber_id: 0,
             watched_keys: watched_keys,
             active_expire_cycle_db: 0,
+            monitor_senders: Vec::new(),
         }
     }
 
@@ -2052,6 +2056,16 @@ impl Database {
                 }
             }
         }
+    }
+
+    pub fn monitor_add(&mut self, sender: Sender<Vec<u8>>) {
+        self.monitor_senders.push(sender);
+    }
+
+    pub fn log_command(&mut self, command: Vec<u8>) {
+        // FIXME: unnecessary free/alloc?
+        let tmp = self.monitor_senders.drain(RangeFull).filter(|s| s.send(command.clone()).is_ok()).collect::<Vec<_>>();
+        self.monitor_senders = tmp;
     }
 }
 
@@ -3449,5 +3463,18 @@ mod test_command {
         assert_eq!(database.dbsize(0), 3);
         database.active_expire_cycle(100);
         assert_eq!(database.dbsize(0), 2);
+    }
+
+    #[test]
+    fn monitor_log() {
+        let config = Config::new(Logger::new(Level::Warning));
+        let mut database = Database::new(config);
+        let (tx, rx) = channel();
+        database.monitor_add(tx.clone());
+        database.monitor_add(tx.clone());
+        database.log_command(vec![1]);
+        assert_eq!(rx.try_recv().unwrap(), vec![1]);
+        assert_eq!(rx.try_recv().unwrap(), vec![1]);
+        assert!(rx.try_recv().is_err())
     }
 }
