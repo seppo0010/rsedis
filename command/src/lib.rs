@@ -2000,6 +2000,235 @@ fn discard(db: &mut Database, client: &mut Client) -> Response {
     }
 }
 
+mod flags {
+    /// write command (may modify the key space).
+    pub const WRITE: u64 = 1;
+    /// read command  (will never modify the key space).
+    pub const READONLY: u64 = 2;
+    /// may increase memory usage once called. Don't allow if out of memory.
+    pub const DENYOOM: u64 = 4;
+    /// admin command, like SAVE or SHUTDOWN.
+    pub const ADMIN: u64 = 8;
+    /// Pub/Sub related command.
+    pub const PUBSUB: u64 = 16;
+    /// command not allowed in scripts.
+    pub const NOSCRIPT: u64 = 32;
+    /// random command. Command is not deterministic, that is, the same command
+    /// with the same arguments, with the same key space, may have different
+    /// results. For instance SPOP and RANDOMKEY are two random commands.
+    pub const RANDOM: u64 = 64;
+    /// Sort command output array if called from script, so that the output
+    /// is deterministic.
+    pub const SORT_FOR_SCRIPT: u64 = 128;
+    /// Allow command while loading the database.
+    pub const LOADING: u64 = 256;
+    /// Allow command while a slave has stale data but is not allowed to
+    /// server this data. Normally no command is accepted in this condition
+    /// but just a few.
+    pub const STALE: u64 = 512;
+    /// Do not automatically propagate the command on MONITOR.
+    pub const SKIP_MONITOR: u64 = 1024;
+    /// Perform an implicit ASKING for this command, so the command will be
+    /// accepted in cluster mode if the slot is marked as 'importing'.
+    pub const ASKING: u64 = 2048;
+    /// Fast command: O(1) or O(log(N)) command that should never delay
+    /// its execution as long as the kernel scheduler is giving us time.
+    /// Note that commands that may trigger a DEL as a side effect (like SET)
+    /// are not fast commands.
+    pub const FAST: u64 = 4096;
+}
+/*
+ * arity
+ * flags: flags as bitmask. Computed by Redis using the 'sflags' field.
+ * first_key_index: first argument that is a key
+ * last_key_index: last argument that is a key
+ * key_step: step to get all the keys from first to last argument. For instance
+ *           in MSET the step is two since arguments are key,val,key,val,...
+   */
+fn command_properties(command_name: &String) -> (i64, u64, i64, i64, i64) {
+    use flags::*;
+    let wm = WRITE | DENYOOM;
+    let wf = WRITE | FAST;
+    let wmf = WRITE | DENYOOM | FAST;
+    let fr = READONLY | FAST;
+    let ls = LOADING | STALE;
+    let ars = READONLY | ADMIN | NOSCRIPT;
+    let sr = READONLY | SORT_FOR_SCRIPT;
+    match &**command_name {
+        "get" => (2, fr, 1, 1, 1),
+        "set" => (3, wm, 1, 1, 1),
+        "setnx" => (3, wmf, 1, 1, 1),
+        "setex" => (4, wm, 1, 1, 1),
+        "psetex" => (4, wm, 1, 1, 1),
+        "append" => (3, wm, 1, 1, 1),
+        "strlen" => (2, fr, 1, 1, 1),
+        "del" => (-2, WRITE, 1, -1, 1),
+        "exists" => (-2, fr, 1, -1, 1),
+        "setbit" => (4, wm, 1, 1, 1),
+        "getbit" => (3, fr, 1, 1, 1),
+        "setrange" => (4, wm, 1, 1, 1),
+        "getrange" => (4, READONLY, 1, 1, 1),
+        "substr" => (4, READONLY, 1, 1, 1),
+        "incr" => (2, wmf, 1, 1, 1),
+        "decr" => (2, wmf, 1, 1, 1),
+        "mget" => (-2, READONLY, 1, -1, 1),
+        "rpush" => (-3, wmf, 1, 1, 1),
+        "lpush" => (-3, wmf, 1, 1, 1),
+        "rpushx" => (-3, wmf, 1, 1, 1),
+        "lpushx" => (-3, wmf, 1, 1, 1),
+        "linsert" => (5, wm, 1, 1, 1),
+        "rpop" => (2, wf, 1, 1, 1),
+        "lpop" => (2, wf, 1, 1, 1),
+        "rpoplpush" => (3, wm, 1, 2, 1),
+        "brpop" => (-3, WRITE | NOSCRIPT, 1, -2, 1),
+        "blpop" => (-3, WRITE | NOSCRIPT, 1, -2, 1),
+        "brpoplpush" => (4, wm | NOSCRIPT, 1, 2, 1),
+        "llen" => (2, fr, 1, 1, 1),
+        "lindex" => (3, READONLY, 1, 1, 1),
+        "lset" => (4, wm, 1, 1, 1),
+        "lrange" => (4, READONLY, 1, 1, 1),
+        "ltrim" => (4, READONLY, 1, 1, 1),
+        "lrem" => (4, READONLY, 1, 1, 1),
+        "sadd" => (-3, wmf, 1, 1, 1),
+        "srem" => (-3, wf, 1, 1, 1),
+        "smove" => (4, wf, 1, 2, 1),
+        "sismember" => (3, fr, 1, 1, 1),
+        "scard" => (2, fr, 1, 1, 1),
+        "spop" => (-2, fr | RANDOM | NOSCRIPT, 1, 1, 1),
+        "srandmember" => (-2, READONLY | RANDOM, 1, 1, 1),
+        "sinter" => (-2, sr, 1, -1, 1),
+        "sinterstore" => (-3, wm, 1, -1, 1),
+        "sunion" => (-2, sr, 1, -1, 1),
+        "sunionstore" => (-3, wm, 1, -1, 1),
+        "sdiff" => (-2, sr, 1, -1, 1),
+        "sdiffstore" => (-3, wm, 1, -1, 1),
+        "smembers" => (2, sr, 1, 1, 1),
+        "sscan" => (-3, READONLY | RANDOM, 1, 1, 1),
+        "zadd" => (-4, wmf, 1, 1, 1),
+        "zincrby" => (4, wmf, 1, 1, 1),
+        "zrem" => (-3, wf, 1, 1, 1),
+        "zremrangebyscore" => (4, WRITE, 1, 1, 1),
+        "zremrangebyrank" => (4, WRITE, 1, 1, 1),
+        "zremrangebylex" => (4, WRITE, 1, 1, 1),
+        "zunionstore" => (-4, wm, 0, 0, 0),
+        "zinterstore" => (-4, wm, 0, 0, 0),
+        "zrange" => (-4, READONLY, 1, 1, 1),
+        "zrevrange" => (-4, READONLY, 1, 1, 1),
+        "zrangebyscore" => (-4, READONLY, 1, 1, 1),
+        "zrevrangebyscore" => (-4, READONLY, 1, 1, 1),
+        "zrangebylex" => (-4, READONLY, 1, 1, 1),
+        "zrevrangebylex" => (-4, READONLY, 1, 1, 1),
+        "zcount" => (4, fr, 1, 1, 1),
+        "zlexcount" => (4, fr, 1, 1, 1),
+        "zcard" => (2, fr, 1, 1, 1),
+        "zscore" => (3, fr, 1, 1, 1),
+        "zrank" => (3, fr, 1, 1, 1),
+        "zrevrank" => (3, fr, 1, 1, 1),
+        "zscan" => (-3, READONLY | RANDOM, 1, 1, 1),
+        "hset" => (4, wmf, 1, 1, 1),
+        "hsetnx" => (4, wmf, 1, 1, 1),
+        "hget" => (3, fr, 1, 1, 1),
+        "hmset" => (-4, wm, 1, 1, 1),
+        "hmget" => (-3, READONLY, 1, 1, 1),
+        "hincrby" => (4, wmf, 1, 1, 1),
+        "hincrbyfloat" => (4, wmf, 1, 1, 1),
+        "hdel" => (-3, wf, 1, 1, 1),
+        "hlen" => (2, fr, 1, 1, 1),
+        "hstrlen" => (3, fr, 1, 1, 1),
+        "hkeys" => (2, sr, 1, 1, 1),
+        "hvals" => (2, sr, 1, 1, 1),
+        "hgetall" => (2, READONLY, 1, 1, 1),
+        "hexists" => (3, fr, 1, 1, 1),
+        "hscan" => (-3, READONLY | RANDOM, 1, 1, 1),
+        "incrby" => (3, wmf, 1, 1, 1),
+        "decrby" => (3, wmf, 1, 1, 1),
+        "incrbyfloat" => (3, wmf, 1, 1, 1),
+        "getset" => (3, wm, 1, 1, 1),
+        "mset" => (-3, wm, 1, -1, 2),
+        "msetnx" => (-3, wm, 1, -1, 2),
+        "randomkey" => (1, READONLY | RANDOM, 0, 0, 0),
+        "select" => (2, fr | LOADING, 0, 0, 0),
+        "move" => (3, wf, 1, 1, 1),
+        "rename" => (3, WRITE, 1, 2, 1),
+        "renamenx" => (3, wf, 1, 2, 1),
+        "expire" => (3, wf, 1, 1, 1),
+        "expireat" => (3, wf, 1, 1, 1),
+        "pexpire" => (3, wf, 1, 1, 1),
+        "pexpireat" => (3, wf, 1, 1, 1),
+        "keys" => (2, sr, 0, 0, 0),
+        "scan" => (-2, READONLY | RANDOM, 0, 0, 0),
+        "dbsize" => (1, fr, 0, 0, 0),
+        "auth" => (2, fr | NOSCRIPT | ls, 0, 0, 0),
+        "ping" => (-1, fr | STALE, 0, 0, 0),
+        "echo" => (2, fr, 0, 0, 0),
+        "save" => (1, ars, 0, 0, 0),
+        "bgsave" => (1, READONLY | ADMIN, 0, 0, 0),
+        "bgrewriteaof" => (1, READONLY | ADMIN, 0, 0, 0),
+        "shutdown" => (-1, READONLY | ADMIN | ls, 0, 0, 0),
+        "lastsave" => (1, fr | RANDOM, 0, 0, 0),
+        "type" => (2, fr, 1, 1, 1),
+        "multi" => (1, fr | NOSCRIPT, 0, 0, 0),
+        "exec" => (1, NOSCRIPT | SKIP_MONITOR, 0, 0, 0),
+        "discard" => (1, fr | NOSCRIPT, 0, 0, 0),
+        "sync" => (1, ars, 0, 0, 0),
+        "psync" => (3, ars, 0, 0, 0),
+        "replconf" => (-1, ars | ls, 0, 0, 0),
+        "flushdb" => (1, WRITE, 0, 0, 0),
+        "flushall" => (1, WRITE, 0, 0, 0),
+        "sort" => (-2, wm, 1, 1, 1),
+        "info" => (-1, READONLY | ls, 0, 0, 0),
+        "monitor" => (1, ars, 0, 0, 0),
+        "ttl" => (2, fr, 1, 1, 1),
+        "pttl" => (2, fr, 1, 1, 1),
+        "persist" => (2, wf, 1, 1, 1),
+        "slaveof" => (3, ADMIN | NOSCRIPT | STALE, 0, 0, 0),
+        "role" => (1, STALE | LOADING | NOSCRIPT, 0, 0, 0),
+        "debug" => (-2, ADMIN | NOSCRIPT, 0, 0, 0),
+        "config" => (-2, ADMIN | READONLY | STALE, 0, 0, 0),
+        "subscribe" => (-2, READONLY | PUBSUB | NOSCRIPT | LOADING | STALE, 0, 0, 0),
+        "unsubscribe" => (-1, READONLY | PUBSUB | NOSCRIPT | LOADING | STALE, 0, 0, 0),
+        "psubscribe" => (-2, READONLY | PUBSUB | NOSCRIPT | LOADING | STALE, 0, 0, 0),
+        "punsubscribe" => (-1, READONLY | PUBSUB | NOSCRIPT | LOADING | STALE, 0, 0, 0),
+        "publish" => (-1, READONLY | PUBSUB | LOADING | STALE | FAST, 0, 0, 0),
+        "pubsub" => (-1, READONLY | PUBSUB | LOADING | STALE | RANDOM, 0, 0, 0),
+        "watch" => (-2, fr | NOSCRIPT, 1, -1, 1),
+        "unwatch" => (1, fr | NOSCRIPT, 0, 0, 0),
+        "cluster" => (-2, ADMIN | READONLY, 0, 0, 0),
+        "restore" => (-4, wm, 1, 1, 1),
+        "restore-asking" => (-4, wm | ASKING, 1, 1, 1),
+        "migrate" => (-6, WRITE, 0, 0, 0),
+        "asking" => (1, READONLY, 0, 0, 0),
+        "readonly" => (1, fr, 0, 0, 0),
+        "readwrite" => (1, fr, 0, 0, 0),
+        "dump" => (2, READONLY, 1, 1, 1),
+        "object" => (3, READONLY, 2, 2, 2),
+        "client" => (-2, READONLY | NOSCRIPT, 0, 0, 0),
+        "eval" => (-3, NOSCRIPT, 0, 0, 0),
+        "evalsha" => (-3, NOSCRIPT, 0, 0, 0),
+        "slowlog" => (-2, READONLY, 0, 0, 0),
+        "script" => (-2, READONLY | NOSCRIPT, 0, 0, 0),
+        "time" => (1, READONLY | RANDOM | FAST, 0, 0, 0),
+        "bitop" => (-4, wm, 2, -1, 1),
+        "bitcount" => (-2, READONLY, 1, 1, 1),
+        "bitpos" => (-3, READONLY, 1, 1, 1),
+        "wait" => (3, READONLY | NOSCRIPT, 0, 0, 0),
+        "command" => (0, READONLY | LOADING | STALE, 0, 0, 0),
+        "geoadd" => (-5, wm, 1, 1, 1),
+        "georadius" => (-6, READONLY, 1, 1, 1),
+        "georadiusbymember" => (-5, READONLY, 1, 1, 1),
+        "geohash" => (-2, READONLY, 1, 1, 1),
+        "geopos" => (-2, READONLY, 1, 1, 1),
+        "geodist" => (-4, READONLY, 1, 1, 1),
+        "pfselftest" => (1, READONLY, 1, 1, 1),
+        "pfadd" => (-2, wmf, 1, 1, 1),
+        "pfcount" => (-2, READONLY, 1, -1, 1),
+        "pfmerge" => (-2, wm, 1, -1, 1),
+        "pfdebug" => (-3, WRITE, 0, 0, 0),
+        "latency" => (-2, ars | ls, 0, 0, 0),
+        _ => (0, 0, 0, 0, 0),
+    }
+}
+
 fn execute_command(
         parser: &mut ParsedCommand,
         db: &mut Database,
