@@ -3,6 +3,7 @@
 
 extern crate config;
 extern crate logger;
+extern crate parser;
 extern crate rand;
 extern crate rdbutil;
 extern crate crc64;
@@ -29,6 +30,7 @@ use std::sync::mpsc::{Sender, channel};
 use config::Config;
 use crc64::crc64;
 use logger::{Level, Logger};
+use parser::ParsedCommand;
 use rehashinghashmap::RehashingHashMap;
 use response::Response;
 use util::{glob_match, mstime, get_random_hex_chars};
@@ -2085,9 +2087,10 @@ impl Database {
         self.monitor_senders.push(sender);
     }
 
-    pub fn log_command(&mut self, command: String) {
+    pub fn log_command(&mut self, command: ParsedCommand) {
         // FIXME: unnecessary free/alloc?
-        let tmp = self.monitor_senders.drain(RangeFull).filter(|s| s.send(command.clone()).is_ok()).collect::<Vec<_>>();
+        let bcommand = format!("{:?}", command);
+        let tmp = self.monitor_senders.drain(RangeFull).filter(|s| s.send(bcommand.clone()).is_ok()).collect::<Vec<_>>();
         self.monitor_senders = tmp;
     }
 }
@@ -2111,6 +2114,7 @@ mod test_command {
     use zset::ValueSortedSet;
 
     use super::{Database, Value, PubsubEvent};
+    use parser::{ParsedCommand, Argument};
 
     #[test]
     fn lpush() {
@@ -3495,9 +3499,9 @@ mod test_command {
         let (tx, rx) = channel();
         database.monitor_add(tx.clone());
         database.monitor_add(tx.clone());
-        database.log_command("1".to_owned());
-        assert_eq!(rx.try_recv().unwrap(), "1".to_owned());
-        assert_eq!(rx.try_recv().unwrap(), "1".to_owned());
+        database.log_command(ParsedCommand::new(b"1", vec![Argument {pos: 0, len: 1}]));
+        assert_eq!(rx.try_recv().unwrap(), "\"1\" ".to_owned());
+        assert_eq!(rx.try_recv().unwrap(), "\"1\" ".to_owned());
         assert!(rx.try_recv().is_err())
     }
 }

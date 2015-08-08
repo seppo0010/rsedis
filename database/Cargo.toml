@@ -6,6 +6,9 @@ authors = ["Sebastian Waisbrot <seppo0010@gmail.com>"]
 [dependencies.config]
 path = "../config"
 
+[dependencies.parser]
+path = "../parser"
+
 [dependencies.logger]
 path = "../logger"
 

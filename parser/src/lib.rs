@@ -248,6 +248,10 @@ impl<'a> ParsedCommand<'a> {
     pub fn into_owned(self) -> OwnedParsedCommand {
         OwnedParsedCommand::new(Vec::from(self.data), self.argv)
     }
+
+    pub fn to_owned(&self) -> OwnedParsedCommand {
+        OwnedParsedCommand::new(Vec::from(self.data), self.argv.clone())
+    }
 }
 
 impl<'a> fmt::Debug for ParsedCommand<'a> {
