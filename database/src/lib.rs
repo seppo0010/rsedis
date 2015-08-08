@@ -2,11 +2,12 @@
 #![feature(drain)]
 
 extern crate config;
-extern crate logger;
+#[macro_use(log)] extern crate logger;
 extern crate parser;
 extern crate rand;
 extern crate rdbutil;
 extern crate crc64;
+extern crate persistence;
 extern crate rehashinghashmap;
 extern crate response;
 extern crate skiplist;
@@ -31,6 +32,7 @@ use config::Config;
 use crc64::crc64;
 use logger::{Level, Logger};
 use parser::ParsedCommand;
+use persistence::aof::AofWriter;
 use rehashinghashmap::RehashingHashMap;
 use response::Response;
 use util::{glob_match, mstime, get_random_hex_chars};
@@ -1536,6 +1538,7 @@ pub struct Database {
     pub run_id: String,
     /// milliseconds when the database started
     pub start_mstime: i64,
+    aof_writer: Option<AofWriter>,
 }
 
 pub struct Iter<'a> {
@@ -1578,6 +1581,11 @@ impl Database {
             key_subscribers.push(RehashingHashMap::new());
             watched_keys.push(HashMap::new());
         }
+        let aof_writer = if config.appendonly {
+            Some(AofWriter::new(&*config.appendfilename).unwrap())
+        } else {
+            None
+        };
         return Database {
             config: config,
             data: data,
@@ -1595,6 +1603,7 @@ impl Database {
             git_dirty: true,
             run_id: get_random_hex_chars(40),
             start_mstime: mstime(),
+            aof_writer: aof_writer,
         }
     }
 
@@ -2087,11 +2096,25 @@ impl Database {
         self.monitor_senders.push(sender);
     }
 
-    pub fn log_command(&mut self, command: ParsedCommand) {
+    pub fn log_command(&mut self, dbindex: usize, command: &ParsedCommand) {
         // FIXME: unnecessary free/alloc?
         let bcommand = format!("{:?}", command);
         let tmp = self.monitor_senders.drain(RangeFull).filter(|s| s.send(bcommand.clone()).is_ok()).collect::<Vec<_>>();
         self.monitor_senders = tmp;
+        let mut err = false;
+        match self.aof_writer {
+            Some(ref mut w) => match w.write(dbindex, command) {
+                Ok(_) => (),
+                Err(e) => {
+                    log!(self.config.logger, Warning, "Error writing aof {:?}; stopped writing", e);
+                    err = true;
+                },
+            },
+            None => (),
+        }
+        if err {
+            self.aof_writer = None;
+        }
     }
 }
 
@@ -3499,7 +3522,7 @@ mod test_command {
         let (tx, rx) = channel();
         database.monitor_add(tx.clone());
         database.monitor_add(tx.clone());
-        database.log_command(ParsedCommand::new(b"1", vec![Argument {pos: 0, len: 1}]));
+        database.log_command(0, &ParsedCommand::new(b"1", vec![Argument {pos: 0, len: 1}]));
         assert_eq!(rx.try_recv().unwrap(), "\"1\" ".to_owned());
         assert_eq!(rx.try_recv().unwrap(), "\"1\" ".to_owned());
         assert!(rx.try_recv().is_err())

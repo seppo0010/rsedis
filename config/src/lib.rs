@@ -39,6 +39,8 @@ pub struct Config {
     pub syslog_ident: String,
     pub syslog_facility: String,
     pub hz: u32,
+    pub appendonly: bool,
+    pub appendfilename: String,
 }
 
 #[derive(Debug)]
@@ -96,6 +98,8 @@ impl Config {
             syslog_ident: "rsedis".to_owned(),
             syslog_facility: "local0".to_owned(),
             hz: 10,
+            appendonly: false,
+            appendfilename: "appendonly.aof".to_owned(),
         }
     }
 
@@ -174,6 +178,8 @@ impl Config {
                 b"syslog-ident" => self.syslog_ident = try!(read_string(args)).to_owned(),
                 b"syslog-facility" => self.syslog_facility = try!(read_string(args)).to_owned(),
                 b"hz" => self.hz = try!(read_parse(args)),
+                b"appendonly" => self.appendonly = try!(read_bool(args)),
+                b"appendfilename" => self.appendfilename = try!(read_string(args)).to_owned(),
                 b"include" => if args.len() != 2 {
                     return Err(ConfigError::InvalidFormat)
                 } else {

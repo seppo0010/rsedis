@@ -245,6 +245,10 @@ impl<'a> ParsedCommand<'a> {
         return Ok(&self.data[arg.pos..arg.pos+arg.len]);
     }
 
+    pub fn get_data(&self) -> &'a [u8] {
+        self.data
+    }
+
     pub fn into_owned(self) -> OwnedParsedCommand {
         OwnedParsedCommand::new(Vec::from(self.data), self.argv)
     }

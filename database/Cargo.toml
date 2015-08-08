@@ -12,6 +12,9 @@ path = "../parser"
 [dependencies.logger]
 path = "../logger"
 
+[dependencies.persistence]
+path = "../persistence"
+
 [dependencies.util]
 path = "../util"
 

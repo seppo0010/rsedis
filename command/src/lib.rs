@@ -2169,7 +2169,7 @@ pub fn command(
     let r = execute_command(&mut parser, db, client, &mut log);
     // TODO: only log if there's anyone listening
     if log {
-        db.log_command(parser);
+        db.log_command(client.dbindex, &parser);
     }
     r
 }

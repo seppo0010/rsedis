@@ -313,9 +313,9 @@
         - [ ] volatile-ttl
         - [ ] noeviction
     - [ ] maxmemory-samples
-    - [ ] appendonly
-    - [ ] appendfilename
-    - [ ] appendfsync
+    - [x] appendonly
+    - [x] appendfilename
+    - appendfsync
         - [ ] always
         - [ ] everysec
         - [ ] no
