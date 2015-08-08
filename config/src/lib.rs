@@ -75,14 +75,14 @@ fn read_bool(args: Vec<Vec<u8>>) -> Result<bool, ConfigError> {
 }
 
 impl Config {
-    pub fn mock(port: u16, logger: Logger) -> Config {
+    pub fn default(port: u16, logger: Logger) -> Config {
         Config {
             logger: logger,
             active_rehashing: true,
             daemonize: false,
             databases: 16,
-            pidfile: "/var/run/sredis.pid".to_owned(),
-            bind: vec!["127.0.0.1".to_owned()],
+            pidfile: "/var/run/rsedis.pid".to_owned(),
+            bind: vec![],
             port: port,
             tcp_keepalive: 0,
             set_max_intset_entries: 512,
@@ -100,27 +100,7 @@ impl Config {
     }
 
     pub fn new(logger: Logger) -> Config {
-        Config {
-            logger: logger,
-            active_rehashing: true,
-            daemonize: false,
-            databases: 16,
-            pidfile: "/var/run/sredis.pid".to_owned(),
-            bind: vec![],
-            port: 6379,
-            tcp_keepalive: 0,
-            set_max_intset_entries: 512,
-            timeout: 0,
-            unixsocket: None,
-            unixsocketperm: 0700,
-            rename_commands: HashMap::new(),
-            requirepass: None,
-            tcp_backlog: 511,
-            syslog_enabled: false,
-            syslog_ident: "rsedis".to_owned(),
-            syslog_facility: "local0".to_owned(),
-            hz: 10,
-        }
+        Self::default(6379, logger)
     }
 
     pub fn parsefile(&mut self, fname: String) -> Result<(), ConfigError> {

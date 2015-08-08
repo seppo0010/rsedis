@@ -1560,7 +1560,7 @@ macro_rules! random_key {
 impl Database {
     /// Creates a new empty `Database` with a mock config.
     pub fn mock() -> Self {
-        Database::new(Config::mock(0, Logger::new(Level::Warning)))
+        Database::new(Config::default(0, Logger::new(Level::Warning)))
     }
 
     /// Creates a new empty `Database`.
