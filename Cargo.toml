@@ -6,6 +6,7 @@ authors = [ "Sebastian Waisbrot <seppo0010@gmail.com>" ]
 exclude = [
     ".gitignore",
     ".travis.yml",
+    "appveyor.yml",
 ]
 
 [[bin]]
