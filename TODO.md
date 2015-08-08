@@ -218,7 +218,10 @@
             - The cluster section currently only contains a unique field
                 - [ ] cluster_enabled
         - keyspace
-            - [ ] dbXXX:keys=XXX,expires=XXX
+            - db
+                - [ ] keys=XXX
+                - [ ] expires=XXX
+                - [ ] avg_ttl=XXX
     - [x] monitor
     - [x] ttl
     - [x] pttl
