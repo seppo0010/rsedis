@@ -17,7 +17,7 @@ use std::sync::mpsc::channel;
 use std::thread;
 use std::usize;
 
-use compat::getos;
+use compat::{getpid, getos};
 use database::{PubsubEvent, Database, Value, zset};
 use response::{Response, ResponseError};
 use parser::{OwnedParsedCommand, ParsedCommand, Argument};
@@ -1846,6 +1846,7 @@ fn info(parser: ParsedCommand, db: &Database) -> Response {
                 arch_bits:{}\r\n\
                 multiplexing_api:no\r\n\
                 rustc_version:{}\r\n\
+                process_id:{}\r\n\
                 ",
                 db.version,
                 db.git_sha1,
@@ -1854,7 +1855,8 @@ fn info(parser: ParsedCommand, db: &Database) -> Response {
                 os.1,
                 os.2,
                 BITS,
-                db.rustc_version
+                db.rustc_version,
+                getpid(),
                 ).into_bytes())
 }
 

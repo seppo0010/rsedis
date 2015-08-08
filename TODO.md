@@ -129,7 +129,7 @@
             - [x] arch_bits
             - [x] multiplexing_api
             - [x] gcc_version
-            - [ ] process_id
+            - [x] process_id
             - [ ] run_id
             - [ ] tcp_port
             - [ ] uptime_in_seconds
