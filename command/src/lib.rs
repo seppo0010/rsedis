@@ -1844,6 +1844,7 @@ fn info(parser: ParsedCommand, db: &Database) -> Response {
                 rsedis_git_dirty:{}\r\n\
                 os:{} {} {}\r\n\
                 arch_bits:{}\r\n\
+                multiplexing_api:no\r\n\
                 ",
                 db.version,
                 db.git_sha1,

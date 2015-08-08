@@ -127,7 +127,7 @@
             - [x] redis_git_dirty
             - [x] os
             - [x] arch_bits
-            - [ ] multiplexing_api
+            - [x] multiplexing_api
             - [ ] gcc_version
             - [ ] process_id
             - [ ] run_id
