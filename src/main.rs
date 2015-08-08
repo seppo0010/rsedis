@@ -14,7 +14,7 @@ use compat::getpid;
 use config::Config;
 use networking::Server;
 use logger::{Logger, Level};
-use release::{GIT_SHA1, GIT_DIRTY};
+use release::*;
 
 fn main() {
     let mut config = Config::new(Logger::new(Level::Notice));
@@ -37,6 +37,7 @@ fn main() {
         db.git_sha1 = GIT_SHA1;
         db.git_dirty = GIT_DIRTY;
         db.version = env!("CARGO_PKG_VERSION");
+        db.rustc_version = RUSTC_VERSION;
     }
 
     if !daemonize {

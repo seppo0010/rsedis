@@ -1530,6 +1530,7 @@ pub struct Database {
     /// Did the code change from the git repository
     pub git_dirty: bool,
     pub version: &'static str,
+    pub rustc_version: &'static str,
 }
 
 pub struct Iter<'a> {
@@ -1584,6 +1585,7 @@ impl Database {
             active_expire_cycle_db: 0,
             monitor_senders: Vec::new(),
             version: "0.0.1",
+            rustc_version: "",
             git_sha1: "00000000",
             git_dirty: true,
         }

@@ -1845,6 +1845,7 @@ fn info(parser: ParsedCommand, db: &Database) -> Response {
                 os:{} {} {}\r\n\
                 arch_bits:{}\r\n\
                 multiplexing_api:no\r\n\
+                rustc_version:{}\r\n\
                 ",
                 db.version,
                 db.git_sha1,
@@ -1852,7 +1853,8 @@ fn info(parser: ParsedCommand, db: &Database) -> Response {
                 os.0,
                 os.1,
                 os.2,
-                BITS
+                BITS,
+                db.rustc_version
                 ).into_bytes())
 }
 

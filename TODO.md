@@ -128,7 +128,7 @@
             - [x] os
             - [x] arch_bits
             - [x] multiplexing_api
-            - [ ] gcc_version
+            - [x] gcc_version
             - [ ] process_id
             - [ ] run_id
             - [ ] tcp_port
