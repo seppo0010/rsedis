@@ -1,6 +1,7 @@
 #![feature(collections_bound)]
 #![feature(drain)]
 extern crate config;
+extern crate compat;
 extern crate database;
 extern crate logger;
 extern crate parser;
@@ -16,6 +17,7 @@ use std::sync::mpsc::channel;
 use std::thread;
 use std::usize;
 
+use compat::getos;
 use database::{PubsubEvent, Database, Value, zset};
 use response::{Response, ResponseError};
 use parser::{OwnedParsedCommand, ParsedCommand, Argument};
@@ -1831,14 +1833,20 @@ fn monitor(parser: ParsedCommand, db: &mut Database, rawsender: Sender<Option<Re
 
 fn info(parser: ParsedCommand, db: &Database) -> Response {
     validate_arguments_exact!(parser, 1);
+    // TODO: cache getos() result
+    let os = getos();
     Response::Data(format!("\
                 rsedis_version:{}\r\n\
                 rsedis_git_sha1:{}\r\n\
                 rsedis_git_dirty:{}\r\n\
+                os:{} {} {}\r\n\
                 ",
                 db.version,
                 db.git_sha1,
-                if db.git_dirty { 1 } else { 0 }
+                if db.git_dirty { 1 } else { 0 },
+                os.0,
+                os.1,
+                os.2,
                 ).into_bytes())
 }
 

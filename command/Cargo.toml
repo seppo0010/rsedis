@@ -3,6 +3,9 @@ name = "command"
 version = "0.1.0"
 authors = ["Sebastian Waisbrot <seppo0010@gmail.com>"]
 
+[dependencies.compat]
+path = "../compat"
+
 [dependencies.config]
 path = "../config"
 

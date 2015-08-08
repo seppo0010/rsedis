@@ -125,7 +125,7 @@
             - [x] redis_version
             - [x] redis_git_sha1
             - [x] redis_git_dirty
-            - [ ] os
+            - [x] os
             - [ ] arch_bits
             - [ ] multiplexing_api
             - [ ] gcc_version

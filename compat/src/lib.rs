@@ -1,4 +1,5 @@
 #[cfg(unix)] extern crate libc;
+#[cfg(unix)] pub mod utsname;
 #[cfg(unix)] pub mod unix;
 #[cfg(unix)] pub use unix::*;
 
@@ -11,4 +12,9 @@
 #[test]
 fn getpid_test() {
     getpid();
+}
+
+#[test]
+fn getos_test() {
+    getos();
 }
