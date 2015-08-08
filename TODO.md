@@ -219,8 +219,8 @@
                 - [ ] cluster_enabled
         - keyspace
             - db
-                - [ ] keys=XXX
-                - [ ] expires=XXX
+                - [x] keys=XXX
+                - [x] expires=XXX
                 - [ ] avg_ttl=XXX
     - [x] monitor
     - [x] ttl

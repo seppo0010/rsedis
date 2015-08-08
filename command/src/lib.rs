@@ -1879,6 +1879,20 @@ fn info(parser: ParsedCommand, db: &Database) -> Response {
                 uptime / (1000 * 60 * 60 * 24),
                 ), "ERR unexpected");
     }
+
+    if section == "default" || section == "all" || section == "keyspace" {
+        try_validate!(write!(out, "# Keyspace\r\n"), "ERR unexpected");
+        for dbindex in 0..(db.config.databases as usize) {
+            let dbsize = db.dbsize(dbindex);
+            if dbsize > 0 {
+                try_validate!(write!(out, "db{}:keys={};expires={}\r\n",
+                            dbindex,
+                            dbsize,
+                            db.db_expire_size(dbindex)
+                            ), "ERR unexpected");
+            }
+        }
+    }
     Response::Data(out)
 }
 

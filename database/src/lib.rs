@@ -1624,6 +1624,10 @@ impl Database {
         self.data[index].len()
     }
 
+    pub fn db_expire_size(&self, index: usize) -> usize {
+        self.data_expiration_ms[index].len()
+    }
+
     /// Gets a value from the database if exists and it is not expired.
     ///
     /// # Examples
