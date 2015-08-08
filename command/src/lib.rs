@@ -1831,6 +1831,9 @@ fn monitor(parser: ParsedCommand, db: &mut Database, rawsender: Sender<Option<Re
     Response::Status("OK".to_owned())
 }
 
+#[cfg(all(target_pointer_width = "32"))] const BITS: usize = 32;
+#[cfg(all(target_pointer_width = "64"))] const BITS: usize = 64;
+
 fn info(parser: ParsedCommand, db: &Database) -> Response {
     validate_arguments_exact!(parser, 1);
     // TODO: cache getos() result
@@ -1840,6 +1843,7 @@ fn info(parser: ParsedCommand, db: &Database) -> Response {
                 rsedis_git_sha1:{}\r\n\
                 rsedis_git_dirty:{}\r\n\
                 os:{} {} {}\r\n\
+                arch_bits:{}\r\n\
                 ",
                 db.version,
                 db.git_sha1,
@@ -1847,6 +1851,7 @@ fn info(parser: ParsedCommand, db: &Database) -> Response {
                 os.0,
                 os.1,
                 os.2,
+                BITS
                 ).into_bytes())
 }
 
