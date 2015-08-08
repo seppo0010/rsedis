@@ -120,7 +120,105 @@
     - [x] flushdb
     - [x] flushall
     - [ ] sort
-    - [ ] info
+    - info
+        - server
+            - [ ] redis_version
+            - [ ] redis_git_sha1
+            - [ ] redis_git_dirty
+            - [ ] os
+            - [ ] arch_bits
+            - [ ] multiplexing_api
+            - [ ] gcc_version
+            - [ ] process_id
+            - [ ] run_id
+            - [ ] tcp_port
+            - [ ] uptime_in_seconds
+            - [ ] uptime_in_days
+            - [ ] lru_clock
+        - clients
+            - [ ] connected_clients
+            - [ ] client_longest_output_list
+            - [ ] client_biggest_input_buf
+            - [ ] blocked_clients
+        - memory
+            - [ ] used_memory
+            - [ ] used_memory_human
+            - [ ] used_memory_rss
+            - [ ] used_memory_peak
+            - [ ] used_memory_peak_human
+            - [ ] used_memory_lua
+            - [ ] mem_fragmentation_ratio
+            - [ ] mem_allocator
+        - persistence
+            - [ ] loading
+            - [ ] rdb_changes_since_last_save
+            - [ ] rdb_bgsave_in_progress
+            - [ ] rdb_last_save_time
+            - [ ] rdb_last_bgsave_status
+            - [ ] rdb_last_bgsave_time_sec
+            - [ ] rdb_current_bgsave_time_sec
+            - [ ] aof_enabled
+            - [ ] aof_rewrite_in_progress
+            - [ ] aof_rewrite_scheduled
+            - [ ] aof_last_rewrite_time_sec
+            - [ ] aof_current_rewrite_time_sec
+            - [ ] aof_last_bgrewrite_status
+            - [ ] changes_since_last_save
+        - If AOF is activated
+            - [ ] aof_current_size
+            - [ ] aof_base_size
+            - [ ] aof_pending_rewrite
+            - [ ] aof_buffer_length
+            - [ ] aof_rewrite_buffer_length
+            - [ ] aof_pending_bio_fsync
+            - [ ] aof_delayed_fsync
+        - If a load operation is on-going
+            - [ ] loading_start_time
+            - [ ] loading_total_bytes
+            - [ ] loading_loaded_bytes
+            - [ ] loading_loaded_perc
+            - [ ] loading_eta_seconds
+        - stats
+            - [ ] total_connections_received
+            - [ ] total_commands_processed
+            - [ ] instantaneous_ops_per_sec
+            - [ ] rejected_connections
+            - [ ] expired_keys
+            - [ ] evicted_keys
+            - [ ] keyspace_hits
+            - [ ] keyspace_misses
+            - [ ] pubsub_channels
+            - [ ] pubsub_patterns
+            - [ ] latest_fork_usec
+        - replication
+            - [ ] role
+            - If the instance is a slave
+                - [ ] master_host
+                - [ ] master_port
+                - [ ] master_link_status
+                - [ ] master_last_io_seconds_ago
+                - [ ] master_sync_in_progress
+            - If a SYNC operation is on-going
+                - [ ] master_sync_left_bytes
+                - [ ] master_sync_last_io_seconds_ago
+            - If the link between master and slave is down
+                - [ ] master_link_down_since_seconds
+            - The following field is always provided
+                - [ ] connected_slaves
+            - For each slave, the following line is added
+                - [ ] slaveXXX
+        - cpu
+            - [ ] used_cpu_sys
+            - [ ] used_cpu_user
+            - [ ] used_cpu_sys_children
+            - [ ] used_cpu_user_children
+        - commandstats
+            - For each command type, the following line is added
+                - [ ] cmdstat_XXX
+            - The cluster section currently only contains a unique field
+                - [ ] cluster_enabled
+        - keyspace
+            - [ ] dbXXX:keys=XXX,expires=XXX
     - [x] monitor
     - [x] ttl
     - [x] pttl
