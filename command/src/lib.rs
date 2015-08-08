@@ -1848,6 +1848,7 @@ fn info(parser: ParsedCommand, db: &Database) -> Response {
                 rustc_version:{}\r\n\
                 process_id:{}\r\n\
                 run_id:{}\r\n\
+                tcp_port:{}\r\n\
                 ",
                 db.version,
                 db.git_sha1,
@@ -1859,6 +1860,7 @@ fn info(parser: ParsedCommand, db: &Database) -> Response {
                 db.rustc_version,
                 getpid(),
                 db.run_id,
+                db.config.port,
                 ).into_bytes())
 }
 
