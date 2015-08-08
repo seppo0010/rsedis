@@ -1839,6 +1839,7 @@ fn info(parser: ParsedCommand, db: &Database) -> Response {
     // TODO: cache getos() result
     let os = getos();
     Response::Data(format!("\
+                # Server\r\n\
                 rsedis_version:{}\r\n\
                 rsedis_git_sha1:{}\r\n\
                 rsedis_git_dirty:{}\r\n\
