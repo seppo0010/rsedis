@@ -11,6 +11,7 @@ extern crate util;
 use std::ascii::AsciiExt;
 use std::collections::{Bound, HashMap, HashSet};
 use std::fmt::Error;
+use std::io::Write;
 use std::mem::replace;
 use std::sync::mpsc::Sender;
 use std::sync::mpsc::channel;
@@ -1835,10 +1836,18 @@ fn monitor(parser: ParsedCommand, db: &mut Database, rawsender: Sender<Option<Re
 #[cfg(all(target_pointer_width = "64"))] const BITS: usize = 64;
 
 fn info(parser: ParsedCommand, db: &Database) -> Response {
-    validate_arguments_exact!(parser, 1);
-    // TODO: cache getos() result
-    let os = getos();
-    Response::Data(format!("\
+    validate_arguments_lte!(parser, 2);
+    let section = &*(if parser.argv.len() == 1 {
+        "default".to_owned()
+    } else {
+        try_validate!(parser.get_str(1), "Invalid section").to_ascii_lowercase()
+    });
+
+    let mut out = vec![];
+    if section == "default" || section == "all" || section == "server" {
+        // TODO: cache getos() result
+        let os = getos();
+        try_validate!(write!(out, "\
                 # Server\r\n\
                 rsedis_version:{}\r\n\
                 rsedis_git_sha1:{}\r\n\
@@ -1850,6 +1859,7 @@ fn info(parser: ParsedCommand, db: &Database) -> Response {
                 process_id:{}\r\n\
                 run_id:{}\r\n\
                 tcp_port:{}\r\n\
+                \r\n\
                 ",
                 db.version,
                 db.git_sha1,
@@ -1862,7 +1872,9 @@ fn info(parser: ParsedCommand, db: &Database) -> Response {
                 getpid(),
                 db.run_id,
                 db.config.port,
-                ).into_bytes())
+                ), "ERR unexpected");
+    }
+    Response::Data(out)
 }
 
 /// Client state that exceeds the lifetime of a command
