@@ -132,8 +132,8 @@
             - [x] process_id
             - [x] run_id
             - [x] tcp_port
-            - [ ] uptime_in_seconds
-            - [ ] uptime_in_days
+            - [x] uptime_in_seconds
+            - [x] uptime_in_days
             - [ ] lru_clock
         - clients
             - [ ] connected_clients

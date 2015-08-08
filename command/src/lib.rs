@@ -1847,6 +1847,7 @@ fn info(parser: ParsedCommand, db: &Database) -> Response {
     if section == "default" || section == "all" || section == "server" {
         // TODO: cache getos() result
         let os = getos();
+        let uptime = db.uptime();
         try_validate!(write!(out, "\
                 # Server\r\n\
                 rsedis_version:{}\r\n\
@@ -1859,6 +1860,8 @@ fn info(parser: ParsedCommand, db: &Database) -> Response {
                 process_id:{}\r\n\
                 run_id:{}\r\n\
                 tcp_port:{}\r\n\
+                uptime_in_seconds:{}\r\n\
+                uptime_in_days:{}\r\n\
                 \r\n\
                 ",
                 db.version,
@@ -1872,6 +1875,8 @@ fn info(parser: ParsedCommand, db: &Database) -> Response {
                 getpid(),
                 db.run_id,
                 db.config.port,
+                uptime / 1000,
+                uptime / (1000 * 60 * 60 * 24),
                 ), "ERR unexpected");
     }
     Response::Data(out)

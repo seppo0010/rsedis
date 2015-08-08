@@ -1532,6 +1532,8 @@ pub struct Database {
     pub rustc_version: &'static str,
     /// a random 40 digits hex string
     pub run_id: String,
+    /// milliseconds when the database started
+    pub start_mstime: i64,
 }
 
 pub struct Iter<'a> {
@@ -1590,7 +1592,12 @@ impl Database {
             git_sha1: "00000000",
             git_dirty: true,
             run_id: get_random_hex_chars(40),
+            start_mstime: mstime(),
         }
+    }
+
+    pub fn uptime(&self) -> i64 {
+        mstime() - self.start_mstime
     }
 
     fn is_expired(&self, index: usize, key: &Vec<u8>) -> bool {
