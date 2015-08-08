@@ -20,6 +20,6 @@ path = "../response"
 
 [dependencies]
 crc64 = "0.2.2"
-rand = "0.3.8"
+rand = "0.3.9"
 skiplist = "0.2.6"
 rehashinghashmap = "0.1.0"

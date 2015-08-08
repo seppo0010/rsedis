@@ -6,3 +6,4 @@ authors = ["Sebastian Waisbrot <seppo0010@gmail.com>"]
 [dependencies]
 time = "0.1"
 libc = "0.1.8"
+rand = "0.3.9"

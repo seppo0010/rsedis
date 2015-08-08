@@ -1847,6 +1847,7 @@ fn info(parser: ParsedCommand, db: &Database) -> Response {
                 multiplexing_api:no\r\n\
                 rustc_version:{}\r\n\
                 process_id:{}\r\n\
+                run_id:{}\r\n\
                 ",
                 db.version,
                 db.git_sha1,
@@ -1857,6 +1858,7 @@ fn info(parser: ParsedCommand, db: &Database) -> Response {
                 BITS,
                 db.rustc_version,
                 getpid(),
+                db.run_id,
                 ).into_bytes())
 }
 

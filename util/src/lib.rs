@@ -1,4 +1,5 @@
 extern crate libc;
+extern crate rand;
 extern crate time;
 
 use std::ascii::AsciiExt;
@@ -6,6 +7,7 @@ use std::fmt;
 
 use libc::funcs::c95::ctype::isprint;
 use libc::types::os::arch::c95::c_int;
+use rand::{thread_rng, Rng};
 use time::get_time;
 
 /// Are two chars the same? Optionally ignoring the case.
@@ -307,6 +309,37 @@ pub fn format_repr(f: &mut fmt::Formatter, s: &[u8]) -> Result<(), fmt::Error> {
         })
     }
     f.write_str("\"")
+}
+
+/// Transform a number from 0 to 15 to an heximal character
+fn numtohex(num: u8) -> char {
+    assert!(num < 16);
+    b"0123456789abcdef"[num as usize] as char
+}
+
+/// Generates a random [0-9A-F]{len} string.
+///
+/// # Examples
+/// ```
+/// # use util::get_random_hex_chars;
+/// #
+/// let s = get_random_hex_chars(31);
+/// assert_eq!(s.len(), 31);
+/// ```
+pub fn get_random_hex_chars(len: usize) -> String {
+    let binarylen = (len + 1) / 2;
+    let mut v = Vec::with_capacity(binarylen);
+    unsafe { v.set_len(binarylen); }
+    thread_rng().fill_bytes(&mut *v);
+    let mut s = String::with_capacity(binarylen * 2);
+    for c in v {
+        s.push(numtohex(c % 16));
+        s.push(numtohex(c / 16));
+    }
+    if binarylen * 2 != len {
+        s.pop();
+    }
+    s
 }
 
 #[cfg(test)]

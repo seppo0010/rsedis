@@ -130,7 +130,7 @@
             - [x] multiplexing_api
             - [x] gcc_version
             - [x] process_id
-            - [ ] run_id
+            - [x] run_id
             - [ ] tcp_port
             - [ ] uptime_in_seconds
             - [ ] uptime_in_days

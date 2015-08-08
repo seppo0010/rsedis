@@ -31,8 +31,7 @@ use crc64::crc64;
 use logger::{Level, Logger};
 use rehashinghashmap::RehashingHashMap;
 use response::Response;
-use util::glob_match;
-use util::mstime;
+use util::{glob_match, mstime, get_random_hex_chars};
 
 use error::OperationError;
 use list::ValueList;
@@ -1531,6 +1530,8 @@ pub struct Database {
     pub git_dirty: bool,
     pub version: &'static str,
     pub rustc_version: &'static str,
+    /// a random 40 digits hex string
+    pub run_id: String,
 }
 
 pub struct Iter<'a> {
@@ -1588,6 +1589,7 @@ impl Database {
             rustc_version: "",
             git_sha1: "00000000",
             git_dirty: true,
+            run_id: get_random_hex_chars(40),
         }
     }
 
