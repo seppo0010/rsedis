@@ -1829,6 +1829,19 @@ fn monitor(parser: ParsedCommand, db: &mut Database, rawsender: Sender<Option<Re
     Response::Status("OK".to_owned())
 }
 
+fn info(parser: ParsedCommand, db: &Database) -> Response {
+    validate_arguments_exact!(parser, 1);
+    Response::Data(format!("\
+                rsedis_version:{}\r\n\
+                rsedis_git_sha1:{}\r\n\
+                rsedis_git_dirty:{}\r\n\
+                ",
+                db.version,
+                db.git_sha1,
+                if db.git_dirty { 1 } else { 0 }
+                ).into_bytes())
+}
+
 /// Client state that exceeds the lifetime of a command
 pub struct Client {
     pub dbindex: usize,
@@ -2090,6 +2103,7 @@ pub fn command(
         "punsubscribe" => return punsubscribe(parser, db, client.subscriptions.len(), &mut client.pattern_subscriptions, &client.rawsender),
         "publish" => publish(parser, db),
         "monitor" => monitor(parser, db, client.rawsender.clone()),
+        "info" => info(parser, db),
         cmd => Response::Error(format!("ERR unknown command \"{}\"", cmd).to_owned()),
     });
 }
@@ -3515,5 +3529,18 @@ mod test_command {
         assert_eq!(command(parser!(b"monitor"), &mut db, &mut client1).unwrap(), Response::Status("OK".to_owned()));
         assert_eq!(command(parser!(b"get key"), &mut db, &mut client2).unwrap(), Response::Nil);
         assert_eq!(rx.recv().unwrap(), Some(Response::Status("\"get\" \"key\" ".to_owned())));
+    }
+
+    #[test]
+    fn info() {
+        let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
+        let mut client = Client::mock();
+        if let Response::Data(d) = command(parser!(b"info"), &mut db, &mut client).unwrap() {
+            let s = from_utf8(&*d).unwrap();
+            assert!(s.contains("rsedis_git_sha1"));
+            assert!(s.contains("rsedis_git_dirty"));
+        } else {
+            panic!("Expected data");
+        }
     }
 }

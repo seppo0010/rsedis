@@ -15,7 +15,7 @@ use std::time::Duration;
 use std::io;
 use std::io::{Read, Write};
 use std::net::{SocketAddr, ToSocketAddrs, TcpStream};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::thread;
 
@@ -392,6 +392,10 @@ impl Server {
             next_id: Arc::new(Mutex::new(0)),
             hz_stop: None,
         }
+    }
+
+    pub fn get_mut_db<'a>(&'a self) -> MutexGuard<'a, database::Database> {
+        self.db.lock().unwrap()
     }
 
     /// Runs the server. If `config.daemonize` is true, it forks and exits.

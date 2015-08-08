@@ -122,9 +122,9 @@
     - [ ] sort
     - info
         - server
-            - [ ] redis_version
-            - [ ] redis_git_sha1
-            - [ ] redis_git_dirty
+            - [x] redis_version
+            - [x] redis_git_sha1
+            - [x] redis_git_dirty
             - [ ] os
             - [ ] arch_bits
             - [ ] multiplexing_api

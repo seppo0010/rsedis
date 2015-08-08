@@ -1524,7 +1524,12 @@ pub struct Database {
     /// Which database to try to run the active expire cycle next
     active_expire_cycle_db: usize,
     /// Clients who are monitoring commands.
-    monitor_senders: Vec<Sender<String>>
+    monitor_senders: Vec<Sender<String>>,
+    /// Git version used
+    pub git_sha1: &'static str,
+    /// Did the code change from the git repository
+    pub git_dirty: bool,
+    pub version: &'static str,
 }
 
 pub struct Iter<'a> {
@@ -1578,6 +1583,9 @@ impl Database {
             watched_keys: watched_keys,
             active_expire_cycle_db: 0,
             monitor_senders: Vec::new(),
+            version: "0.0.1",
+            git_sha1: "00000000",
+            git_dirty: true,
         }
     }
 

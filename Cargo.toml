@@ -8,6 +8,7 @@ exclude = [
     ".travis.yml",
     "appveyor.yml",
 ]
+build = "build.rs"
 
 [[bin]]
 
