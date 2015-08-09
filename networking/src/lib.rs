@@ -527,6 +527,11 @@ impl Server {
                 }
             });
         }
+
+        let mut db = self.db.lock().unwrap();
+        if db.aof.is_some() {
+            command::aof::load(&mut *db);
+        }
     }
 
     #[cfg(unix)]

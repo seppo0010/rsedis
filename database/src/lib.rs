@@ -32,7 +32,7 @@ use config::Config;
 use crc64::crc64;
 use logger::{Level, Logger};
 use parser::ParsedCommand;
-use persistence::aof::AofWriter;
+use persistence::aof::Aof;
 use rehashinghashmap::RehashingHashMap;
 use response::Response;
 use util::{glob_match, mstime, get_random_hex_chars};
@@ -1538,7 +1538,8 @@ pub struct Database {
     pub run_id: String,
     /// milliseconds when the database started
     pub start_mstime: i64,
-    aof_writer: Option<AofWriter>,
+    /// Aof reader/writer
+    pub aof: Option<Aof>,
 }
 
 pub struct Iter<'a> {
@@ -1581,8 +1582,8 @@ impl Database {
             key_subscribers.push(RehashingHashMap::new());
             watched_keys.push(HashMap::new());
         }
-        let aof_writer = if config.appendonly {
-            Some(AofWriter::new(&*config.appendfilename).unwrap())
+        let aof = if config.appendonly {
+            Some(Aof::new(&*config.appendfilename).unwrap())
         } else {
             None
         };
@@ -1603,7 +1604,7 @@ impl Database {
             git_dirty: true,
             run_id: get_random_hex_chars(40),
             start_mstime: mstime(),
-            aof_writer: aof_writer,
+            aof: aof,
         }
     }
 
@@ -2103,7 +2104,7 @@ impl Database {
         self.monitor_senders = tmp;
         if write {
             let mut err = false;
-            match self.aof_writer {
+            match self.aof {
                 Some(ref mut w) => match w.write(dbindex, command) {
                     Ok(_) => (),
                     Err(e) => {
@@ -2114,7 +2115,7 @@ impl Database {
                 None => (),
             }
             if err {
-                self.aof_writer = None;
+                self.aof = None;
             }
         }
     }
