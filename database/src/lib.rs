@@ -2096,24 +2096,26 @@ impl Database {
         self.monitor_senders.push(sender);
     }
 
-    pub fn log_command(&mut self, dbindex: usize, command: &ParsedCommand) {
+    pub fn log_command(&mut self, dbindex: usize, command: &ParsedCommand, write: bool) {
         // FIXME: unnecessary free/alloc?
         let bcommand = format!("{:?}", command);
         let tmp = self.monitor_senders.drain(RangeFull).filter(|s| s.send(bcommand.clone()).is_ok()).collect::<Vec<_>>();
         self.monitor_senders = tmp;
-        let mut err = false;
-        match self.aof_writer {
-            Some(ref mut w) => match w.write(dbindex, command) {
-                Ok(_) => (),
-                Err(e) => {
-                    log!(self.config.logger, Warning, "Error writing aof {:?}; stopped writing", e);
-                    err = true;
+        if write {
+            let mut err = false;
+            match self.aof_writer {
+                Some(ref mut w) => match w.write(dbindex, command) {
+                    Ok(_) => (),
+                    Err(e) => {
+                        log!(self.config.logger, Warning, "Error writing aof {:?}; stopped writing", e);
+                        err = true;
+                    },
                 },
-            },
-            None => (),
-        }
-        if err {
-            self.aof_writer = None;
+                None => (),
+            }
+            if err {
+                self.aof_writer = None;
+            }
         }
     }
 }
@@ -3522,7 +3524,7 @@ mod test_command {
         let (tx, rx) = channel();
         database.monitor_add(tx.clone());
         database.monitor_add(tx.clone());
-        database.log_command(0, &ParsedCommand::new(b"1", vec![Argument {pos: 0, len: 1}]));
+        database.log_command(0, &ParsedCommand::new(b"1", vec![Argument {pos: 0, len: 1}]), true);
         assert_eq!(rx.try_recv().unwrap(), "\"1\" ".to_owned());
         assert_eq!(rx.try_recv().unwrap(), "\"1\" ".to_owned());
         assert!(rx.try_recv().is_err())

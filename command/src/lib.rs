@@ -2045,7 +2045,7 @@ mod flags {
  * key_step: step to get all the keys from first to last argument. For instance
  *           in MSET the step is two since arguments are key,val,key,val,...
    */
-fn command_properties(command_name: &String) -> (i64, u64, i64, i64, i64) {
+fn command_properties(command_name: &str) -> (i64, u64, i64, i64, i64) {
     use flags::*;
     let wm = WRITE | DENYOOM;
     let wf = WRITE | FAST;
@@ -2054,7 +2054,7 @@ fn command_properties(command_name: &String) -> (i64, u64, i64, i64, i64) {
     let ls = LOADING | STALE;
     let ars = READONLY | ADMIN | NOSCRIPT;
     let sr = READONLY | SORT_FOR_SCRIPT;
-    match &**command_name {
+    match command_name {
         "get" => (2, fr, 1, 1, 1),
         "set" => (3, wm, 1, 1, 1),
         "setnx" => (3, wmf, 1, 1, 1),
@@ -2229,11 +2229,23 @@ fn command_properties(command_name: &String) -> (i64, u64, i64, i64, i64) {
     }
 }
 
+fn command_has_flags(command_name: &str, flags: u64) -> bool {
+    (command_properties(command_name).1 & flags) == flags
+}
+
+#[test]
+fn command_has_flags_test() {
+    assert!(command_has_flags("set", flags::WRITE));
+    assert!(command_has_flags("setnx", flags::WRITE | flags::FAST));
+    assert!(!command_has_flags("append", flags::READONLY));
+}
+
 fn execute_command(
         parser: &mut ParsedCommand,
         db: &mut Database,
         client: &mut Client,
         log: &mut bool,
+        write: &mut bool,
         ) -> Result<Response, ResponseError> {
     if parser.argv.len() == 0 {
         return Err(ResponseError::NoReply);
@@ -2242,6 +2254,9 @@ fn execute_command(
         Some(c) => c,
         None => return Ok(Response::Error("unknown command".to_owned())),
     };
+
+    *write = !command_has_flags(command_name, flags::READONLY);
+
     if db.config.requirepass.is_none() {
         client.auth = true;
     }
@@ -2395,10 +2410,11 @@ pub fn command(
         client: &mut Client,
         ) -> Result<Response, ResponseError> {
     let mut log = true;
-    let r = execute_command(&mut parser, db, client, &mut log);
+    let mut write = false;
+    let r = execute_command(&mut parser, db, client, &mut log, &mut write);
     // TODO: only log if there's anyone listening
     if log {
-        db.log_command(client.dbindex, &parser);
+        db.log_command(client.dbindex, &parser, write);
     }
     r
 }
