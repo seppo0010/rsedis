@@ -23,9 +23,11 @@ pub mod zset;
 use std::collections::Bound;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::env;
 use std::io::Write;
 use std::iter::FromIterator;
 use std::ops::RangeFull;
+use std::path::Path;
 use std::sync::mpsc::{Sender, channel};
 
 use config::Config;
@@ -1571,6 +1573,7 @@ impl Database {
 
     /// Creates a new empty `Database`.
     pub fn new(config: Config) -> Self {
+        env::set_current_dir(&Path::new(&*config.dir)).unwrap();
         let size = config.databases as usize;
         let mut data = Vec::with_capacity(size);
         let mut data_expiration_ms = Vec::with_capacity(size);

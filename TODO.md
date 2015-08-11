@@ -286,7 +286,7 @@
     - [ ] rdbcompression
     - [ ] rdbchecksum
     - [ ] dbfilename
-    - [ ] dir
+    - [x] dir
     - [ ] slaveof
     - [ ] masterauth
     - [ ] slave-serve-stale-data

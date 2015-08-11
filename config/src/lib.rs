@@ -24,6 +24,7 @@ pub struct Config {
     pub daemonize: bool,
     pub databases: u8,
     pub pidfile: String,
+    pub dir: String,
     pub bind: Vec<String>,
     pub port: u16,
     pub tcp_keepalive: u32,
@@ -84,6 +85,7 @@ impl Config {
             daemonize: false,
             databases: 16,
             pidfile: "/var/run/rsedis.pid".to_owned(),
+            dir: "./".to_owned(),
             bind: vec![],
             port: port,
             tcp_keepalive: 0,
@@ -147,6 +149,7 @@ impl Config {
                 b"unixsocket" => self.unixsocket = Some(try!(read_string(args)).to_owned()),
                 b"unixsocketperm" => self.unixsocketperm = try!(u32::from_str_radix(&*try!(read_string(args)), 8)),
                 b"pidfile" => self.pidfile = try!(read_string(args)).to_owned(),
+                b"dir" => self.dir = try!(read_string(args)).to_owned(),
                 b"logfile" => {
                     let logfile = try!(read_string(args));
                     if logfile.len() > 0 {
