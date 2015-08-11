@@ -32,7 +32,7 @@ tags {"aof"} {
     }
 
     start_server_aof [list dir $server_path aof-load-truncated yes] {
-        xtest "Unfinished MULTI: Server should start if load-truncated is yes" {
+        test "Unfinished MULTI: Server should start if load-truncated is yes" {
             assert_equal 1 [is_alive $srv]
         }
     }
@@ -48,30 +48,30 @@ tags {"aof"} {
     }
 
     start_server_aof [list dir $server_path aof-load-truncated yes] {
-        xtest "Short read: Server should start if load-truncated is yes" {
+        test "Short read: Server should start if load-truncated is yes" {
             assert_equal 1 [is_alive $srv]
         }
 
         set client [redis [dict get $srv host] [dict get $srv port]]
 
-        xtest "Truncated AOF loaded: we expect foo to be equal to 5" {
+        test "Truncated AOF loaded: we expect foo to be equal to 5" {
             assert {[$client get foo] eq "5"}
         }
 
-        xtest "Append a new command after loading an incomplete AOF" {
+        test "Append a new command after loading an incomplete AOF" {
             $client incr foo
         }
     }
 
     # Now the AOF file is expected to be correct
     start_server_aof [list dir $server_path aof-load-truncated yes] {
-        xtest "Short read + command: Server should start" {
+        test "Short read + command: Server should start" {
             assert_equal 1 [is_alive $srv]
         }
 
         set client [redis [dict get $srv host] [dict get $srv port]]
 
-        xtest "Truncated AOF loaded: we expect foo to be equal to 6 now" {
+        test "Truncated AOF loaded: we expect foo to be equal to 6 now" {
             assert {[$client get foo] eq "6"}
         }
     }
