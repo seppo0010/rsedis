@@ -27,6 +27,9 @@ pub fn load(db: &mut Database) {
             if len == 0 {
                 // TODO: if there's something in the buffer
                 // it might be an incomplete AOF
+                if parser.written > parser.position {
+                    aof.truncate(parser.position);
+                }
                 break;
             }
         }

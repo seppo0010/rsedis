@@ -1,6 +1,8 @@
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::io;
+use std::io::Seek;
+use std::io::SeekFrom;
 use std::io::Write;
 use std::path::Path;
 use std::usize;
@@ -33,6 +35,14 @@ impl Aof {
         }
         Ok(())
     }
+
+    pub fn truncate(&mut self, pos: usize) -> bool {
+        if self.fp.set_len(pos as u64).is_err() {
+            return false;
+        }
+        self.fp.seek(SeekFrom::Start(pos as u64)).is_ok()
+    }
+
     pub fn write(&mut self, dbindex: usize, command: &ParsedCommand) -> io::Result<()> {
         try!(self.select(dbindex));
         try!(self.fp.write(command.get_data()));
