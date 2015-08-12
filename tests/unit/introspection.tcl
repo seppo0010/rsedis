@@ -6,10 +6,11 @@ start_server {tags {"introspection"}} {
     test {MONITOR can log executed commands} {
         set rd [redis_deferring_client]
         $rd monitor
+        assert_match {*OK*} [$rd read]
         r set foo bar
         r get foo
-        list [$rd read] [$rd read] [$rd read]
-    } {*OK*"set" "foo"*"get" "foo"*}
+        list [$rd read] [$rd read]
+    } {*"set" "foo"*"get" "foo"*}
 
     xtest {MONITOR can log commands issued by the scripting engine} {
         set rd [redis_deferring_client]
