@@ -58,11 +58,11 @@ proc cat {path} {
 
 proc tailstr {n str} {
     set arr [split $str "\n"]
-    return [join [lrange $arr end-$n+1 end] "\n"]
+    return [join [lrange $arr end-$n end] "\n"]
 }
 
 proc tail {n path} {
-    return [tailstr n [cat path]]
+    return [tailstr $n [cat $path]]
 }
 
 proc randstring {min max {type binary}} {
