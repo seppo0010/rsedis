@@ -189,11 +189,11 @@ tags {"aof"} {
     }
 
     start_server_aof [list dir $server_path aof-load-truncated no] {
-        xtest "AOF+SPOP: Server should have been started" {
+        test "AOF+SPOP: Server should have been started" {
             assert_equal 1 [is_alive $srv]
         }
 
-        xtest "AOF+SPOP: Set should have 1 member" {
+        test "AOF+SPOP: Set should have 1 member" {
             set client [redis [dict get $srv host] [dict get $srv port]]
             wait_for_condition 50 100 {
                 [catch {$client ping} e] == 0
@@ -213,11 +213,11 @@ tags {"aof"} {
     }
 
     start_server_aof [list dir $server_path] {
-        xtest "AOF+SPOP: Server should have been started" {
+        test "AOF+SPOP: Server should have been started" {
             assert_equal 1 [is_alive $srv]
         }
 
-        xtest "AOF+SPOP: Set should have 1 member" {
+        test "AOF+SPOP: Set should have 1 member" {
             set client [redis [dict get $srv host] [dict get $srv port]]
             wait_for_condition 50 100 {
                 [catch {$client ping} e] == 0
@@ -252,7 +252,7 @@ tags {"aof"} {
     }
 
     start_server {overrides {appendonly {yes} appendfilename {appendonly.aof}}} {
-        xtest {Redis should not try to convert DEL into EXPIREAT for EXPIRE -1} {
+        test {Redis should not try to convert DEL into EXPIREAT for EXPIRE -1} {
             r set x 10
             r expire x -1
         }
