@@ -7,6 +7,7 @@ use std::iter::FromIterator;
 use std::fs::{File, OpenOptions};
 use std::fmt::{Debug, Error, Formatter};
 use std::path::Path;
+use std::process;
 use std::sync::mpsc::{Sender, channel};
 use std::thread;
 
@@ -28,7 +29,14 @@ use std::thread;
 #[macro_export]
 macro_rules! log {
     ($logger: expr, $level: ident, $($arg:tt)*) => ({
-        $logger.log(Level::$level, format!($($arg)*))
+        $logger.log(Level::$level, format!($($arg)*), None)
+    })
+}
+
+#[macro_export]
+macro_rules! log_and_exit {
+    ($logger: expr, $level: ident, $code: expr, $($arg:tt)*) => ({
+        $logger.log(Level::$level, format!($($arg)*), Some($code))
     })
 }
 
@@ -150,36 +158,37 @@ impl Level {
 #[cfg(unix)]
 pub struct Logger {
     // this might be ugly, but here it goes...
-    /// To change the Output target, send `(Some(Output), None, None)`
-    /// To change the Level target, send `(None, Some(Level), None)`
-    /// To log a message send `(None, Some(Level), Some(String))` where the
+    /// To change the Output target, send `(Some(Output), None, None, None)`
+    /// To change the Level target, send `(None, Some(Level), None, None)`
+    /// To log a message send `(None, Some(Level), Some(String), None)` where the
     /// level is the message level
-    tx: Sender<(Option<Output>, Option<Level>, Option<String>, Option<Option<Box<syslog::Logger>>>)>,
+    /// If the last parameter is not none, it will exit the process with that exit code
+    tx: Sender<(Option<Output>, Option<Level>, Option<String>, Option<Option<Box<syslog::Logger>>>, Option<i32>)>,
 }
 
 #[derive(Clone)]
 #[cfg(not(unix))]
 pub struct Logger {
     // this might be ugly, but here it goes...
-    /// To change the Output target, send `(Some(Output), None, None)`
-    /// To change the Level target, send `(None, Some(Level), None)`
-    /// To log a message send `(None, Some(Level), Some(String))` where the
+    /// To change the Output target, send `(Some(Output), None, None, None)`
+    /// To change the Level target, send `(None, Some(Level), None, None)`
+    /// To log a message send `(None, Some(Level), Some(String), None)` where the
     /// level is the message level
-    tx: Sender<(Option<Output>, Option<Level>, Option<String>, Option<()>)>,
+    tx: Sender<(Option<Output>, Option<Level>, Option<String>, Option<()>, Option<i32>)>,
 }
 
 impl Logger {
     /// Creates a new `Logger` for a given `Output` and severity `Level`.
     #[cfg(unix)]
     fn create(level: Level, output: Output) -> Logger {
-        let (tx, rx) = channel::<(Option<Output>, Option<Level>, Option<String>, Option<Option<Box<syslog::Logger>>>)>();
+        let (tx, rx) = channel::<(Option<Output>, Option<Level>, Option<String>, Option<Option<Box<syslog::Logger>>>, Option<i32>)>();
         {
             let mut level = level;
             let mut output = output;
             let mut syslog_writer:Option<Box<syslog::Logger>> = None;
             thread::spawn(move || {
                 loop {
-                    let (_output, _level, _msg, _syslog_writer) = match rx.recv() {
+                    let (_output, _level, _msg, _syslog_writer, _code) = match rx.recv() {
                         Ok(m) => m,
                         Err(_) => break,
                     };
@@ -220,6 +229,9 @@ impl Logger {
                     } else {
                         panic!("Unknown message {:?}", (_output, _level, _msg, _syslog_writer.is_some()));
                     }
+                    if let Some(code) = _code {
+                        process::exit(code);
+                    }
                 };
             });
         }
@@ -231,13 +243,13 @@ impl Logger {
 
     #[cfg(not(unix))]
     fn create(level: Level, output: Output) -> Logger {
-        let (tx, rx) = channel::<(Option<Output>, Option<Level>, Option<String>, Option<()>)>();
+        let (tx, rx) = channel::<(Option<Output>, Option<Level>, Option<String>, Option<()>, Option<i32>)>();
         {
             let mut level = level;
             let mut output = output;
             thread::spawn(move || {
                 loop {
-                    let (_output, _level, _msg, _) = match rx.recv() {
+                    let (_output, _level, _msg, _, _code) = match rx.recv() {
                         Ok(m) => m,
                         Err(_) => break,
                     };
@@ -261,6 +273,9 @@ impl Logger {
                     } else {
                         panic!("Unknown message {:?}", (_output, _level, _msg));
                     }
+                    if let Some(code) = _code {
+                        process::exit(code);
+                    }
                 };
             });
         }
@@ -277,7 +292,7 @@ impl Logger {
     /// # use logger::{Logger, Level};
     /// #
     /// let logger = Logger::new(Level::Warning);
-    /// logger.log(Level::Warning, "hello world".to_owned());
+    /// logger.log(Level::Warning, "hello world".to_owned(), None);
     /// ```
     pub fn new(level: Level) -> Self {
         Self::create(level, Output::Stdout)
@@ -290,7 +305,7 @@ impl Logger {
     /// # use logger::{Logger, Level};
     /// #
     /// let logger = Logger::new_err(Level::Warning);
-    /// logger.log(Level::Warning, "hello world".to_owned());
+    /// logger.log(Level::Warning, "hello world".to_owned(), None);
     /// ```
     pub fn new_err(level: Level) -> Self {
         Self::create(level, Output::Stderr)
@@ -305,7 +320,7 @@ impl Logger {
     /// #
     /// let (tx, rx) = channel();
     /// let logger = Logger::channel(Level::Debug, tx);
-    /// logger.log(Level::Debug, "hello world".to_owned());
+    /// logger.log(Level::Debug, "hello world".to_owned(), None);
     /// assert_eq!(rx.recv().unwrap(), b"hello world\n".to_vec());
     /// ```
     pub fn channel(level: Level, s: Sender<Vec<u8>>) -> Self {
@@ -320,7 +335,7 @@ impl Logger {
     /// Disables syslog
     #[cfg(unix)]
     pub fn disable_syslog(&mut self) {
-        self.tx.send((None, None, None, Some(None))).unwrap();
+        self.tx.send((None, None, None, Some(None), None)).unwrap();
     }
 
     #[cfg(not(unix))]
@@ -342,7 +357,7 @@ impl Logger {
             _ => syslog::Facility::LOG_USER,
         }).unwrap();
         w.set_process_name(ident.clone());
-        self.tx.send((None, None, None, Some(Some(w)))).unwrap();
+        self.tx.send((None, None, None, Some(Some(w)), None)).unwrap();
     }
 
     #[cfg(not(unix))]
@@ -352,13 +367,13 @@ impl Logger {
     /// Changes the output to be a file in `path`.
     pub fn set_logfile(&mut self, path: &str) -> io::Result<()> {
         let file = Output::File(try!(File::create(Path::new(path))), path.to_owned());
-        self.tx.send((Some(file), None, None, None)).unwrap();
+        self.tx.send((Some(file), None, None, None, None)).unwrap();
         Ok(())
     }
 
     /// Changes the log level.
     pub fn set_loglevel(&mut self, level: Level) {
-        self.tx.send((None, Some(level), None, None)).unwrap();
+        self.tx.send((None, Some(level), None, None, None)).unwrap();
     }
 
     /// Creates a new sender to log messages.
@@ -371,7 +386,7 @@ impl Logger {
                     Ok(msg) => msg,
                     Err(_) => break,
                 };
-                match tx2.send((None, Some(level), Some(message), None)) {
+                match tx2.send((None, Some(level), Some(message), None, None)) {
                     Ok(_) => (),
                     Err(_) => break,
                 };
@@ -381,8 +396,8 @@ impl Logger {
     }
 
     /// Logs a message with a log level.
-    pub fn log(&self, level: Level, msg: String) {
-        self.tx.send((None, Some(level), Some(msg), None)).unwrap();
+    pub fn log(&self, level: Level, msg: String, code: Option<i32>) {
+        self.tx.send((None, Some(level), Some(msg), None, code)).unwrap();
     }
 }
 
@@ -420,7 +435,7 @@ mod test_log {
     fn log_something() {
         let (tx, rx) = channel();
         let logger = Logger::channel(Level::Debug, tx);
-        logger.log(Level::Debug, "hello world".to_owned());
+        logger.log(Level::Debug, "hello world".to_owned(), None);
         assert_eq!(rx.recv().unwrap(), b"hello world\n");
     }
 
@@ -428,7 +443,7 @@ mod test_log {
     fn dont_log_something() {
         let (tx, rx) = channel();
         let logger = Logger::channel(Level::Warning, tx);
-        logger.log(Level::Debug, "hello world".to_owned());
+        logger.log(Level::Debug, "hello world".to_owned(), None);
         assert_eq!(rx.try_recv().unwrap_err(), TryRecvError::Empty);
     }
 

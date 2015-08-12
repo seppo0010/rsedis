@@ -8,7 +8,6 @@ mod release;
 
 use std::env::args;
 use std::process::exit;
-use std::thread;
 
 use compat::getpid;
 use config::Config;
@@ -22,9 +21,6 @@ fn main() {
         Some(f) => match config.parsefile(f) {
             Ok(_) => (),
             Err(_) => {
-                thread::sleep_ms(100);
-                // I'm not proud, but fatal errors are logged in a background thread
-                // I need to ensure they were printed
                 exit(1);
             },
         },

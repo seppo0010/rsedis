@@ -1,4 +1,4 @@
-#[macro_use(log)]
+#[macro_use(log_and_exit)]
 extern crate logger;
 extern crate rand;
 extern crate time;
@@ -116,7 +116,7 @@ impl Config {
         let file = BufReader::new(match File::open(&path) {
             Ok(f) => f,
             Err(_) => {
-                log!(self.logger, Warning, "Fatal error, can't open config file '{}'", fname);
+                log_and_exit!(self.logger, Warning, 1, "Fatal error, can't open config file '{}'", fname);
                 return Err(ConfigError::FileNotFound);
             }
         });
