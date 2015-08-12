@@ -3,7 +3,7 @@
 extern crate config;
 extern crate compat;
 extern crate database;
-extern crate logger;
+#[macro_use(log, sendlog)] extern crate logger;
 extern crate parser;
 extern crate response;
 extern crate util;

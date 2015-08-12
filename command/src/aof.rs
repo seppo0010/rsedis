@@ -2,6 +2,7 @@ use std::io::Read;
 use std::sync::mpsc::channel;
 
 use database::Database;
+use logger::Level;
 use parser::{Parser, ParseError};
 
 use command;
@@ -38,7 +39,8 @@ pub fn load(db: &mut Database) {
             Ok(p) => p,
             Err(err) => match err {
                 ParseError::Incomplete => { continue; }
-                ParseError::BadProtocol(s) => panic!("Broken aof {:?}", s),
+                // TODO: break, continue, or panic?
+                ParseError::BadProtocol(s) => { log!(db.config.logger, Warning, "Bad file format reading the append only file {:?}", s); break; },
                 _ => panic!("Broken aof {:?}"),
             }
         };
