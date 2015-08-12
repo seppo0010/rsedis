@@ -109,11 +109,11 @@ tags {"aof"} {
     }
 
     start_server_aof [list dir $server_path aof-load-truncated no] {
-        xtest "Unfinished MULTI: Server should have logged an error" {
+        test "Unfinished MULTI: Server should have logged an error" {
             set pattern "*Unexpected end of file reading the append only file*"
             set retry 10
             while {$retry} {
-                set result [tailstr 1 [dict get $srv stdout]]
+                set result [tail 1 [dict get $srv stdout]]
                 if {[string match $pattern $result]} {
                     break
                 }

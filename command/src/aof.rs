@@ -47,5 +47,8 @@ pub fn load(db: &mut Database) {
 
         command::command(parsed_command, db, &mut client).unwrap();
     }
+    if client.multi {
+        log!(db.config.logger, Warning, "Unexpected end of file reading the append only file");
+    }
     db.aof = Some(aof);
 }

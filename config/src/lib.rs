@@ -42,6 +42,7 @@ pub struct Config {
     pub hz: u32,
     pub appendonly: bool,
     pub appendfilename: String,
+    pub aof_load_truncated: bool,
 }
 
 #[derive(Debug)]
@@ -102,6 +103,7 @@ impl Config {
             hz: 10,
             appendonly: false,
             appendfilename: "appendonly.aof".to_owned(),
+            aof_load_truncated: false,
         }
     }
 
@@ -183,6 +185,7 @@ impl Config {
                 b"hz" => self.hz = try!(read_parse(args)),
                 b"appendonly" => self.appendonly = try!(read_bool(args)),
                 b"appendfilename" => self.appendfilename = try!(read_string(args)).to_owned(),
+                b"aof-load-truncated" => self.aof_load_truncated = try!(read_bool(args)),
                 b"include" => if args.len() != 2 {
                     return Err(ConfigError::InvalidFormat)
                 } else {
