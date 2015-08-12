@@ -7,6 +7,8 @@ use parser::{Parser, ParseError};
 
 use command;
 
+const UNEXPECTED_END:&'static str = "Unexpected end of file reading the append only file. You can: 1) Make a backup of your AOF file, then use ./redis-check-aof --fix <filename>. 2) Alternatively you can set the 'aof-load-truncated' configuration option to yes and restart the server.";
+
 pub fn load(db: &mut Database) {
     let mut aof = db.aof.take().unwrap();
     let mut client = command::Client::new(channel().0, 0);
@@ -26,9 +28,10 @@ pub fn load(db: &mut Database) {
             parser.written += len;
 
             if len == 0 {
-                // TODO: if there's something in the buffer
-                // it might be an incomplete AOF
                 if parser.written > parser.position {
+                    if !db.config.aof_load_truncated {
+                        log_and_exit!(db.config.logger, Warning, 1, "{}", UNEXPECTED_END);
+                    }
                     aof.truncate(parser.position);
                 }
                 break;
@@ -47,8 +50,8 @@ pub fn load(db: &mut Database) {
 
         command::command(parsed_command, db, &mut client).unwrap();
     }
-    if client.multi {
-        log!(db.config.logger, Warning, "Unexpected end of file reading the append only file");
+    if client.multi && !db.config.aof_load_truncated {
+        log_and_exit!(db.config.logger, Warning, 1, "{}", UNEXPECTED_END);
     }
     db.aof = Some(aof);
 }
