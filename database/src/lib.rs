@@ -485,6 +485,47 @@ impl Value {
         }
     }
 
+    /// Merge multiple hyperloglog into this value.
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    ///
+    /// let mut val1 = Value::Nil;
+    /// assert_eq!(val1.pfadd(vec![vec![1], vec![2], vec![3]]).unwrap(), true);
+    /// let val2 = Value::Nil;
+    /// let mut val3 = Value::Nil;
+    /// assert_eq!(val3.pfadd(vec![vec![1], vec![2], vec![4]]).unwrap(), true);
+    /// let mut val = Value::Nil;
+    /// assert!(val.pfmerge(vec![&val1, &val2, &val3]).is_ok());
+    /// assert_eq!(val.pfcount().unwrap(), 4);
+    /// ```
+    pub fn pfmerge(&mut self, values: Vec<&Value>) -> Result<(), OperationError> {
+        let mut values_string = Vec::with_capacity(values.len());
+        for v in values {
+            match *v {
+                Value::Nil => (),
+                Value::String(ref s) => values_string.push(s),
+                _ => return Err(OperationError::WrongTypeError),
+            }
+        }
+
+        if values_string.len() == 0 {
+            return Ok(())
+        }
+
+        match *self {
+            Value::Nil => *self = Value::String(ValueString::Data(Vec::new())),
+            Value::String(_) => (),
+            _ => return Err(OperationError::WrongTypeError),
+        };
+
+        match *self {
+            Value::String(ref mut value) => value.pfmerge(values_string),
+            _ => panic!("Expected value to be a string"),
+        }
+    }
+
     /// Adds an element to a list.
     /// Returns the size of the list.
     ///

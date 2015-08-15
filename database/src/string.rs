@@ -228,6 +228,21 @@ impl ValueString {
         Ok(hll.count().round() as usize)
     }
 
+    pub fn pfmerge(&mut self, data: Vec<&ValueString>) -> Result<(), OperationError> {
+        let mut hll = if self.strlen() == 0 {
+            HLL::new(HLL_ERROR)
+        } else {
+            try!(HLL::from_vec(self.to_vec()))
+        };
+
+        for s in data {
+            hll = &hll + &try!(HLL::from_vec(s.to_vec()));
+        }
+
+        *self = ValueString::new(try!(hll.into_vec()));
+        Ok(())
+    }
+
     pub fn dump<T: Write>(&self, writer: &mut T) -> io::Result<usize> {
         let mut v = vec![];
         match *self {
