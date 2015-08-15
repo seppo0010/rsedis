@@ -259,9 +259,9 @@
     - [ ] wait
     - [ ] command
     - [ ] pfselftest
-    - [ ] pfadd
-    - [ ] pfcount
-    - [ ] pfmerge
+    - [x] pfadd
+    - [x] pfcount
+    - [x] pfmerge
     - [ ] pfdebug
     - [ ] latency
 - config
