@@ -4,31 +4,31 @@ start_server {tags {"hll"}} {
         set e
     } {OK}
 
-    xtest {PFADD without arguments creates an HLL value} {
+    test {PFADD without arguments creates an HLL value} {
         r pfadd hll
         r exists hll
     } {1}
 
-    xtest {Approximated cardinality after creation is zero} {
+    test {Approximated cardinality after creation is zero} {
         r pfcount hll
     } {0}
 
-    xtest {PFADD returns 1 when at least 1 reg was modified} {
+    test {PFADD returns 1 when at least 1 reg was modified} {
         r pfadd hll a b c
     } {1}
 
-    xtest {PFADD returns 0 when no reg was modified} {
+    test {PFADD returns 0 when no reg was modified} {
         r pfadd hll a b c
     } {0}
 
-    xtest {PFADD works with empty string (regression)} {
+    test {PFADD works with empty string (regression)} {
         r pfadd hll ""
     }
 
     # Note that the self test stresses much better the
     # cardinality estimation error. We are testing just the
     # command implementation itself here.
-    xtest {PFCOUNT returns approximated cardinality of set} {
+    test {PFCOUNT returns approximated cardinality of set} {
         r del hll
         set res {}
         r pfadd hll 1 2 3 4 5
@@ -127,7 +127,7 @@ start_server {tags {"hll"}} {
         assert_match {*WRONGTYPE*} $e
     }
 
-    xtest {PFMERGE results on the cardinality of union of sets} {
+    test {PFMERGE results on the cardinality of union of sets} {
         r del hll hll1 hll2 hll3
         r pfadd hll1 a b c
         r pfadd hll2 b c d
