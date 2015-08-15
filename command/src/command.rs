@@ -527,6 +527,85 @@ fn incrbyfloat(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) ->
     r
 }
 
+fn pfadd(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
+    validate_arguments_gte!(parser, 3);
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+    let mut values = Vec::with_capacity(parser.argv.len() - 2);
+    for i in 2..parser.argv.len() {
+        values.push(try_validate!(parser.get_vec(i), "Invalid value"));
+    }
+    let r = match db.get_or_create(dbindex, &key).pfadd(values) {
+        Ok(val) => Response::Integer(if val { 1 } else { 0 }),
+        Err(err) =>  Response::Error(err.to_string()),
+    };
+    db.key_updated(dbindex, &key);
+    r
+}
+
+fn pfcount(parser: &ParsedCommand, db: &Database, dbindex: usize) -> Response {
+    validate_arguments_gte!(parser, 2);
+    if parser.argv.len() == 2 {
+        let key = try_validate!(parser.get_vec(1), "Invalid key");
+        Response::Integer(match db.get(dbindex, &key) {
+            Some(v) => match v.pfcount() {
+                Ok(val) => val as i64,
+                Err(err) =>  return Response::Error(err.to_string()),
+            },
+            None => 0,
+        })
+    } else {
+        let mut values = Vec::with_capacity(parser.argv.len() - 2);
+        for i in  2..parser.argv.len() {
+            let key = try_validate!(parser.get_vec(i), "Invalid key");
+            match db.get(dbindex, &key) {
+                Some(v) => values.push(v),
+                None => (),
+            }
+        }
+        let mut val = Value::Nil;
+        if let Err(err) = val.pfmerge(values) {
+            return Response::Error(err.to_string());
+        }
+        Response::Integer(match val.pfcount() {
+            Ok(v) => v as i64,
+            Err(err) => return Response::Error(err.to_string()),
+        })
+    }
+}
+
+fn pfmerge(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
+    validate_arguments_gte!(parser, 3);
+    let key = try_validate!(parser.get_vec(1), "Invalid key");
+
+    let (val, r) = {
+        let mut val = Value::Nil;
+        if let Some(v) = db.get(dbindex, &key) {
+            try_validate!(val.set(try_validate!(v.get(), "ERR")), "ERR"); // FIXME unnecesary clone
+        }
+        let mut values = Vec::with_capacity(parser.argv.len() - 2);
+        for i in  2..parser.argv.len() {
+            let key = try_validate!(parser.get_vec(i), "Invalid key");
+            match db.get(dbindex, &key) {
+                Some(v) => values.push(v),
+                None => (),
+            }
+        }
+
+        let r = match val.pfmerge(values) {
+            Ok(()) => Response::Status("OK".to_owned()),
+            Err(err) => Response::Error(err.to_string()),
+        };
+        (val, r)
+    };
+
+    {
+        let value = db.get_or_create(dbindex, &key);
+        *value = val;
+    }
+    db.key_updated(dbindex, &key);
+    r
+}
+
 fn generic_push(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize, right: bool, create: bool) -> Response {
     validate!(parser.argv.len() >= 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
@@ -2323,6 +2402,9 @@ fn execute_command(
         "incrby" => incrby(parser, db, dbindex),
         "decrby" => decrby(parser, db, dbindex),
         "incrbyfloat" => incrbyfloat(parser, db, dbindex),
+        "pfadd" => pfadd(parser, db, dbindex),
+        "pfcount" => pfcount(parser, db, dbindex),
+        "pfmerge" => pfmerge(parser, db, dbindex),
         "exists" => exists(parser, db, dbindex),
         "ping" => return Ok(ping(parser, client)),
         "flushdb" => flushdb(parser, db, dbindex),
@@ -2793,6 +2875,42 @@ mod test_command {
             },
             _ => panic!("Unexpected response"),
         }
+    }
+
+    #[test]
+    fn pfadd_command() {
+        let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
+        assert_eq!(command(parser!(b"PFADD key 1 2 3"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(1));
+        assert_eq!(command(parser!(b"PFADD key 1 2 4"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(1));
+        assert_eq!(command(parser!(b"PFADD key 1 2 3 4"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(0));
+    }
+
+    #[test]
+    fn pfcount1_command() {
+        let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
+        assert_eq!(command(parser!(b"PFCOUNT key"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(0));
+        assert_eq!(command(parser!(b"PFADD key 1 2 3"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(1));
+        assert_eq!(command(parser!(b"PFCOUNT key"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(3));
+    }
+
+    #[test]
+    fn pfcount2_command() {
+        let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
+        assert_eq!(command(parser!(b"PFADD key1 1 2 3"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(1));
+        assert_eq!(command(parser!(b"PFADD key2 1 2 4"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(1));
+        assert_eq!(command(parser!(b"PFCOUNT key1 key2"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(3));
+    }
+
+    #[test]
+    fn pfmerge_command() {
+        let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
+        assert_eq!(command(parser!(b"PFADD key1 1 2 3"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(1));
+        assert_eq!(command(parser!(b"PFADD key3 1 2 4"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(1));
+        assert_eq!(command(parser!(b"PFADD key4 5 6"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(1));
+        assert_eq!(command(parser!(b"PFMERGE key key1 key2 key3"), &mut db, &mut Client::mock()).unwrap(), Response::Status("OK".to_owned()));
+        assert_eq!(command(parser!(b"PFCOUNT key"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(4));
+        assert_eq!(command(parser!(b"PFMERGE key key4"), &mut db, &mut Client::mock()).unwrap(), Response::Status("OK".to_owned()));
+        assert_eq!(command(parser!(b"PFCOUNT key"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(6));
     }
 
     #[test]
