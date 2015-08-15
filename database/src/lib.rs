@@ -467,6 +467,24 @@ impl Value {
         }
     }
 
+    /// Count the elements in an HyperLogLog.
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// assert_eq!(val.pfadd(vec![vec![1], vec![2], vec![3]]).unwrap(), true);
+    /// assert_eq!(val.pfcount().unwrap(), 3);
+    /// ```
+    pub fn pfcount(&self) -> Result<usize, OperationError> {
+        match *self {
+            Value::Nil => Ok(0),
+            Value::String(ref s) => s.pfcount(),
+            _ => Err(OperationError::WrongTypeError),
+        }
+    }
+
     /// Adds an element to a list.
     /// Returns the size of the list.
     ///

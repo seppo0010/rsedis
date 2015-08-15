@@ -219,6 +219,15 @@ impl ValueString {
         Ok(changed)
     }
 
+    pub fn pfcount(&self) -> Result<usize, OperationError> {
+        let hll = if self.strlen() == 0 {
+            return Ok(0);
+        } else {
+            try!(HLL::from_vec(self.to_vec()))
+        };
+        Ok(hll.count().round() as usize)
+    }
+
     pub fn dump<T: Write>(&self, writer: &mut T) -> io::Result<usize> {
         let mut v = vec![];
         match *self {
