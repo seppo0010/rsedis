@@ -29,3 +29,4 @@ crc64 = "0.2.2"
 rand = "0.3"
 skiplist = "0.2.6"
 rehashinghashmap = "0.1.0"
+basichll = { git = "https://github.com/seppo0010/hll.rs.git", branch = "new-features" }

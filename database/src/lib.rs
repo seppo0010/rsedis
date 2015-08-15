@@ -1,6 +1,7 @@
 #![feature(collections_bound)]
 #![feature(drain)]
 
+extern crate basichll;
 extern crate config;
 #[macro_use(log)] extern crate logger;
 extern crate parser;
@@ -439,6 +440,30 @@ impl Value {
             Value::Nil => return Ok(false),
             Value::String(ref value) => Ok(value.getbit(bitoffset)),
             _ => return Err(OperationError::WrongTypeError),
+        }
+    }
+
+    /// Adds elements to an HyperLogLog. Returns true if the element was
+    /// modified.
+    ///
+    /// # Examples
+    /// ```
+    /// use database::Value;
+    ///
+    /// let mut val = Value::Nil;
+    /// assert_eq!(val.pfadd(vec![vec![1], vec![2], vec![3]]).unwrap(), true);
+    /// assert_eq!(val.pfadd(vec![vec![1], vec![2], vec![3]]).unwrap(), false);
+    /// ```
+    pub fn pfadd(&mut self, data: Vec<Vec<u8>>) -> Result<bool, OperationError> {
+        match *self {
+            Value::Nil => *self = Value::String(ValueString::Data(Vec::new())),
+            Value::String(_) => (),
+            _ => return Err(OperationError::WrongTypeError),
+        };
+
+        match *self {
+            Value::String(ref mut value) => value.pfadd(data),
+            _ => panic!("Expected value to be a string"),
         }
     }
 

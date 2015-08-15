@@ -2,10 +2,13 @@ use std::io;
 use std::io::Write;
 use std::str::from_utf8;
 
+use basichll::HLL;
 use dbutil::normalize_position;
 use error::OperationError;
 use rdbutil::constants::*;
 use rdbutil::{EncodeError, encode_i64, encode_slice_u8};
+
+const HLL_ERROR:f64 = 0.001;
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum ValueString {
@@ -198,6 +201,22 @@ impl ValueString {
             index += 1;
         }
         d.len()
+    }
+
+    pub fn pfadd(&mut self, data: Vec<Vec<u8>>) -> Result<bool, OperationError> {
+        let mut changed = false;
+        let mut hll = if self.strlen() == 0 {
+            HLL::new(HLL_ERROR)
+        } else {
+            try!(HLL::from_vec(self.to_vec()))
+        };
+        for el in data {
+            changed = hll.insert(&el) || changed;
+        }
+        if changed {
+            *self = ValueString::new(try!(hll.into_vec()));
+        }
+        Ok(changed)
     }
 
     pub fn dump<T: Write>(&self, writer: &mut T) -> io::Result<usize> {
