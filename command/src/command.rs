@@ -554,8 +554,8 @@ fn pfcount(parser: &ParsedCommand, db: &Database, dbindex: usize) -> Response {
             None => 0,
         })
     } else {
-        let mut values = Vec::with_capacity(parser.argv.len() - 2);
-        for i in  2..parser.argv.len() {
+        let mut values = Vec::with_capacity(parser.argv.len() - 1);
+        for i in  1..parser.argv.len() {
             let key = try_validate!(parser.get_vec(i), "Invalid key");
             match db.get(dbindex, &key) {
                 Some(v) => values.push(v),
@@ -2898,7 +2898,7 @@ mod test_command {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
         assert_eq!(command(parser!(b"PFADD key1 1 2 3"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(1));
         assert_eq!(command(parser!(b"PFADD key2 1 2 4"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(1));
-        assert_eq!(command(parser!(b"PFCOUNT key1 key2"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(3));
+        assert_eq!(command(parser!(b"PFCOUNT key1 key2"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(4));
     }
 
     #[test]
