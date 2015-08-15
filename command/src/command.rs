@@ -528,7 +528,7 @@ fn incrbyfloat(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) ->
 }
 
 fn pfadd(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
-    validate_arguments_gte!(parser, 3);
+    validate_arguments_gte!(parser, 2);
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let mut values = Vec::with_capacity(parser.argv.len() - 2);
     for i in 2..parser.argv.len() {
