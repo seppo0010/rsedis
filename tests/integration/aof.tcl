@@ -237,11 +237,11 @@ tags {"aof"} {
     }
 
     start_server_aof [list dir $server_path aof-load-truncated no] {
-        xtest "AOF+EXPIRE: Server should have been started" {
+        test "AOF+EXPIRE: Server should have been started" {
             assert_equal 1 [is_alive $srv]
         }
 
-        xtest "AOF+EXPIRE: List should be empty" {
+        test "AOF+EXPIRE: List should be empty" {
             set client [redis [dict get $srv host] [dict get $srv port]]
             wait_for_condition 50 100 {
                 [catch {$client ping} e] == 0

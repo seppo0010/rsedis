@@ -1542,6 +1542,8 @@ pub struct Database {
     pub start_mstime: i64,
     /// Aof reader/writer
     pub aof: Option<Aof>,
+    /// Is it loading data from a file
+    pub loading: bool,
 }
 
 pub struct Iter<'a> {
@@ -1608,6 +1610,7 @@ impl Database {
             run_id: get_random_hex_chars(40),
             start_mstime: mstime(),
             aof: aof,
+            loading: false,
         }
     }
 
@@ -1616,7 +1619,7 @@ impl Database {
     }
 
     fn is_expired(&self, index: usize, key: &Vec<u8>) -> bool {
-        match self.data_expiration_ms[index].get(key) {
+        !self.loading && match self.data_expiration_ms[index].get(key) {
             Some(t) => t <= &mstime(),
             None => false,
         }

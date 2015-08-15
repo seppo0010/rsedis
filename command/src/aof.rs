@@ -11,6 +11,7 @@ const UNEXPECTED_END:&'static str = "Unexpected end of file reading the append o
 
 pub fn load(db: &mut Database) {
     let mut aof = db.aof.take().unwrap();
+    db.loading = true;
     let mut client = command::Client::new(channel().0, 0);
     let mut parser = Parser::new();
     loop {
@@ -54,4 +55,5 @@ pub fn load(db: &mut Database) {
         log_and_exit!(db.config.logger, Warning, 1, "{}", UNEXPECTED_END);
     }
     db.aof = Some(aof);
+    db.loading = false;
 }
