@@ -8,7 +8,7 @@ use error::OperationError;
 use rdbutil::constants::*;
 use rdbutil::{EncodeError, encode_i64, encode_slice_u8};
 
-const HLL_ERROR:f64 = 0.001;
+const HLL_ERROR:f64 = 0.0019;
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum ValueString {
