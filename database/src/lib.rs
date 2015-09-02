@@ -1860,9 +1860,8 @@ impl Database {
             return self.get_mut(index, key).unwrap();
         }
         let val = Value::Nil;
-        self.data[index].insert(key.clone(), val);
         self.remove_msexpiration(index, key);
-        return self.data[index].get_mut(key).unwrap();
+        self.data[index].entry(key.clone()).or_insert(val)
     }
 
     /// Sets up the hashmap to subscribe clients to a key.
