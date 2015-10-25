@@ -1,0 +1,16 @@
+[package]
+name = "networkingmio"
+version = "0.1.0"
+authors = ["Sebastian Waisbrot <swaisbrot@twitter.com>"]
+
+[dependencies.config]
+path = "../config"
+
+[dependencies.database]
+path = "../database"
+
+[dependencies.parser]
+path = "../parser"
+
+[dependencies]
+mio = "0.4.3"

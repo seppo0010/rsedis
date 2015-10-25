@@ -10,6 +10,11 @@ exclude = [
 ]
 build = "build.rs"
 
+[features]
+
+default = []
+networking-mio = ["networkingmio"]
+
 [[bin]]
 
 name = "rsedis"
@@ -41,3 +46,6 @@ path = "logger"
 
 [dependencies.compat]
 path = "compat"
+
+[dependencies]
+networkingmio = { path = "networkingmio", optional = true }

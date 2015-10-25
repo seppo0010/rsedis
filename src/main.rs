@@ -1,7 +1,10 @@
 extern crate rsedis;
 extern crate config;
 extern crate logger;
+#[cfg(not(feature = "networking-mio"))]
 extern crate networking;
+#[cfg(feature = "networking-mio")]
+extern crate networkingmio;
 extern crate compat;
 
 mod release;
@@ -11,7 +14,10 @@ use std::process::exit;
 
 use compat::getpid;
 use config::Config;
+#[cfg(not(feature = "networking-mio"))]
 use networking::Server;
+#[cfg(feature = "networking-mio")]
+use networkingmio::Server;
 use logger::{Logger, Level};
 use release::*;
 
