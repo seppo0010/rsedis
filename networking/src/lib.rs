@@ -1,4 +1,3 @@
-#![feature(socket_timeout)]
 #[cfg(unix)]extern crate libc;
 #[cfg(unix)]extern crate unix_socket;
 #[macro_use(log, sendlog)] extern crate logger;
