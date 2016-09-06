@@ -1,5 +1,4 @@
 #![feature(collections_bound)]
-#![feature(drain)]
 extern crate config;
 extern crate compat;
 extern crate database;

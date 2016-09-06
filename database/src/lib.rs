@@ -1,5 +1,4 @@
 #![feature(collections_bound)]
-#![feature(drain)]
 
 extern crate basichll;
 extern crate config;
@@ -30,7 +29,7 @@ use std::io::Write;
 use std::iter::FromIterator;
 use std::ops::RangeFull;
 use std::path::Path;
-use std::sync::mpsc::{Sender, channel};
+use std::sync::mpsc::Sender;
 
 use config::Config;
 use crc64::crc64;

@@ -1,6 +1,6 @@
 use std::ascii::AsciiExt;
 use std::collections::{Bound, HashMap, HashSet};
-use std::fmt::Error;
+use std::time::Duration;
 use std::io::Write;
 use std::mem::replace;
 use std::sync::mpsc::Sender;
@@ -804,7 +804,7 @@ fn brpoplpush(parser: &mut ParsedCommand,
     if timeout > 0 {
         let tx = txcommand.clone();
         thread::spawn(move || {
-            thread::sleep_ms(timeout as u32 * 1000);
+            thread::sleep(Duration::from_secs(timeout as u64));
             tx.send(None);
         });
     }
@@ -891,7 +891,7 @@ fn generic_bpop(parser: &mut ParsedCommand,
     if timeout > 0 {
         let tx = txcommand.clone();
         thread::spawn(move || {
-            thread::sleep_ms(timeout as u32 * 1000);
+            thread::sleep(Duration::from_secs(timeout as u64));
             tx.send(None);
         });
     }
@@ -1904,7 +1904,8 @@ fn zinter_union_store(parser: &mut ParsedCommand,
         let numkeys = {
             let n = try_validate!(parser.get_i64(2), "Invalid number of keys");
             if n <= 0 {
-                return Response::Error("at least 1 input key is needed for ZUNIONSTORE/ZINTERSTORE"
+                return Response::Error("at least 1 input key is needed for \
+                                        ZUNIONSTORE/ZINTERSTORE"
                     .to_string());
             }
             n as usize
