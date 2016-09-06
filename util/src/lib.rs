@@ -49,10 +49,10 @@ pub fn glob_match(pattern: &Vec<u8>, element: &Vec<u8>, ignore_case: bool) -> bo
     let mut patternpos = 0;
     let mut elementpos = 0;
 
-    let star          = '*' as u8;
+    let star = '*' as u8;
     let question_mark = '?' as u8;
-    let backslash     = '\\' as u8;
-    let open_bracket  = '[' as u8;
+    let backslash = '\\' as u8;
+    let open_bracket = '[' as u8;
     let close_bracket = ']' as u8;
 
     while patternpos < pattern.len() {
@@ -65,28 +65,30 @@ pub fn glob_match(pattern: &Vec<u8>, element: &Vec<u8>, ignore_case: bool) -> bo
                     return true;
                 }
                 for i in elementpos..(element.len() + 1) {
-                    if glob_match(&pattern[patternpos + 1..].to_vec(), &element[i..].to_vec(), ignore_case) {
+                    if glob_match(&pattern[patternpos + 1..].to_vec(),
+                                  &element[i..].to_vec(),
+                                  ignore_case) {
                         return true;
                     }
                 }
                 return false;
-            },
+            }
             x if x == question_mark => {
                 if elementpos >= element.len() {
                     return false;
                 }
                 elementpos += 1;
-            },
+            }
             x if x == backslash => {
                 patternpos += 1;
-                if elementpos >= element.len(){
+                if elementpos >= element.len() {
                     return false;
                 }
                 if !match_char(&pattern[patternpos], &element[elementpos], ignore_case) {
                     return false;
                 }
                 elementpos += 1;
-            },
+            }
             x if x == open_bracket => {
                 patternpos += 1;
                 let not = pattern[patternpos] == ('^' as u8);
@@ -105,7 +107,8 @@ pub fn glob_match(pattern: &Vec<u8>, element: &Vec<u8>, ignore_case: bool) -> bo
                     } else if patternpos >= pattern.len() {
                         patternpos += 1;
                         break;
-                    } else if pattern.len() >= patternpos + 3 && pattern[patternpos + 1] == ('-' as u8) {
+                    } else if pattern.len() >= patternpos + 3 &&
+                              pattern[patternpos + 1] == ('-' as u8) {
                         let mut start = pattern[patternpos];
                         let mut end = pattern[patternpos + 2];
                         let mut c = element[elementpos];
@@ -137,16 +140,16 @@ pub fn glob_match(pattern: &Vec<u8>, element: &Vec<u8>, ignore_case: bool) -> bo
                     return false;
                 }
                 elementpos += 1;
-            },
+            }
             _ => {
-                if elementpos >= element.len(){
+                if elementpos >= element.len() {
                     return false;
                 }
                 if !match_char(&pattern[patternpos], &element[elementpos], ignore_case) {
                     return false;
                 }
                 elementpos += 1;
-            },
+            }
         }
         patternpos += 1;
         if elementpos == element.len() {
@@ -196,8 +199,12 @@ pub fn splitargs(args: &[u8]) -> Result<Vec<Vec<u8>>, ()> {
     let mut i = 0;
     let mut result = Vec::new();
     for _ in args {
-        while i < args.len() && (args[i] == 0 || (args[i] as char).is_whitespace()) { i += 1; }
-        if i >=  args.len() { break; }
+        while i < args.len() && (args[i] == 0 || (args[i] as char).is_whitespace()) {
+            i += 1;
+        }
+        if i >= args.len() {
+            break;
+        }
         let mut inq = false;
         let mut insq = false;
         let mut done = false;
@@ -212,10 +219,12 @@ pub fn splitargs(args: &[u8]) -> Result<Vec<Vec<u8>>, ()> {
                             i += 3;
                         }
                     }
-                } else if p == '"'{
+                } else if p == '"' {
                     // closing quote must be followed by a space or nothing at all
                     i += 1;
-                    if i != args.len() && !(args[i] as char).is_whitespace() { return Err(()); }
+                    if i != args.len() && !(args[i] as char).is_whitespace() {
+                        return Err(());
+                    }
                     inq = false;
                     done = true;
                 } else if p == '\\' && i + 1 < args.len() {
@@ -237,7 +246,9 @@ pub fn splitargs(args: &[u8]) -> Result<Vec<Vec<u8>>, ()> {
                 if p == '\'' {
                     // closing quote must be followed by a space or nothing at all
                     i += 1;
-                    if i != args.len() && !(args[i] as char).is_whitespace() { return Err(()); }
+                    if i != args.len() && !(args[i] as char).is_whitespace() {
+                        return Err(());
+                    }
                     insq = false;
                     done = true;
                 } else if p == '\\' && i + 1 < args.len() && (args[i + 1] as char == '\'') {
@@ -261,7 +272,7 @@ pub fn splitargs(args: &[u8]) -> Result<Vec<Vec<u8>>, ()> {
             i += 1;
         }
         result.push(current);
-        if i >=  args.len() {
+        if i >= args.len() {
             if inq || insq {
                 return Err(());
             }
@@ -274,12 +285,10 @@ pub fn splitargs(args: &[u8]) -> Result<Vec<Vec<u8>>, ()> {
 /// Creates an array of four `u8` from a `u32`.
 pub fn htonl(v: u32) -> [u8; 4] {
     // maybe it should use C api instead?
-    [
-        ((v >> 24) & 0xFF) as u8,
-        ((v >> 16) & 0xFF) as u8,
-        ((v >> 8) & 0xFF) as u8,
-        ((v >> 0) & 0xFF) as u8,
-    ]
+    [((v >> 24) & 0xFF) as u8,
+     ((v >> 16) & 0xFF) as u8,
+     ((v >> 8) & 0xFF) as u8,
+     ((v >> 0) & 0xFF) as u8]
 }
 
 fn is_print(c: char) -> bool {
@@ -289,8 +298,14 @@ pub fn format_repr(f: &mut fmt::Formatter, s: &[u8]) -> Result<(), fmt::Error> {
     try!(f.write_str("\""));
     for c in s {
         match *c {
-            0x07 => { try!(f.write_str("\\a")); continue; },
-            0x08 => { try!(f.write_str("\\b")); continue; },
+            0x07 => {
+                try!(f.write_str("\\a"));
+                continue;
+            }
+            0x08 => {
+                try!(f.write_str("\\b"));
+                continue;
+            }
             _ => (),
         };
         try!(match *c as char {
@@ -329,7 +344,9 @@ fn numtohex(num: u8) -> char {
 pub fn get_random_hex_chars(len: usize) -> String {
     let binarylen = (len + 1) / 2;
     let mut v = Vec::with_capacity(binarylen);
-    unsafe { v.set_len(binarylen); }
+    unsafe {
+        v.set_len(binarylen);
+    }
     thread_rng().fill_bytes(&mut *v);
     let mut s = String::with_capacity(binarylen * 2);
     for c in v {
@@ -402,26 +419,34 @@ mod test_util {
 
     #[test]
     fn splitargs_quotes() {
-        assert_eq!(splitargs(&b"\"\\x9f\"".to_vec()).unwrap(), vec![vec![159u8]]);
+        assert_eq!(splitargs(&b"\"\\x9f\"".to_vec()).unwrap(),
+                   vec![vec![159u8]]);
         assert_eq!(splitargs(&b"\"\"".to_vec()).unwrap(), vec![vec![]]);
-        assert_eq!(splitargs(&b"\"\\thello\\n\"".to_vec()).unwrap(), vec![b"\thello\n".to_vec()]);
+        assert_eq!(splitargs(&b"\"\\thello\\n\"".to_vec()).unwrap(),
+                   vec![b"\thello\n".to_vec()]);
         assert!(splitargs(&b"\"a".to_vec()).is_err());
     }
 
     #[test]
     fn splitargs_singlequotes() {
-        assert_eq!(splitargs(&b"\'\\x9f\'".to_vec()).unwrap(), vec![b"\\x9f".to_vec()]);
+        assert_eq!(splitargs(&b"\'\\x9f\'".to_vec()).unwrap(),
+                   vec![b"\\x9f".to_vec()]);
         assert_eq!(splitargs(&b"\'\'".to_vec()).unwrap(), vec![vec![]]);
-        assert_eq!(splitargs(&b"\'\\\'\'".to_vec()).unwrap(), vec![b"'".to_vec()]);
-        assert_eq!(splitargs(&b"\'\\thello\\n\'".to_vec()).unwrap(), vec![b"\\thello\\n".to_vec()]);
+        assert_eq!(splitargs(&b"\'\\\'\'".to_vec()).unwrap(),
+                   vec![b"'".to_vec()]);
+        assert_eq!(splitargs(&b"\'\\thello\\n\'".to_vec()).unwrap(),
+                   vec![b"\\thello\\n".to_vec()]);
         assert!(splitargs(&b"\'a".to_vec()).is_err());
     }
 
     #[test]
     fn splitargs_misc() {
-        assert_eq!(splitargs(&b"hello world".to_vec()).unwrap(), vec![b"hello".to_vec(), b"world".to_vec()]);
-        assert_eq!(splitargs(&b"\'hello\' world".to_vec()).unwrap(), vec![b"hello".to_vec(), b"world".to_vec()]);
-        assert_eq!(splitargs(&b"\"hello\" world".to_vec()).unwrap(), vec![b"hello".to_vec(), b"world".to_vec()]);
+        assert_eq!(splitargs(&b"hello world".to_vec()).unwrap(),
+                   vec![b"hello".to_vec(), b"world".to_vec()]);
+        assert_eq!(splitargs(&b"\'hello\' world".to_vec()).unwrap(),
+                   vec![b"hello".to_vec(), b"world".to_vec()]);
+        assert_eq!(splitargs(&b"\"hello\" world".to_vec()).unwrap(),
+                   vec![b"hello".to_vec(), b"world".to_vec()]);
         assert!(splitargs(&b"\"hello\"world".to_vec()).is_err());
         assert!(splitargs(&b"\'hello\'world".to_vec()).is_err());
     }

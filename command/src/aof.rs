@@ -7,7 +7,10 @@ use parser::{Parser, ParseError};
 
 use command;
 
-const UNEXPECTED_END:&'static str = "Unexpected end of file reading the append only file. You can: 1) Make a backup of your AOF file, then use ./redis-check-aof --fix <filename>. 2) Alternatively you can set the 'aof-load-truncated' configuration option to yes and restart the server.";
+const UNEXPECTED_END: &'static str =
+    "Unexpected end of file reading the append only file. You can: 1) Make a backup of your AOF \
+     file, then use ./redis-check-aof --fix <filename>. 2) Alternatively you can set the \
+     'aof-load-truncated' configuration option to yes and restart the server.";
 
 pub fn load(db: &mut Database) {
     let mut aof = db.aof.take().unwrap();
@@ -41,11 +44,21 @@ pub fn load(db: &mut Database) {
 
         let parsed_command = match parser.next() {
             Ok(p) => p,
-            Err(err) => match err {
-                ParseError::Incomplete => { continue; }
-                // TODO: break, continue, or panic?
-                ParseError::BadProtocol(s) => { log!(db.config.logger, Warning, "Bad file format reading the append only file {:?}", s); break; },
-                _ => panic!("Broken aof {:?}"),
+            Err(err) => {
+                match err {
+                    ParseError::Incomplete => {
+                        continue;
+                    }
+                    // TODO: break, continue, or panic?
+                    ParseError::BadProtocol(s) => {
+                        log!(db.config.logger,
+                             Warning,
+                             "Bad file format reading the append only file {:?}",
+                             s);
+                        break;
+                    }
+                    _ => panic!("Broken aof {:?}"),
+                }
             }
         };
 

@@ -1,7 +1,7 @@
 // Taken from nix
 
 use std::mem;
-use libc::{c_char};
+use libc::c_char;
 use std::ffi::CStr;
 use std::str::from_utf8_unchecked;
 
@@ -9,14 +9,16 @@ mod ffi {
     use libc::c_int;
     use super::UtsName;
 
-    extern {
+    extern "C" {
         pub fn uname(buf: *mut UtsName) -> c_int;
     }
 }
 
 
-#[cfg(target_os = "linux")] const UTSNAME_LEN: usize = 65;
-#[cfg(target_os = "macos")] const UTSNAME_LEN: usize = 256;
+#[cfg(target_os = "linux")]
+const UTSNAME_LEN: usize = 65;
+#[cfg(target_os = "macos")]
+const UTSNAME_LEN: usize = 256;
 
 #[repr(C)]
 #[derive(Copy)]
@@ -28,31 +30,35 @@ pub struct UtsName {
     machine: [c_char; UTSNAME_LEN],
     // ifdef _GNU_SOURCE
     #[allow(dead_code)]
-    domainname: [c_char; UTSNAME_LEN]
+    domainname: [c_char; UTSNAME_LEN],
 }
 
 // workaround for `derive(Clone)` not working for fixed-length arrays
-impl Clone for UtsName { fn clone(&self) -> UtsName { *self } }
+impl Clone for UtsName {
+    fn clone(&self) -> UtsName {
+        *self
+    }
+}
 
 impl UtsName {
     pub fn sysname<'a>(&'a self) -> &'a str {
-        to_str(&(&self.sysname as *const c_char ) as *const *const c_char)
+        to_str(&(&self.sysname as *const c_char) as *const *const c_char)
     }
 
     pub fn nodename<'a>(&'a self) -> &'a str {
-        to_str(&(&self.nodename as *const c_char ) as *const *const c_char)
+        to_str(&(&self.nodename as *const c_char) as *const *const c_char)
     }
 
     pub fn release<'a>(&'a self) -> &'a str {
-        to_str(&(&self.release as *const c_char ) as *const *const c_char)
+        to_str(&(&self.release as *const c_char) as *const *const c_char)
     }
 
     pub fn version<'a>(&'a self) -> &'a str {
-        to_str(&(&self.version as *const c_char ) as *const *const c_char)
+        to_str(&(&self.version as *const c_char) as *const *const c_char)
     }
 
     pub fn machine<'a>(&'a self) -> &'a str {
-        to_str(&(&self.machine as *const c_char ) as *const *const c_char)
+        to_str(&(&self.machine as *const c_char) as *const *const c_char)
     }
 }
 

@@ -19,11 +19,13 @@ impl ValueList {
 
     pub fn push(&mut self, el: Vec<u8>, right: bool) {
         match *self {
-            ValueList::Data(ref mut list) => if right {
-                list.push_back(el);
-            } else {
-                list.push_front(el);
-            },
+            ValueList::Data(ref mut list) => {
+                if right {
+                    list.push_back(el);
+                } else {
+                    list.push_front(el);
+                }
+            }
         };
     }
 
@@ -47,7 +49,7 @@ impl ValueList {
                     Err(_) => return None,
                 };
                 list.iter().nth(index as usize)
-            },
+            }
         }
     }
 
@@ -61,10 +63,10 @@ impl ValueList {
                         list.push_back(newvalue);
                         list.append(&mut right);
                         Some(list.len())
-                    },
+                    }
                     None => return None,
                 }
-            },
+            }
         }
     }
 
@@ -80,14 +82,29 @@ impl ValueList {
                 let len = list.len();
                 let start = match normalize_position(_start, len) {
                     Ok(i) => i,
-                    Err(g) => if !g { 0 } else { return Vec::new(); },
+                    Err(g) => {
+                        if !g {
+                            0
+                        } else {
+                            return Vec::new();
+                        }
+                    }
                 };
                 let stop = match normalize_position(_stop, len) {
                     Ok(i) => i,
-                    Err(g) => if !g { return Vec::new(); } else { len },
+                    Err(g) => {
+                        if !g {
+                            return Vec::new();
+                        } else {
+                            len
+                        }
+                    }
                 };
-                list.iter().skip(start as usize).take(stop as usize - start as usize + 1).collect::<Vec<_>>()
-            },
+                list.iter()
+                    .skip(start as usize)
+                    .take(stop as usize - start as usize + 1)
+                    .collect::<Vec<_>>()
+            }
         }
     }
 
@@ -131,7 +148,7 @@ impl ValueList {
                     list.append(&mut newlist);
                     newlist.append(list);
                 }
-            },
+            }
         };
         *self = ValueList::Data(newlist);
         count
@@ -159,17 +176,25 @@ impl ValueList {
                 let len = list.len();
                 let start = match normalize_position(_start, len) {
                     Ok(i) => i,
-                    Err(g) => if !g { 0 } else {
-                        list.clear();
-                        return Ok(())
-                    },
+                    Err(g) => {
+                        if !g {
+                            0
+                        } else {
+                            list.clear();
+                            return Ok(());
+                        }
+                    }
                 };
                 let stop = match normalize_position(_stop, len) {
                     Ok(i) => i,
-                    Err(g) => if !g {
-                        list.clear();
-                        return Ok(())
-                    } else { len - 1 },
+                    Err(g) => {
+                        if !g {
+                            list.clear();
+                            return Ok(());
+                        } else {
+                            len - 1
+                        }
+                    }
                 };
                 list.split_off(stop + 1);
                 list.split_off(start)
@@ -189,12 +214,9 @@ impl ValueList {
                 }
             }
         };
-        let data = [
-            vec![TYPE_LIST],
-            v,
-            vec![(VERSION & 0xff) as u8],
-            vec![((VERSION >> 8) & 0xff) as u8],
-        ].concat();
+        let data =
+            [vec![TYPE_LIST], v, vec![(VERSION & 0xff) as u8], vec![((VERSION >> 8) & 0xff) as u8]]
+                .concat();
         writer.write(&*data)
     }
 
@@ -204,7 +226,11 @@ impl ValueList {
         let encoding = match *self {
             ValueList::Data(_) => "linkedlist",
         };
-        format!("Value at:0x0000000000 refcount:1 encoding:{} serializedlength:{} lru:0 lru_seconds_idle:0", encoding, serialized).to_owned()
+        format!("Value at:0x0000000000 refcount:1 encoding:{} serializedlength:{} lru:0 \
+                 lru_seconds_idle:0",
+                encoding,
+                serialized)
+            .to_owned()
     }
 }
 

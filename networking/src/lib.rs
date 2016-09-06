@@ -1,6 +1,9 @@
-#[cfg(unix)]extern crate libc;
-#[cfg(unix)]extern crate unix_socket;
-#[macro_use(log, sendlog)] extern crate logger;
+#[cfg(unix)]
+extern crate libc;
+#[cfg(unix)]
+extern crate unix_socket;
+#[macro_use(log, sendlog)]
+extern crate logger;
 extern crate config;
 extern crate util;
 extern crate parser;
@@ -17,14 +20,20 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::thread;
 
-#[cfg(unix)] use std::path::Path;
-#[cfg(unix)] use std::fs::File;
+#[cfg(unix)]
+use std::path::Path;
+#[cfg(unix)]
+use std::fs::File;
 
-#[cfg(unix)] use libc::funcs::posix88::unistd::fork;
-#[cfg(unix)] use libc::funcs::c95::stdlib::exit;
-#[cfg(unix)] use libc::funcs::posix88::unistd::getpid;
+#[cfg(unix)]
+use libc::funcs::posix88::unistd::fork;
+#[cfg(unix)]
+use libc::funcs::c95::stdlib::exit;
+#[cfg(unix)]
+use libc::funcs::posix88::unistd::getpid;
 use net2::{TcpBuilder, TcpStreamExt};
-#[cfg(unix)] use unix_socket::{UnixStream, UnixListener};
+#[cfg(unix)]
+use unix_socket::{UnixStream, UnixListener};
 
 use config::Config;
 use database::Database;
@@ -187,7 +196,7 @@ impl Client {
             stream: Stream::Tcp(stream),
             db: db,
             id: id,
-        }
+        };
     }
 
     /// Creates a new UNIX socket client
@@ -197,22 +206,34 @@ impl Client {
             stream: Stream::Unix(stream),
             db: db,
             id: id,
-        }
+        };
     }
 
     /// Creates a thread that writes into the client stream each response received
-    fn create_writer_thread(&self, sender: Sender<(Level, String)>, rx: Receiver<Option<Response>>) {
+    fn create_writer_thread(&self,
+                            sender: Sender<(Level, String)>,
+                            rx: Receiver<Option<Response>>) {
         let mut stream = self.stream.try_clone().unwrap();
         thread::spawn(move || {
             loop {
                 match rx.recv() {
-                    Ok(m) => match m {
-                        Some(msg) => match stream.write(&*msg.as_bytes()) {
-                            Ok(_) => (),
-                            Err(e) => sendlog!(sender, Warning, "Error writing to client: {:?}", e).unwrap(),
-                        },
-                        None => break,
-                    },
+                    Ok(m) => {
+                        match m {
+                            Some(msg) => {
+                                match stream.write(&*msg.as_bytes()) {
+                                    Ok(_) => (),
+                                    Err(e) => {
+                                        sendlog!(sender,
+                                                 Warning,
+                                                 "Error writing to client: {:?}",
+                                                 e)
+                                            .unwrap()
+                                    }
+                                }
+                            }
+                            None => break,
+                        }
+                    }
                     Err(_) => break,
                 };
             }
@@ -229,8 +250,8 @@ impl Client {
         let mut client = command::Client::new(stream_tx.clone(), self.id);
         let mut parser = Parser::new();
 
-        let mut this_command:Option<OwnedParsedCommand>;
-        let mut next_command:Option<OwnedParsedCommand> = None;
+        let mut this_command: Option<OwnedParsedCommand>;
+        let mut next_command: Option<OwnedParsedCommand> = None;
         loop {
             // FIXME: is_incomplete parses the command a second time
             if next_command.is_none() && parser.is_incomplete() {
@@ -245,7 +266,7 @@ impl Client {
                         Err(err) => {
                             sendlog!(sender, Verbose, "Reading from client: {:?}", err);
                             break;
-                        },
+                        }
                     }
                 };
                 parser.written += len;
@@ -266,20 +287,29 @@ impl Client {
             // try to parse received command
             let parsed_command = match this_command {
                 Some(ref c) => c.get_command(),
-                None => match parser.next() {
-                    Ok(p) => p,
-                    Err(err) => match err {
-                        // if it's incomplete, keep adding to the buffer
-                        ParseError::Incomplete => { continue; }
-                        ParseError::BadProtocol(s) => {
-                            let _ = stream_tx.send(Some(Response::Error(s)));
-                            break;
-                        },
-                        _ =>  {
-                            sendlog!(sender, Verbose, "Protocol error from client: {:?}", err);
-                            break;
+                None => {
+                    match parser.next() {
+                        Ok(p) => p,
+                        Err(err) => {
+                            match err {
+                                // if it's incomplete, keep adding to the buffer
+                                ParseError::Incomplete => {
+                                    continue;
+                                }
+                                ParseError::BadProtocol(s) => {
+                                    let _ = stream_tx.send(Some(Response::Error(s)));
+                                    break;
+                                }
+                                _ => {
+                                    sendlog!(sender,
+                                             Verbose,
+                                             "Protocol error from client: {:?}",
+                                             err);
+                                    break;
+                                }
+                            }
                         }
-                    },
+                    }
                 }
             };
 
@@ -301,24 +331,28 @@ impl Client {
                         Ok(_) => (),
                         Err(_) => error = true,
                     };
-                },
+                }
                 // no response
-                Err(err) => match err {
-                    // There is no reply to send, that's ok
-                    ResponseError::NoReply => (),
-                    // We have to wait until a sender signals us back and then retry
-                    // (Repeating the same command is actually wrong because of the timeout)
-                    ResponseError::Wait(ref receiver) => {
-                        // if we receive a None, send a nil, otherwise execute the command
-                        match receiver.recv().unwrap() {
-                            Some(cmd) => next_command = Some(cmd),
-                            None => match stream_tx.send(Some(Response::Nil)) {
-                                Ok(_) => (),
-                                Err(_) => error = true,
-                            },
+                Err(err) => {
+                    match err {
+                        // There is no reply to send, that's ok
+                        ResponseError::NoReply => (),
+                        // We have to wait until a sender signals us back and then retry
+                        // (Repeating the same command is actually wrong because of the timeout)
+                        ResponseError::Wait(ref receiver) => {
+                            // if we receive a None, send a nil, otherwise execute the command
+                            match receiver.recv().unwrap() {
+                                Some(cmd) => next_command = Some(cmd),
+                                None => {
+                                    match stream_tx.send(Some(Response::Nil)) {
+                                        Ok(_) => (),
+                                        Err(_) => error = true,
+                                    }
+                                }
+                            }
                         }
                     }
-                },
+                }
             }
 
             // if something failed, let's shut down the client
@@ -351,7 +385,7 @@ macro_rules! handle_listener {
         thread::spawn(move || {
             for stream in $listener.incoming() {
                 if $rx.try_recv().is_ok() {
-                    // any new message should break
+// any new message should break
                     break;
                 }
                 match stream {
@@ -389,7 +423,7 @@ impl Server {
             listener_threads: Vec::new(),
             next_id: Arc::new(Mutex::new(0)),
             hz_stop: None,
-        }
+        };
     }
 
     pub fn get_mut_db<'a>(&'a self) -> MutexGuard<'a, database::Database> {
@@ -414,12 +448,12 @@ impl Server {
                                 Err(e) => {
                                     let db = self.db.lock().unwrap();
                                     log!(db.config.logger, Warning, "Error writing pid: {}", e);
-                                },
+                                }
                             }
                         }
                         self.start();
                         self.join();
-                    },
+                    }
                     _ => exit(0),
                 };
             }
@@ -463,7 +497,12 @@ impl Server {
     }
 
     /// Listens to a socket address.
-    fn listen<T: ToSocketAddrs>(&mut self, t: T, tcp_keepalive: u32, timeout: u64, tcp_backlog: i32) -> io::Result<()> {
+    fn listen<T: ToSocketAddrs>(&mut self,
+                                t: T,
+                                tcp_keepalive: u32,
+                                timeout: u64,
+                                tcp_backlog: i32)
+                                -> io::Result<()> {
         for addr in try!(t.to_socket_addrs()) {
             let (tx, rx) = channel();
             let builder = try!(match addr {
@@ -472,13 +511,17 @@ impl Server {
             });
 
             try!(self.reuse_address(&builder));
-            let listener = try!(try!(
-                        builder.bind(addr))
-                    .listen(tcp_backlog));
+            let listener = try!(try!(builder.bind(addr)).listen(tcp_backlog));
             self.listener_channels.push(tx);
             {
                 let db = self.db.lock().unwrap();
-                let th = handle_listener!(db.config.logger, listener, self, rx, tcp_keepalive, timeout, tcp);
+                let th = handle_listener!(db.config.logger,
+                                          listener,
+                                          self,
+                                          rx,
+                                          tcp_keepalive,
+                                          timeout,
+                                          tcp);
                 self.listener_threads.push(th);
             }
         }
@@ -492,18 +535,25 @@ impl Server {
             (db.config.tcp_keepalive.clone(),
              db.config.timeout.clone(),
              db.config.addresses().clone(),
-             db.config.tcp_backlog.clone(),
-             )
+             db.config.tcp_backlog.clone())
         };
         for (host, port) in addresses {
             match self.listen((&host[..], port), tcp_keepalive, timeout, tcp_backlog) {
                 Ok(_) => {
                     let db = self.db.lock().unwrap();
-                    log!(db.config.logger, Notice, "The server is now ready to accept connections on port {}", port);
-                },
+                    log!(db.config.logger,
+                         Notice,
+                         "The server is now ready to accept connections on port {}",
+                         port);
+                }
                 Err(err) => {
                     let db = self.db.lock().unwrap();
-                    log!(db.config.logger, Warning, "Creating Server TCP listening socket {}:{}: {:?}", host, port, err);
+                    log!(db.config.logger,
+                         Warning,
+                         "Creating Server TCP listening socket {}:{}: {:?}",
+                         host,
+                         port,
+                         err);
                     continue;
                 }
             }
@@ -521,7 +571,7 @@ impl Server {
                     let hz = db.config.hz.clone();
                     db.active_expire_cycle(10);
                     drop(db);
-                    thread::sleep_ms(10000 / hz);
+                    thread::sleep(Duration::from_millis(10000 / hz as u64));
                 }
             });
         }
@@ -544,11 +594,21 @@ impl Server {
             let listener = match UnixListener::bind(unixsocket) {
                 Ok(l) => l,
                 Err(err) => {
-                    log!(db.config.logger, Warning, "Creating Server Unix socket {}: {:?}", unixsocket, err);
+                    log!(db.config.logger,
+                         Warning,
+                         "Creating Server Unix socket {}: {:?}",
+                         unixsocket,
+                         err);
                     return;
                 }
             };
-            let th = handle_listener!(db.config.logger, listener, self, rx, tcp_keepalive, timeout, unix);
+            let th = handle_listener!(db.config.logger,
+                                      listener,
+                                      self,
+                                      rx,
+                                      tcp_keepalive,
+                                      timeout,
+                                      unix);
             self.listener_threads.push(th);
         }
     }
@@ -557,7 +617,8 @@ impl Server {
     fn handle_unixsocket(&mut self) {
         let db = self.db.lock().unwrap();
         if db.config.unixsocket.is_some() {
-            let _ = writeln!(&mut std::io::stderr(), "Ignoring unixsocket in non unix environment\n");
+            let _ = writeln!(&mut std::io::stderr(),
+                             "Ignoring unixsocket in non unix environment\n");
         }
     }
 
@@ -575,7 +636,9 @@ impl Server {
             }
         }
         match self.hz_stop {
-            Some(ref t) => { let _ = t.send(()); },
+            Some(ref t) => {
+                let _ = t.send(());
+            }
             None => (),
         }
         self.join();

@@ -6,8 +6,8 @@ use std::error::Error;
 use std::f64::{INFINITY, NEG_INFINITY};
 use std::fmt;
 use std::iter;
-use std::num::{ParseIntError,ParseFloatError};
-use std::str::{from_utf8,Utf8Error};
+use std::num::{ParseIntError, ParseFloatError};
+use std::str::{from_utf8, Utf8Error};
 
 use util::format_repr;
 
@@ -23,15 +23,15 @@ pub struct Argument {
 /// A protocol parser
 pub struct ParsedCommand<'a> {
     /// The data itself
-    data: &'a[u8],
+    data: &'a [u8],
     /// The arguments location and length
-    pub argv: Vec<Argument>
+    pub argv: Vec<Argument>,
 }
 
 #[derive(Debug)]
 pub struct OwnedParsedCommand {
     data: Vec<u8>,
-    pub argv: Vec<Argument>
+    pub argv: Vec<Argument>,
 }
 
 /// Error parsing
@@ -77,19 +77,27 @@ impl Error for ParseError {
         }
     }
 
-    fn cause(&self) -> Option<&Error> { None }
+    fn cause(&self) -> Option<&Error> {
+        None
+    }
 }
 
 impl From<Utf8Error> for ParseError {
-    fn from(_: Utf8Error) -> ParseError { ParseError::InvalidArgument }
+    fn from(_: Utf8Error) -> ParseError {
+        ParseError::InvalidArgument
+    }
 }
 
 impl From<ParseIntError> for ParseError {
-    fn from(_: ParseIntError) -> ParseError { ParseError::InvalidArgument }
+    fn from(_: ParseIntError) -> ParseError {
+        ParseError::InvalidArgument
+    }
 }
 
 impl From<ParseFloatError> for ParseError {
-    fn from(_: ParseFloatError) -> ParseError { ParseError::InvalidArgument }
+    fn from(_: ParseFloatError) -> ParseError {
+        ParseError::InvalidArgument
+    }
 }
 
 impl OwnedParsedCommand {
@@ -242,7 +250,7 @@ impl<'a> ParsedCommand<'a> {
             return Err(ParseError::InvalidArgument);
         }
         let arg = &self.argv[pos];
-        return Ok(&self.data[arg.pos..arg.pos+arg.len]);
+        return Ok(&self.data[arg.pos..arg.pos + arg.len]);
     }
 
     pub fn get_data(&self) -> &'a [u8] {
@@ -302,7 +310,8 @@ fn parse_int(input: &[u8], len: usize, name: &str) -> Result<(Option<usize>, usi
         return Err(ParseError::Incomplete);
     }
     if input[i] as char != '\n' {
-        return Err(ParseError::BadProtocol(format!("expected \\r\\n separator, got \\r{}", input[i] as char)));
+        return Err(ParseError::BadProtocol(format!("expected \\r\\n separator, got \\r{}",
+                                                   input[i] as char)));
     }
     return Ok((argco, i + 1));
 }
@@ -325,7 +334,9 @@ pub fn parse(input: &[u8]) -> Result<(ParsedCommand, usize), ParseError> {
     while input.len() > pos && input[pos] as char == '\r' {
         if pos + 1 < input.len() {
             if input[pos + 1] as char != '\n' {
-                return Err(ParseError::BadProtocol(format!("expected \\r\\n separator, got \\r{}", input[pos + 1] as char)));
+                return Err(ParseError::BadProtocol(format!("expected \\r\\n separator, got \
+                                                            \\r{}",
+                                                           input[pos + 1] as char)));
             }
             pos += 2;
         } else {
@@ -355,7 +366,8 @@ pub fn parse(input: &[u8]) -> Result<(ParsedCommand, usize), ParseError> {
             return Err(ParseError::Incomplete);
         }
         if input[pos] as char != '$' {
-            return Err(ParseError::BadProtocol(format!("expected '$', got '{}'", input[pos] as char)));
+            return Err(ParseError::BadProtocol(format!("expected '$', got '{}'",
+                                                       input[pos] as char)));
         }
         pos += 1;
         let (argleno, arglenlen) = try!(parse_int(&input[pos..len], len - pos, "bulk"));
@@ -363,7 +375,7 @@ pub fn parse(input: &[u8]) -> Result<(ParsedCommand, usize), ParseError> {
             Some(i) => i,
             None => return Err(ParseError::BadProtocol("invalid bulk length".to_owned())),
         };
-        if arglen > 512*1024*1024 {
+        if arglen > 512 * 1024 * 1024 {
             return Err(ParseError::BadProtocol("invalid bulk length".to_owned()));
         }
         pos += arglenlen;
@@ -404,7 +416,7 @@ impl Parser {
         }
 
         let len = self.data.len();
-        let add =  if len == 0 {
+        let add = if len == 0 {
             16
         } else if self.written * 2 > len {
             len
@@ -466,8 +478,8 @@ mod test_parser {
         let r = parse(message);
         assert!(r.is_err());
         match r.unwrap_err() {
-            ParseError::Incomplete => {},
-            _ => assert!(false)
+            ParseError::Incomplete => {}
+            _ => assert!(false),
         }
     }
 
@@ -477,8 +489,8 @@ mod test_parser {
         let r = parse(message);
         assert!(r.is_err());
         match r.unwrap_err() {
-            ParseError::BadProtocol(_) => {},
-            _ => assert!(false)
+            ParseError::BadProtocol(_) => {}
+            _ => assert!(false),
         }
     }
 
@@ -574,6 +586,7 @@ mod test_parser {
             let mut v = parser.get_mut();
             v.extend(&*message.to_vec());
         }
-        assert_eq!(format!("{:?}", parser), "Parser: \"*2\\r\\n$3\\r\\n\\x01\\x00\\b\\r\\n$4\\r\\n\\xffarz\\r\\n\"");
+        assert_eq!(format!("{:?}", parser),
+                   "Parser: \"*2\\r\\n$3\\r\\n\\x01\\x00\\b\\r\\n$4\\r\\n\\xffarz\\r\\n\"");
     }
 }
