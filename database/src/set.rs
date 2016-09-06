@@ -26,7 +26,9 @@ impl ValueSet {
         let mut s = HashSet::new();
         for v in h.iter() {
             match vec_to_usize(&v) {
-                Ok(n) => { s.insert(n); },
+                Ok(n) => {
+                    s.insert(n);
+                }
                 Err(_) => break,
             }
         }
@@ -51,7 +53,7 @@ impl ValueSet {
                 for i in set.iter() {
                     h.insert(usize_to_vec(i.clone()));
                 }
-            },
+            }
             ValueSet::Data(_) => return,
         }
         *self = ValueSet::Data(h);
@@ -66,7 +68,7 @@ impl ValueSet {
                         Err(_) => (), // no return
                     }
                 }
-            },
+            }
             ValueSet::Data(ref mut set) => return set.insert(el),
         }
 
@@ -78,9 +80,11 @@ impl ValueSet {
     pub fn srem(&mut self, el: &Vec<u8>) -> bool {
         match *self {
             ValueSet::Data(ref mut set) => set.remove(el),
-            ValueSet::Integer(ref mut set) => match vec_to_usize(&el) {
-                Ok(v) => set.remove(&v),
-                Err(_) => false, // only have usize, removing not a usize
+            ValueSet::Integer(ref mut set) => {
+                match vec_to_usize(&el) {
+                    Ok(v) => set.remove(&v),
+                    Err(_) => false, // only have usize, removing not a usize
+                }
             }
         }
     }
@@ -88,9 +92,11 @@ impl ValueSet {
     pub fn sismember(&self, el: &Vec<u8>) -> bool {
         match *self {
             ValueSet::Data(ref set) => set.contains(el),
-            ValueSet::Integer(ref set) => match vec_to_usize(&el) {
-                Ok(v) => set.contains(&v),
-                Err(_) => false, // only have usize, removing not a usize
+            ValueSet::Integer(ref set) => {
+                match vec_to_usize(&el) {
+                    Ok(v) => set.contains(&v),
+                    Err(_) => false, // only have usize, removing not a usize
+                }
             }
         }
     }
@@ -105,7 +111,9 @@ impl ValueSet {
     pub fn smembers(&self) -> Vec<Vec<u8>> {
         match *self {
             ValueSet::Data(ref set) => set.iter().map(|x| x.clone()).collect::<Vec<_>>(),
-            ValueSet::Integer(ref set) => set.iter().map(|x| usize_to_vec(x.clone())).collect::<Vec<_>>()
+            ValueSet::Integer(ref set) => {
+                set.iter().map(|x| usize_to_vec(x.clone())).collect::<Vec<_>>()
+            }
         }
     }
 
@@ -132,7 +140,11 @@ impl ValueSet {
         }
     }
 
-    fn srandmember_data(&self, set: &HashSet<Vec<u8>>, count: usize, allow_duplicates: bool) -> Vec<Vec<u8>> {
+    fn srandmember_data(&self,
+                        set: &HashSet<Vec<u8>>,
+                        count: usize,
+                        allow_duplicates: bool)
+                        -> Vec<Vec<u8>> {
         // TODO: implemented in O(n), should be O(1)
         let mut r = Vec::new();
         for pos in self.get_random_positions(set.len(), count, allow_duplicates) {
@@ -141,7 +153,11 @@ impl ValueSet {
         r
     }
 
-    fn srandmember_integer(&self, set: &HashSet<usize>, count: usize, allow_duplicates: bool) -> Vec<Vec<u8>> {
+    fn srandmember_integer(&self,
+                           set: &HashSet<usize>,
+                           count: usize,
+                           allow_duplicates: bool)
+                           -> Vec<Vec<u8>> {
         // TODO: implemented in O(n), should be O(1)
         let mut r = Vec::new();
         for pos in self.get_random_positions(set.len(), count, allow_duplicates) {
@@ -164,7 +180,9 @@ impl ValueSet {
         if count >= len {
             return match *self {
                 ValueSet::Data(ref mut set) => set.drain().collect::<Vec<_>>(),
-                ValueSet::Integer(ref mut set) => set.drain().map(|x| usize_to_vec(x)).collect::<Vec<_>>(),
+                ValueSet::Integer(ref mut set) => {
+                    set.drain().map(|x| usize_to_vec(x)).collect::<Vec<_>>()
+                }
             };
         }
 
@@ -178,7 +196,7 @@ impl ValueSet {
                     r.push(el);
                 }
                 r
-            },
+            }
             ValueSet::Integer(ref mut set) => {
                 let mut r = Vec::new();
                 for pos in positions {
@@ -187,7 +205,7 @@ impl ValueSet {
                     r.push(usize_to_vec(el));
                 }
                 r
-            },
+            }
         }
     }
 
@@ -206,11 +224,11 @@ impl ValueSet {
                             for el in set {
                                 elements.remove(el);
                             }
-                        },
+                        }
                     }
                 }
                 elements
-            },
+            }
             ValueSet::Integer(ref original_set) => {
                 let mut elements: HashSet<usize> = original_set.clone();
                 for newvalue in sets {
@@ -227,7 +245,7 @@ impl ValueSet {
                                     Err(_) => false,
                                 };
                             }
-                        },
+                        }
                     }
                 }
                 elements.iter().map(|x| usize_to_vec(x.clone())).collect()
@@ -242,28 +260,44 @@ impl ValueSet {
                 for newvalue in sets {
                     match *newvalue {
                         ValueSet::Integer(ref set) => {
-                            result = result.intersection(&set.iter().map(|x| usize_to_vec(x.clone())).collect::<HashSet<_>>()).cloned().collect();
-                        },
+                            result = result.intersection(&set.iter()
+                                    .map(|x| usize_to_vec(x.clone()))
+                                    .collect::<HashSet<_>>())
+                                .cloned()
+                                .collect();
+                        }
                         ValueSet::Data(ref set) => {
                             result = result.intersection(set).cloned().collect();
-                        },
+                        }
                     }
-                    if result.len() == 0 { break; }
+                    if result.len() == 0 {
+                        break;
+                    }
                 }
                 result
-            },
+            }
             ValueSet::Integer(ref original_set) => {
-                let mut result: HashSet<usize> = original_set.iter().cloned().collect::<HashSet<_>>();
+                let mut result: HashSet<usize> =
+                    original_set.iter().cloned().collect::<HashSet<_>>();
                 for newvalue in sets {
                     match *newvalue {
                         ValueSet::Integer(ref set) => {
-                            result = result.intersection(&set.iter().cloned().collect::<HashSet<_>>()).cloned().collect();
-                        },
+                            result =
+                                result.intersection(&set.iter().cloned().collect::<HashSet<_>>())
+                                    .cloned()
+                                    .collect();
+                        }
                         ValueSet::Data(ref set) => {
-                            result = result.intersection(&set.iter().filter_map(|x| vec_to_usize(x).ok()).collect::<HashSet<_>>()).cloned().collect();
-                        },
+                            result = result.intersection(&set.iter()
+                                    .filter_map(|x| vec_to_usize(x).ok())
+                                    .collect::<HashSet<_>>())
+                                .cloned()
+                                .collect();
+                        }
                     }
-                    if result.len() == 0 { break; }
+                    if result.len() == 0 {
+                        break;
+                    }
                 }
                 result.into_iter().map(|x| usize_to_vec(x.clone())).collect()
             }
@@ -273,16 +307,22 @@ impl ValueSet {
     pub fn sunion(&self, sets: Vec<&ValueSet>) -> HashSet<Vec<u8>> {
         let mut result: HashSet<Vec<u8>> = match *self {
             ValueSet::Data(ref original_set) => original_set.clone(),
-            ValueSet::Integer(ref set) => set.iter().map(|x| usize_to_vec(x.clone())).collect::<HashSet<_>>(),
+            ValueSet::Integer(ref set) => {
+                set.iter().map(|x| usize_to_vec(x.clone())).collect::<HashSet<_>>()
+            }
         };
         for newvalue in sets {
             match *newvalue {
                 ValueSet::Integer(ref set) => {
-                    result = result.union(&set.iter().map(|x| usize_to_vec(x.clone())).collect::<HashSet<_>>()).cloned().collect();
-                },
+                    result = result.union(&set.iter()
+                            .map(|x| usize_to_vec(x.clone()))
+                            .collect::<HashSet<_>>())
+                        .cloned()
+                        .collect();
+                }
                 ValueSet::Data(ref set) => {
                     result = result.union(set).cloned().collect();
-                },
+                }
             }
         }
         result
@@ -317,9 +357,11 @@ impl ValueSet {
                     };
                     match r {
                         Ok(_) => (),
-                        Err(err) => match err {
-                            EncodeError::IOError(err) => return Err(err),
-                            _ => panic!("Unexpected error {:?}", err),
+                        Err(err) => {
+                            match err {
+                                EncodeError::IOError(err) => return Err(err),
+                                _ => panic!("Unexpected error {:?}", err),
+                            }
                         }
                     }
                 }
@@ -334,12 +376,9 @@ impl ValueSet {
                 }
             }
         };
-        let data = [
-            vec![settype],
-            v,
-            vec![(VERSION & 0xff) as u8],
-            vec![((VERSION >> 8) & 0xff) as u8],
-        ].concat();
+        let data =
+            [vec![settype], v, vec![(VERSION & 0xff) as u8], vec![((VERSION >> 8) & 0xff) as u8]]
+                .concat();
         writer.write(&*data)
     }
 
@@ -350,7 +389,11 @@ impl ValueSet {
             ValueSet::Integer(_) => "intset",
             ValueSet::Data(_) => "hashtable",
         };
-        format!("Value at:0x0000000000 refcount:1 encoding:{} serializedlength:{} lru:0 lru_seconds_idle:0", encoding, serialized).to_owned()
+        format!("Value at:0x0000000000 refcount:1 encoding:{} serializedlength:{} lru:0 \
+                 lru_seconds_idle:0",
+                encoding,
+                serialized)
+            .to_owned()
     }
 }
 
@@ -428,7 +471,8 @@ mod test_set {
         h.insert(set.spop(1).pop().unwrap());
         h.insert(set.spop(1).pop().unwrap());
         assert_eq!(set.spop(1).len(), 0);
-        assert_eq!(h, HashSet::from_iter(vec![b"123".to_vec(), b"456".to_vec()]));
+        assert_eq!(h,
+                   HashSet::from_iter(vec![b"123".to_vec(), b"456".to_vec()]));
     }
 
     #[test]
@@ -445,7 +489,8 @@ mod test_set {
         assert!(set3.sadd(b"456".to_vec(), 100));
         assert!(set3.sadd(b"foo".to_vec(), 100));
 
-        assert_eq!(set.sdiff(vec![&set2, &set3]), HashSet::from_iter(vec![b"789".to_vec()]));
+        assert_eq!(set.sdiff(vec![&set2, &set3]),
+                   HashSet::from_iter(vec![b"789".to_vec()]));
     }
 
     #[test]
@@ -465,7 +510,8 @@ mod test_set {
         assert!(set3.sadd(b"456".to_vec(), 100));
         assert!(set3.sadd(b"foo".to_vec(), 100));
 
-        assert_eq!(set.sinter(vec![&set2, &set3]), HashSet::from_iter(vec![
+        assert_eq!(set.sinter(vec![&set2, &set3]),
+                   HashSet::from_iter(vec![
                     b"123".to_vec(),
                     b"456".to_vec(),
                     ]));
@@ -487,7 +533,8 @@ mod test_set {
         assert!(set3.sadd(b"456".to_vec(), 100));
         assert!(set3.sadd(b"foo".to_vec(), 100));
 
-        assert_eq!(set.sinter(vec![&set2, &set3]), HashSet::from_iter(vec![
+        assert_eq!(set.sinter(vec![&set2, &set3]),
+                   HashSet::from_iter(vec![
                     b"123".to_vec(),
                     b"456".to_vec(),
                     ]));
@@ -507,7 +554,8 @@ mod test_set {
         assert!(set3.sadd(b"456".to_vec(), 100));
         assert!(set3.sadd(b"foo".to_vec(), 100));
 
-        assert_eq!(set.sunion(vec![&set2, &set3]), HashSet::from_iter(vec![
+        assert_eq!(set.sunion(vec![&set2, &set3]),
+                   HashSet::from_iter(vec![
                     b"123".to_vec(),
                     b"456".to_vec(),
                     b"foo".to_vec(),
@@ -526,7 +574,8 @@ mod test_set {
         let mut set3 = ValueSet::new();
         assert!(set3.sadd(b"456".to_vec(), 100));
 
-        assert_eq!(set.sunion(vec![&set2, &set3]), HashSet::from_iter(vec![
+        assert_eq!(set.sunion(vec![&set2, &set3]),
+                   HashSet::from_iter(vec![
                     b"123".to_vec(),
                     b"456".to_vec(),
                     ]));

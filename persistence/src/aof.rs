@@ -18,10 +18,10 @@ impl Aof {
     pub fn new<P: AsRef<Path>>(path: P) -> io::Result<Aof> {
         Ok(Aof {
             fp: try!(OpenOptions::new()
-                    .read(true)
-                    .write(true)
-                    .create(true)
-                    .open(path)),
+                .read(true)
+                .write(true)
+                .create(true)
+                .open(path)),
             dbindex: usize::MAX,
         })
     }
@@ -80,7 +80,8 @@ mod test_aof {
         {
             let mut data = String::with_capacity(100);;
             File::open(path.as_path()).unwrap().read_to_string(&mut data).unwrap();
-            assert_eq!(data, "*2\r\n$6\r\nSELECT\r\n$2\r\n10\r\n*2\r\n$5\r\nhello\r\n$5\r\nworld\r\n");
+            assert_eq!(data,
+                       "*2\r\n$6\r\nSELECT\r\n$2\r\n10\r\n*2\r\n$5\r\nhello\r\n$5\r\nworld\r\n");
         }
     }
 
@@ -90,7 +91,7 @@ mod test_aof {
         path.push("aoftest2");
         File::create(path.as_path()).unwrap().write(b"hello world").unwrap();
 
-        let mut r = [0,0,0,0,0,0,0,0,0,0,0, '!' as u8];
+        let mut r = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '!' as u8];
         let mut aof = Aof::new(path.as_path()).unwrap();
         assert_eq!(11, aof.read(&mut r).unwrap());
         assert_eq!(&r, b"hello world!");

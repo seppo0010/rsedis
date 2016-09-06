@@ -62,7 +62,8 @@ fn read_string(args: Vec<Vec<u8>>) -> Result<String, ConfigError> {
 }
 
 fn read_parse<T>(args: Vec<Vec<u8>>) -> Result<T, ConfigError>
-        where T: FromStr {
+    where T: FromStr
+{
     let s = try!(read_string(args));
     match s.parse() {
         Ok(f) => Ok(f),
@@ -116,7 +117,11 @@ impl Config {
         let file = BufReader::new(match File::open(&path) {
             Ok(f) => f,
             Err(_) => {
-                log_and_exit!(self.logger, Warning, 1, "Fatal error, can't open config file '{}'", fname);
+                log_and_exit!(self.logger,
+                              Warning,
+                              1,
+                              "Fatal error, can't open config file '{}'",
+                              fname);
                 return Err(ConfigError::FileNotFound);
             }
         });
@@ -137,10 +142,14 @@ impl Config {
             }
 
             match &*args[0] {
-                b"bind" => self.bind.extend(args[1..].iter().filter(|x| x.len() > 0).map(|x| match from_utf8(x) {
+                b"bind" => {
+                    self.bind.extend(args[1..].iter().filter(|x| x.len() > 0).map(|x| {
+                        match from_utf8(x) {
                             Ok(s) => s.to_owned(),
                             Err(_) => "".to_owned(), // TODO: return ConfigError
-                            })),
+                        }
+                    }))
+                }
                 b"port" => self.port = try!(read_parse(args)),
                 b"activerehashing" => self.active_rehashing = try!(read_bool(args)),
                 b"daemonize" => self.daemonize = try!(read_bool(args)),
@@ -149,7 +158,9 @@ impl Config {
                 b"set-max-intset-entries" => self.set_max_intset_entries = try!(read_parse(args)),
                 b"timeout" => self.timeout = try!(read_parse(args)),
                 b"unixsocket" => self.unixsocket = Some(try!(read_string(args)).to_owned()),
-                b"unixsocketperm" => self.unixsocketperm = try!(u32::from_str_radix(&*try!(read_string(args)), 8)),
+                b"unixsocketperm" => {
+                    self.unixsocketperm = try!(u32::from_str_radix(&*try!(read_string(args)), 8))
+                }
                 b"pidfile" => self.pidfile = try!(read_string(args)).to_owned(),
                 b"dir" => self.dir = try!(read_string(args)).to_owned(),
                 b"logfile" => {
@@ -157,26 +168,29 @@ impl Config {
                     if logfile.len() > 0 {
                         try!(self.logger.set_logfile(&*logfile))
                     }
-                },
-                b"loglevel" => self.logger.set_loglevel(match &*try!(read_string(args)) {
-                    "debug" => Level::Debug,
-                    "verbose" => Level::Verbose,
-                    "notice" => Level::Notice,
-                    "warning" => Level::Warning,
-                    _ => return Err(ConfigError::InvalidParameter),
-                }),
+                }
+                b"loglevel" => {
+                    self.logger.set_loglevel(match &*try!(read_string(args)) {
+                        "debug" => Level::Debug,
+                        "verbose" => Level::Verbose,
+                        "notice" => Level::Notice,
+                        "warning" => Level::Warning,
+                        _ => return Err(ConfigError::InvalidParameter),
+                    })
+                }
                 b"rename-command" => {
                     if args.len() != 3 {
-                        return Err(ConfigError::InvalidFormat)
+                        return Err(ConfigError::InvalidFormat);
                     } else {
                         let command = try!(from_utf8(&*args[1])).to_owned();
                         let newname = try!(from_utf8(&*args[2])).to_owned();
                         if newname.len() > 0 {
-                            self.rename_commands.insert(newname.to_lowercase(), Some(command.clone().to_lowercase()));
+                            self.rename_commands.insert(newname.to_lowercase(),
+                                                        Some(command.clone().to_lowercase()));
                         }
                         self.rename_commands.insert(command.to_lowercase(), None);
                     }
-                },
+                }
                 b"requirepass" => self.requirepass = Some(try!(read_string(args)).to_owned()),
                 b"tcp-backlog" => self.tcp_backlog = try!(read_parse(args)),
                 b"syslog-enabled" => self.syslog_enabled = try!(read_bool(args)),
@@ -186,11 +200,13 @@ impl Config {
                 b"appendonly" => self.appendonly = try!(read_bool(args)),
                 b"appendfilename" => self.appendfilename = try!(read_string(args)).to_owned(),
                 b"aof-load-truncated" => self.aof_load_truncated = try!(read_bool(args)),
-                b"include" => if args.len() != 2 {
-                    return Err(ConfigError::InvalidFormat)
-                } else {
-                    try!(self.parsefile(try!(from_utf8(&*args[1])).to_owned()));
-                },
+                b"include" => {
+                    if args.len() != 2 {
+                        return Err(ConfigError::InvalidFormat);
+                    } else {
+                        try!(self.parsefile(try!(from_utf8(&*args[1])).to_owned()));
+                    }
+                }
                 _ => writeln!(&mut std::io::stderr(), "Unknown configuration {:?}", line).unwrap(),
             };
         }
@@ -211,15 +227,21 @@ impl Config {
 }
 
 impl From<IOError> for ConfigError {
-    fn from(e: IOError) -> ConfigError { ConfigError::IOError(e) }
+    fn from(e: IOError) -> ConfigError {
+        ConfigError::IOError(e)
+    }
 }
 
 impl From<ParseIntError> for ConfigError {
-    fn from(_: ParseIntError) -> ConfigError { ConfigError::InvalidParameter }
+    fn from(_: ParseIntError) -> ConfigError {
+        ConfigError::InvalidParameter
+    }
 }
 
 impl From<Utf8Error> for ConfigError {
-    fn from(_: Utf8Error) -> ConfigError { ConfigError::InvalidParameter }
+    fn from(_: Utf8Error) -> ConfigError {
+        ConfigError::InvalidParameter
+    }
 }
 
 #[cfg(test)]
@@ -313,7 +335,8 @@ mod tests {
 
     #[test]
     fn parse_set_max_intset_entries() {
-        let config = config!(b"set-max-intset-entries 123456", Logger::new(Level::Warning));
+        let config = config!(b"set-max-intset-entries 123456",
+                             Logger::new(Level::Warning));
         assert_eq!(config.set_max_intset_entries, 123456);
     }
 
@@ -325,14 +348,16 @@ mod tests {
 
     #[test]
     fn parse_unixsocket() {
-        let config = config!(b"unixsocket /dev/null\nunixsocketperm 777", Logger::new(Level::Warning));
+        let config = config!(b"unixsocket /dev/null\nunixsocketperm 777",
+                             Logger::new(Level::Warning));
         assert_eq!(config.unixsocket, Some("/dev/null".to_owned()));
         assert_eq!(config.unixsocketperm, 511);
     }
 
     #[test]
     fn parse_rename_commands() {
-        let config = config!(b"rename-command C1 C2\nrename-command HELLO world", Logger::new(Level::Warning));
+        let config = config!(b"rename-command C1 C2\nrename-command HELLO world",
+                             Logger::new(Level::Warning));
         let mut h = HashMap::new();
         h.insert("c2".to_owned(), Some("c1".to_owned()));
         h.insert("c1".to_owned(), None);
@@ -343,7 +368,8 @@ mod tests {
 
     #[test]
     fn parse_requirepass() {
-        let config = config!(b"requirepass THISISASTRONGPASSWORD", Logger::new(Level::Warning));
+        let config = config!(b"requirepass THISISASTRONGPASSWORD",
+                             Logger::new(Level::Warning));
         assert_eq!(config.requirepass, Some("THISISASTRONGPASSWORD".to_owned()));
     }
 }

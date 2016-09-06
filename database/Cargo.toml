@@ -1,22 +1,32 @@
 [package]
+authors = ["Sebastian Waisbrot <seppo0010@gmail.com>"]
 name = "database"
 version = "0.1.0"
-authors = ["Sebastian Waisbrot <seppo0010@gmail.com>"]
+
+[dependencies]
+crc64 = "0.2.2"
+rand = "0.3"
+rehashinghashmap = "0.1.0"
+
+[dependencies.skiplist]
+version = "0.2.10"
+features = ["unstable"]
+
+[dependencies.basichll]
+branch = "new-features"
+git = "https://github.com/seppo0010/hll.rs.git"
 
 [dependencies.config]
 path = "../config"
 
-[dependencies.parser]
-path = "../parser"
-
 [dependencies.logger]
 path = "../logger"
 
+[dependencies.parser]
+path = "../parser"
+
 [dependencies.persistence]
 path = "../persistence"
-
-[dependencies.util]
-path = "../util"
 
 [dependencies.rdbutil]
 path = "./rdbutil"
@@ -24,9 +34,5 @@ path = "./rdbutil"
 [dependencies.response]
 path = "../response"
 
-[dependencies]
-crc64 = "0.2.2"
-rand = "0.3"
-skiplist = "0.2.6"
-rehashinghashmap = "0.1.0"
-basichll = { git = "https://github.com/seppo0010/hll.rs.git", branch = "new-features" }
+[dependencies.util]
+path = "../util"

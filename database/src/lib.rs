@@ -1,9 +1,9 @@
 #![feature(collections_bound)]
-#![feature(drain)]
 
 extern crate basichll;
 extern crate config;
-#[macro_use(log)] extern crate logger;
+#[macro_use(log)]
+extern crate logger;
 extern crate parser;
 extern crate rand;
 extern crate rdbutil;
@@ -29,7 +29,7 @@ use std::io::Write;
 use std::iter::FromIterator;
 use std::ops::RangeFull;
 use std::path::Path;
-use std::sync::mpsc::{Sender, channel};
+use std::sync::mpsc::Sender;
 
 use config::Config;
 use crc64::crc64;
@@ -47,7 +47,7 @@ use set::ValueSet;
 use string::ValueString;
 use zset::ValueSortedSet;
 
-const ACTIVE_EXPIRE_CYCLE_LOOKUPS_PER_LOOP:usize = 20;
+const ACTIVE_EXPIRE_CYCLE_LOOKUPS_PER_LOOP: usize = 20;
 
 /// Any value storable in the database
 #[derive(PartialEq, Debug)]
@@ -79,39 +79,53 @@ impl PubsubEvent {
     /// Serialize the event into a Response object.
     pub fn as_response(&self) -> Response {
         match *self {
-            PubsubEvent::Message(ref channel, ref pattern, ref message) => match *pattern {
-                Some(ref pattern) => Response::Array(vec![
+            PubsubEvent::Message(ref channel, ref pattern, ref message) => {
+                match *pattern {
+                    Some(ref pattern) => {
+                        Response::Array(vec![
                         Response::Data(b"pmessage".to_vec()),
                         Response::Data(pattern.clone()),
                         Response::Data(channel.clone()),
                         Response::Data(message.clone()),
-                        ]),
-                None => Response::Array(vec![
+                        ])
+                    }
+                    None => {
+                        Response::Array(vec![
                         Response::Data(b"message".to_vec()),
                         Response::Data(channel.clone()),
                         Response::Data(message.clone()),
-                        ]),
-            },
-            PubsubEvent::Subscription(ref channel, ref subscriptions) => Response::Array(vec![
+                        ])
+                    }
+                }
+            }
+            PubsubEvent::Subscription(ref channel, ref subscriptions) => {
+                Response::Array(vec![
                     Response::Data(b"subscribe".to_vec()),
                     Response::Data(channel.clone()),
                     Response::Integer(subscriptions.clone() as i64),
-                    ]),
-            PubsubEvent::Unsubscription(ref channel, ref subscriptions) => Response::Array(vec![
+                    ])
+            }
+            PubsubEvent::Unsubscription(ref channel, ref subscriptions) => {
+                Response::Array(vec![
                     Response::Data(b"unsubscribe".to_vec()),
                     Response::Data(channel.clone()),
                     Response::Integer(subscriptions.clone() as i64),
-                    ]),
-            PubsubEvent::PatternSubscription(ref pattern, ref subscriptions) => Response::Array(vec![
+                    ])
+            }
+            PubsubEvent::PatternSubscription(ref pattern, ref subscriptions) => {
+                Response::Array(vec![
                     Response::Data(b"psubscribe".to_vec()),
                     Response::Data(pattern.clone()),
                     Response::Integer(subscriptions.clone() as i64),
-                    ]),
-            PubsubEvent::PatternUnsubscription(ref pattern, ref subscriptions) => Response::Array(vec![
+                    ])
+            }
+            PubsubEvent::PatternUnsubscription(ref pattern, ref subscriptions) => {
+                Response::Array(vec![
                     Response::Data(b"punsubscribe".to_vec()),
                     Response::Data(pattern.clone()),
                     Response::Integer(subscriptions.clone() as i64),
-                    ]),
+                    ])
+            }
         }
     }
 }
@@ -119,7 +133,9 @@ impl PubsubEvent {
 /// Gets all ValueSet references from a list of Value references.
 /// If a Value is nil, `default` is used.
 /// If any of the values is not a set, an error is returned instead.
-fn get_set_list<'a>(set_values: &Vec<&'a Value>, default: &'a ValueSet) -> Result<Vec<&'a ValueSet>, OperationError> {
+fn get_set_list<'a>(set_values: &Vec<&'a Value>,
+                    default: &'a ValueSet)
+                    -> Result<Vec<&'a ValueSet>, OperationError> {
     let mut sets = Vec::with_capacity(set_values.len());
     for value in set_values {
         sets.push(match **value {
@@ -134,7 +150,9 @@ fn get_set_list<'a>(set_values: &Vec<&'a Value>, default: &'a ValueSet) -> Resul
 /// Gets all ValueSortedSet references from a list of Value references.
 /// If a Value is nil, `default` is used.
 /// If any of the values is not a zset, an error is returned instead.
-fn get_zset_list<'a>(zset_values: &Vec<&'a Value>, default: &'a ValueSortedSet) -> Result<Vec<&'a ValueSortedSet>, OperationError> {
+fn get_zset_list<'a>(zset_values: &Vec<&'a Value>,
+                     default: &'a ValueSortedSet)
+                     -> Result<Vec<&'a ValueSortedSet>, OperationError> {
     let mut zsets = Vec::with_capacity(zset_values.len());
     for value in zset_values {
         zsets.push(match **value {
@@ -293,8 +311,11 @@ impl Value {
                 let len = newvalue.len();
                 *self = Value::String(ValueString::new(newvalue));
                 Ok(len)
-            },
-            Value::String(ref mut val) => { val.append(newvalue); Ok(val.strlen()) },
+            }
+            Value::String(ref mut val) => {
+                val.append(newvalue);
+                Ok(val.strlen())
+            }
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -316,7 +337,7 @@ impl Value {
             Value::Nil => {
                 *self = Value::String(ValueString::Integer(incr.clone()));
                 return Ok(incr);
-            },
+            }
             Value::String(ref mut value) => value.incr(incr),
             _ => return Err(OperationError::WrongTypeError),
         }
@@ -339,7 +360,7 @@ impl Value {
             Value::Nil => {
                 *self = Value::String(ValueString::Data(format!("{}", incr).into_bytes()));
                 return Ok(incr);
-            },
+            }
             Value::String(ref mut value) => value.incrbyfloat(incr),
             _ => return Err(OperationError::WrongTypeError),
         }
@@ -417,7 +438,7 @@ impl Value {
 
         match *self {
             Value::String(ref mut value) => Ok(value.setbit(bitoffset, on)),
-            _ => panic!("Value must be a string")
+            _ => panic!("Value must be a string"),
         }
     }
 
@@ -511,7 +532,7 @@ impl Value {
         }
 
         if values_string.len() == 0 {
-            return Ok(())
+            return Ok(());
         }
 
         match *self {
@@ -546,8 +567,11 @@ impl Value {
                 list.push(el, right);
                 *self = Value::List(list);
                 1
-            },
-            Value::List(ref mut list) => { list.push(el, right); list.llen() },
+            }
+            Value::List(ref mut list) => {
+                list.push(el, right);
+                list.llen()
+            }
             _ => return Err(OperationError::WrongTypeError),
         })
     }
@@ -609,7 +633,11 @@ impl Value {
     /// assert_eq!(val.linsert(true, vec![5], vec![4]).unwrap(), None);
     /// assert_eq!(val.lrange(0, -1).unwrap(), vec![&vec![1], &vec![2], &vec![3]]);
     /// ```
-    pub fn linsert(&mut self, before: bool, pivot: Vec<u8>, newvalue: Vec<u8>) -> Result<Option<usize>, OperationError> {
+    pub fn linsert(&mut self,
+                   before: bool,
+                   pivot: Vec<u8>,
+                   newvalue: Vec<u8>)
+                   -> Result<Option<usize>, OperationError> {
         match *self {
             Value::Nil => Ok(None),
             Value::List(ref mut value) => Ok(value.linsert(before, pivot, newvalue)),
@@ -682,7 +710,11 @@ impl Value {
     /// assert_eq!(val.lrem(true, 1, vec![4]).unwrap(), 0);
     /// assert_eq!(val.lrange(0, -1).unwrap(), vec![&vec![3], &vec![2], &vec![1]]);
     /// ```
-    pub fn lrem(&mut self, left: bool, limit: usize, newvalue: Vec<u8>) -> Result<usize, OperationError> {
+    pub fn lrem(&mut self,
+                left: bool,
+                limit: usize,
+                newvalue: Vec<u8>)
+                -> Result<usize, OperationError> {
         match *self {
             Value::Nil => Ok(0),
             Value::List(ref mut value) => Ok(value.lrem(left, limit, newvalue)),
@@ -747,14 +779,17 @@ impl Value {
     /// assert_eq!(val.sadd(vec![3], 3).unwrap(), true);
     /// assert_eq!(val.sadd(vec![1], 3).unwrap(), false);
     /// ```
-    pub fn sadd(&mut self, el: Vec<u8>, set_max_intset_entries: usize) -> Result<bool, OperationError> {
+    pub fn sadd(&mut self,
+                el: Vec<u8>,
+                set_max_intset_entries: usize)
+                -> Result<bool, OperationError> {
         match *self {
             Value::Nil => {
                 let mut value = ValueSet::new();
                 value.sadd(el, set_max_intset_entries);
                 *self = Value::Set(value);
                 Ok(true)
-            },
+            }
             Value::Set(ref mut value) => Ok(value.sadd(el, set_max_intset_entries)),
             _ => Err(OperationError::WrongTypeError),
         }
@@ -879,7 +914,10 @@ impl Value {
     /// let elements = val.srandmember(10, true).unwrap();
     /// assert_eq!(elements.len(), 10);
     /// ```
-    pub fn srandmember(&self, count: usize, allow_duplicates: bool) -> Result<Vec<Vec<u8>>, OperationError> {
+    pub fn srandmember(&self,
+                       count: usize,
+                       allow_duplicates: bool)
+                       -> Result<Vec<Vec<u8>>, OperationError> {
         match *self {
             Value::Nil => Ok(Vec::new()),
             Value::Set(ref value) => Ok(value.srandmember(count, allow_duplicates)),
@@ -941,7 +979,7 @@ impl Value {
                 let emptyset = ValueSet::new();
                 let sets = try!(get_set_list(set_values, &emptyset));
                 Ok(value.sdiff(sets))
-            },
+            }
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -973,7 +1011,7 @@ impl Value {
                 let emptyset = ValueSet::new();
                 let sets = try!(get_set_list(set_values, &emptyset));
                 Ok(value.sinter(sets))
-            },
+            }
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -1100,7 +1138,14 @@ impl Value {
     /// assert_eq!(val.zadd(1.0, vec![1], false, false, false, true).unwrap(), false);
     /// assert_eq!(val.zscore(vec![1]).unwrap(), Some(2.0));
     /// ```
-    pub fn zadd(&mut self, s: f64, el: Vec<u8>, nx: bool, xx: bool, ch: bool, incr: bool) -> Result<bool, OperationError> {
+    pub fn zadd(&mut self,
+                s: f64,
+                el: Vec<u8>,
+                nx: bool,
+                xx: bool,
+                ch: bool,
+                incr: bool)
+                -> Result<bool, OperationError> {
         match *self {
             Value::Nil => {
                 if xx {
@@ -1110,7 +1155,7 @@ impl Value {
                 let r = try!(value.zadd(s, el, nx, xx, ch, incr, false));
                 *self = Value::SortedSet(value);
                 Ok(r)
-            },
+            }
             Value::SortedSet(ref mut value) => value.zadd(s, el, nx, xx, ch, incr, false),
             _ => Err(OperationError::WrongTypeError),
         }
@@ -1174,7 +1219,7 @@ impl Value {
                     Ok(_) => Ok(increment),
                     Err(err) => Err(err),
                 }
-            },
+            }
             Value::SortedSet(ref mut value) => value.zincrby(increment, member),
             _ => Err(OperationError::WrongTypeError),
         }
@@ -1220,7 +1265,10 @@ impl Value {
     /// assert_eq!(val.zlexcount(Bound::Included(vec![2]), Bound::Excluded(vec![3])).unwrap(), 1);
     /// assert_eq!(val.zlexcount(Bound::Unbounded, Bound::Unbounded).unwrap(), 3);
     /// ```
-    pub fn zlexcount(&self, min: Bound<Vec<u8>>, max: Bound<Vec<u8>>) -> Result<usize, OperationError> {
+    pub fn zlexcount(&self,
+                     min: Bound<Vec<u8>>,
+                     max: Bound<Vec<u8>>)
+                     -> Result<usize, OperationError> {
         match *self {
             Value::Nil => Ok(0),
             Value::SortedSet(ref value) => Ok(value.zlexcount(min, max)),
@@ -1261,7 +1309,12 @@ impl Value {
     ///     vec![2],
     /// ]);
     /// ```
-    pub fn zrange(&self, start: i64, stop: i64, withscores: bool, rev: bool) -> Result<Vec<Vec<u8>>, OperationError> {
+    pub fn zrange(&self,
+                  start: i64,
+                  stop: i64,
+                  withscores: bool,
+                  rev: bool)
+                  -> Result<Vec<Vec<u8>>, OperationError> {
         match *self {
             Value::Nil => Ok(vec![]),
             Value::SortedSet(ref value) => Ok(value.zrange(start, stop, withscores, rev)),
@@ -1296,10 +1349,19 @@ impl Value {
     ///     vec![3],
     /// ]);
     /// ```
-    pub fn zrangebyscore(&self, min: Bound<f64>, max: Bound<f64>, withscores: bool, offset: usize, count: usize, rev: bool) -> Result<Vec<Vec<u8>>, OperationError> {
+    pub fn zrangebyscore(&self,
+                         min: Bound<f64>,
+                         max: Bound<f64>,
+                         withscores: bool,
+                         offset: usize,
+                         count: usize,
+                         rev: bool)
+                         -> Result<Vec<Vec<u8>>, OperationError> {
         match *self {
             Value::Nil => Ok(vec![]),
-            Value::SortedSet(ref value) => Ok(value.zrangebyscore(min, max, withscores, offset, count, rev)),
+            Value::SortedSet(ref value) => {
+                Ok(value.zrangebyscore(min, max, withscores, offset, count, rev))
+            }
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -1329,7 +1391,13 @@ impl Value {
     ///     vec![3],
     /// ]);
     /// ```
-    pub fn zrangebylex(&self, min: Bound<Vec<u8>>, max: Bound<Vec<u8>>, offset: usize, count: usize, rev: bool) -> Result<Vec<Vec<u8>>, OperationError> {
+    pub fn zrangebylex(&self,
+                       min: Bound<Vec<u8>>,
+                       max: Bound<Vec<u8>>,
+                       offset: usize,
+                       count: usize,
+                       rev: bool)
+                       -> Result<Vec<Vec<u8>>, OperationError> {
         match *self {
             Value::Nil => Ok(vec![]),
             Value::SortedSet(ref value) => Ok(value.zrangebylex(min, max, offset, count, rev)),
@@ -1377,7 +1445,10 @@ impl Value {
     /// assert_eq!(val.zremrangebyscore(Bound::Included(2.0), Bound::Excluded(3.0)).unwrap(), 0);
     /// assert_eq!(val.zcard().unwrap(), 2);
     /// ```
-    pub fn zremrangebyscore(&mut self, min: Bound<f64>, max: Bound<f64>) -> Result<usize, OperationError> {
+    pub fn zremrangebyscore(&mut self,
+                            min: Bound<f64>,
+                            max: Bound<f64>)
+                            -> Result<usize, OperationError> {
         match *self {
             Value::Nil => Ok(0),
             Value::SortedSet(ref mut value) => Ok(value.zremrangebyscore(min, max)),
@@ -1402,7 +1473,10 @@ impl Value {
     /// assert_eq!(val.zremrangebylex(Bound::Included(vec![2]), Bound::Excluded(vec![3])).unwrap(), 0);
     /// assert_eq!(val.zcard().unwrap(), 2);
     /// ```
-    pub fn zremrangebylex(&mut self, min: Bound<Vec<u8>>, max: Bound<Vec<u8>>) -> Result<usize, OperationError> {
+    pub fn zremrangebylex(&mut self,
+                          min: Bound<Vec<u8>>,
+                          max: Bound<Vec<u8>>)
+                          -> Result<usize, OperationError> {
         match *self {
             Value::Nil => Ok(0),
             Value::SortedSet(ref mut value) => Ok(value.zremrangebylex(min, max)),
@@ -1478,7 +1552,11 @@ impl Value {
     /// assert!(((val4.zscore(vec![2]).unwrap().unwrap() - 4.4)).abs() < 0.01);
     /// assert!(((val4.zscore(vec![3]).unwrap().unwrap() - 9.9)).abs() < 0.01);
     /// ```
-    pub fn zunion(&self, zset_values: &Vec<&Value>, weights: Option<Vec<f64>>, aggregate: zset::Aggregate) -> Result<Value, OperationError> {
+    pub fn zunion(&self,
+                  zset_values: &Vec<&Value>,
+                  weights: Option<Vec<f64>>,
+                  aggregate: zset::Aggregate)
+                  -> Result<Value, OperationError> {
         let emptyzset = ValueSortedSet::new();
         let zsets = try!(get_zset_list(zset_values, &emptyzset));
 
@@ -1526,7 +1604,11 @@ impl Value {
     /// assert_eq!(val4.zcard().unwrap(), 1);
     /// assert!(((val4.zscore(vec![1]).unwrap().unwrap() - 1.1)).abs() < 0.01);
     /// ```
-    pub fn zinter(&self, zset_values: &Vec<&Value>, weights: Option<Vec<f64>>, aggregate: zset::Aggregate) -> Result<Value, OperationError> {
+    pub fn zinter(&self,
+                  zset_values: &Vec<&Value>,
+                  weights: Option<Vec<f64>>,
+                  aggregate: zset::Aggregate)
+                  -> Result<Value, OperationError> {
         let emptyzset = ValueSortedSet::new();
         let zsets = try!(get_zset_list(zset_values, &emptyzset));
 
@@ -1564,7 +1646,11 @@ impl Value {
 
     pub fn debug_object(&self) -> String {
         match *self {
-            Value::Nil => "Value at:0x0000000000 refcount:0 encoding:nil serializedlength:0 lru:0 lru_seconds_idle:0".to_owned(),
+            Value::Nil => {
+                "Value at:0x0000000000 refcount:0 encoding:nil serializedlength:0 lru:0 \
+                 lru_seconds_idle:0"
+                    .to_owned()
+            }
             Value::String(ref s) => s.debug_object(),
             Value::List(ref l) => l.debug_object().to_owned(),
             Value::Set(ref s) => s.debug_object().to_owned(),
@@ -1587,11 +1673,6 @@ pub struct Database {
     pub config: Config,
     data: Vec<RehashingHashMap<Vec<u8>, Value>>,
     /// Maps a key to an expiration time. Expiration time is in milliseconds.
-    // FIXME: Duplicating key when it has an expiration.
-    // Options:
-    // - Use Rc
-    // - Use a reference
-    // - Move expiration to `data`
     data_expiration_ms: Vec<RehashingHashMap<Vec<u8>, i64>>,
     /// Maps a key to a collection of client identifiers.
     /// Every time a key is modified, the watched key client is flushed.
@@ -1631,14 +1712,20 @@ pub struct Database {
 }
 
 pub struct Iter<'a> {
-    inner: rehashinghashmap::Iter<'a, Vec<u8>, Value>
+    inner: rehashinghashmap::Iter<'a, Vec<u8>, Value>,
 }
 
 impl<'a> Iterator for Iter<'a> {
     type Item = (&'a Vec<u8>, &'a Value);
 
-    #[inline] fn next(&mut self) -> Option<(&'a Vec<u8>, &'a Value)> { self.inner.next() }
-    #[inline] fn size_hint(&self) -> (usize, Option<usize>) { self.inner.size_hint()  }
+    #[inline]
+    fn next(&mut self) -> Option<(&'a Vec<u8>, &'a Value)> {
+        self.inner.next()
+    }
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.inner.size_hint()
+    }
 }
 
 macro_rules! random_key {
@@ -1695,7 +1782,7 @@ impl Database {
             start_mstime: mstime(),
             aof: aof,
             loading: false,
-        }
+        };
     }
 
     pub fn uptime(&self) -> i64 {
@@ -1703,7 +1790,8 @@ impl Database {
     }
 
     fn is_expired(&self, index: usize, key: &Vec<u8>) -> bool {
-        !self.loading && match self.data_expiration_ms[index].get(key) {
+        !self.loading &&
+        match self.data_expiration_ms[index].get(key) {
             Some(t) => t <= &mstime(),
             None => false,
         }
@@ -1800,10 +1888,12 @@ impl Database {
             if self.data[index].len() * 10 / 12 < self.data[index].capacity() {
                 self.data[index].shrink_to_fit();
             }
-            if self.data_expiration_ms[index].len() * 10 / 12 < self.data_expiration_ms[index].capacity() {
+            if self.data_expiration_ms[index].len() * 10 / 12 <
+               self.data_expiration_ms[index].capacity() {
                 self.data_expiration_ms[index].shrink_to_fit();
             }
-            if self.key_subscribers[index].len() * 10 / 12 < self.key_subscribers[index].capacity() {
+            if self.key_subscribers[index].len() * 10 / 12 <
+               self.key_subscribers[index].capacity() {
                 self.key_subscribers[index].shrink_to_fit();
             }
         }
@@ -1885,7 +1975,11 @@ impl Database {
     pub fn key_watch(&mut self, index: usize, key: &Vec<u8>, identifier: usize) {
         match self.watched_keys[index].contains_key(key) {
             true => self.watched_keys[index].get_mut(key).unwrap().insert(identifier),
-            false => self.watched_keys[index].insert(key.clone(), HashSet::from_iter(vec![identifier])).is_some(),
+            false => {
+                self.watched_keys[index]
+                    .insert(key.clone(), HashSet::from_iter(vec![identifier]))
+                    .is_some()
+            }
         };
     }
 
@@ -1898,7 +1992,7 @@ impl Database {
     pub fn key_watch_verify(&self, index: usize, key: &Vec<u8>, identifier: usize) -> bool {
         match self.watched_keys[index].get(key) {
             Some(ref l) => l.contains(&identifier),
-            None => false
+            None => false,
         }
     }
 
@@ -2046,7 +2140,10 @@ impl Database {
         match self.subscribers.get(channel_name) {
             Some(channels) => {
                 for (_, channel) in channels {
-                    match channel.send(Some(PubsubEvent::Message(channel_name.clone(), None, message.clone()).as_response())) {
+                    match channel.send(Some(PubsubEvent::Message(channel_name.clone(),
+                                                                 None,
+                                                                 message.clone())
+                        .as_response())) {
                         Ok(_) => c += 1,
                         Err(_) => (),
                     }
@@ -2057,7 +2154,10 @@ impl Database {
         for (pattern, channels) in self.pattern_subscribers.iter() {
             if glob_match(&pattern, &channel_name, false) {
                 for (_, channel) in channels {
-                    match channel.send(Some(PubsubEvent::Message(channel_name.clone(), Some(pattern.clone()), message.clone()).as_response())) {
+                    match channel.send(Some(PubsubEvent::Message(channel_name.clone(),
+                                                                 Some(pattern.clone()),
+                                                                 message.clone())
+                        .as_response())) {
                         Ok(_) => c += 1,
                         Err(_) => (),
                     }
@@ -2106,23 +2206,23 @@ impl Database {
     /// ```
     pub fn mapped_command(&self, command: &String) -> Option<String> {
         match self.config.rename_commands.get(command) {
-            Some(c) => match *c {
-                Some(ref s) => Some(s.clone()),
-                None => None,
-            },
+            Some(c) => {
+                match *c {
+                    Some(ref s) => Some(s.clone()),
+                    None => None,
+                }
+            }
             None => Some(command.clone()),
         }
     }
 
     /// Iterate over the keys in one database
     pub fn iter_db(&self, dbindex: usize) -> Iter {
-        Iter {
-            inner: self.data[dbindex].iter()
-        }
+        Iter { inner: self.data[dbindex].iter() }
     }
 
     /// Collect all keys from a database matching a pattern.
-    pub fn keys(&self, dbindex: usize, pattern: &Vec<u8>) ->Vec<Vec<u8>> {
+    pub fn keys(&self, dbindex: usize, pattern: &Vec<u8>) -> Vec<Vec<u8>> {
         let iter = self.iter_db(dbindex);
         let mut responses = Vec::with_capacity(iter.size_hint().1.unwrap_or(1));
         for (k, _) in iter {
@@ -2189,18 +2289,26 @@ impl Database {
     pub fn log_command(&mut self, dbindex: usize, command: &ParsedCommand, write: bool) {
         // FIXME: unnecessary free/alloc?
         let bcommand = format!("{:?}", command);
-        let tmp = self.monitor_senders.drain(RangeFull).filter(|s| s.send(bcommand.clone()).is_ok()).collect::<Vec<_>>();
+        let tmp = self.monitor_senders
+            .drain(RangeFull)
+            .filter(|s| s.send(bcommand.clone()).is_ok())
+            .collect::<Vec<_>>();
         self.monitor_senders = tmp;
         if write {
             let mut err = false;
             match self.aof {
-                Some(ref mut w) => match w.write(dbindex, command) {
-                    Ok(_) => (),
-                    Err(e) => {
-                        log!(self.config.logger, Warning, "Error writing aof {:?}; stopped writing", e);
-                        err = true;
-                    },
-                },
+                Some(ref mut w) => {
+                    match w.write(dbindex, command) {
+                        Ok(_) => (),
+                        Err(e) => {
+                            log!(self.config.logger,
+                                 Warning,
+                                 "Error writing aof {:?}; stopped writing",
+                                 e);
+                            err = true;
+                        }
+                    }
+                }
                 None => (),
             }
             if err {
@@ -2239,14 +2347,28 @@ mod test_command {
 
         value.push(v1.clone(), false).unwrap();
         {
-            let list = match value { Value::List(ref value) => match value { &ValueList::Data(ref l) => l }, _ => panic!("Expected list") };
+            let list = match value {
+                Value::List(ref value) => {
+                    match value {
+                        &ValueList::Data(ref l) => l,
+                    }
+                }
+                _ => panic!("Expected list"),
+            };
             assert_eq!(list.len(), 1);
             assert_eq!(list.front(), Some(&v1));
         }
 
         value.push(v2.clone(), false).unwrap();
         {
-            let list = match value { Value::List(ref value) => match value { &ValueList::Data(ref l) => l }, _ => panic!("Expected list") };
+            let list = match value {
+                Value::List(ref value) => {
+                    match value {
+                        &ValueList::Data(ref l) => l,
+                    }
+                }
+                _ => panic!("Expected list"),
+            };
             assert_eq!(list.len(), 2);
             assert_eq!(list.back(), Some(&v1));
             assert_eq!(list.front(), Some(&v2));
@@ -2291,7 +2413,8 @@ mod test_command {
         value.push(v1.clone(), true).unwrap();
         value.push(v2.clone(), true).unwrap();
 
-        assert_eq!(value.linsert(true, v2.clone(), v3.clone()).unwrap().unwrap(), 3);
+        assert_eq!(value.linsert(true, v2.clone(), v3.clone()).unwrap().unwrap(),
+                   3);
         assert_eq!(value.lindex(0).unwrap(), Some(&v1));
         assert_eq!(value.lindex(1).unwrap(), Some(&v3));
         assert_eq!(value.lindex(2).unwrap(), Some(&v2));
@@ -2361,7 +2484,14 @@ mod test_command {
         assert_eq!(value.lrem(true, 3, v1.clone()).unwrap(), 3);
         assert_eq!(value.llen().unwrap(), 2);
         {
-            let list = match value { Value::List(ref value) => match value { &ValueList::Data(ref l) => l }, _ => panic!("Expected list") };
+            let list = match value {
+                Value::List(ref value) => {
+                    match value {
+                        &ValueList::Data(ref l) => l,
+                    }
+                }
+                _ => panic!("Expected list"),
+            };
             assert_eq!(list.front().unwrap(), &v2);
         }
         assert_eq!(value.lrem(true, 3, v1.clone()).unwrap(), 1);
@@ -2400,7 +2530,14 @@ mod test_command {
         assert_eq!(value.lrem(false, 3, v1.clone()).unwrap(), 3);
         assert_eq!(value.llen().unwrap(), 2);
         {
-            let list = match value { Value::List(ref value) => match value { &ValueList::Data(ref l) => l }, _ => panic!("Expected list") };
+            let list = match value {
+                Value::List(ref value) => {
+                    match value {
+                        &ValueList::Data(ref l) => l,
+                    }
+                }
+                _ => panic!("Expected list"),
+            };
             assert_eq!(list.front().unwrap(), &v1);
         }
         assert_eq!(value.lrem(false, 3, v1.clone()).unwrap(), 1);
@@ -2542,8 +2679,7 @@ mod test_command {
 
         let mut v = value.srandmember(2, false).unwrap();
         v.sort_by(|a, b| a.cmp(b));
-        assert!(v == vec![v1.clone(), v1.clone()] ||
-                v == vec![v1.clone(), v2.clone()] ||
+        assert!(v == vec![v1.clone(), v1.clone()] || v == vec![v1.clone(), v2.clone()] ||
                 v == vec![v2.clone(), v2.clone()]);
     }
 
@@ -2557,8 +2693,7 @@ mod test_command {
 
         let mut v = value.srandmember(1, false).unwrap();
         v.sort_by(|a, b| a.cmp(b));
-        assert!(v == vec![v1.clone()] ||
-                v == vec![v2.clone()]);
+        assert!(v == vec![v1.clone()] || v == vec![v2.clone()]);
     }
 
     #[test]
@@ -2568,7 +2703,8 @@ mod test_command {
         value.sadd(v1.clone(), 100).unwrap();
 
         let v = value.srandmember(5, true).unwrap();
-        assert_eq!(v, vec![v1.clone(), v1.clone(), v1.clone(), v1.clone(), v1.clone()]);
+        assert_eq!(v,
+                   vec![v1.clone(), v1.clone(), v1.clone(), v1.clone(), v1.clone()]);
     }
 
     #[test]
@@ -2647,7 +2783,7 @@ mod test_command {
         assert_eq!(value2.sadd(v3.clone(), 100).unwrap(), true);
 
         assert_eq!(value1.sdiff(&vec![&value2]).unwrap(),
-                vec![v2].iter().cloned().collect::<HashSet<_>>());
+                   vec![v2].iter().cloned().collect::<HashSet<_>>());
     }
 
     #[test]
@@ -2665,11 +2801,11 @@ mod test_command {
         assert_eq!(value2.sadd(v3.clone(), 100).unwrap(), true);
 
         assert_eq!(value1.sinter(&vec![&value2]).unwrap().iter().collect::<Vec<_>>(),
-                vec![&v1]);
+                   vec![&v1]);
 
-        let empty:Vec<&Value> = Vec::new();
+        let empty: Vec<&Value> = Vec::new();
         assert_eq!(value1.sinter(&empty).unwrap(),
-                vec![v1, v2].iter().cloned().collect::<HashSet<_>>());
+                   vec![v1, v2].iter().cloned().collect::<HashSet<_>>());
 
         assert_eq!(value1.sinter(&vec![&value2, &Value::Nil]).unwrap().len(), 0);
     }
@@ -2684,8 +2820,10 @@ mod test_command {
         assert_eq!(value1.sadd(v1.clone(), 100).unwrap(), true);
         assert_eq!(value1.sadd(v2.clone(), 100).unwrap(), true);
 
-        assert_eq!(value1.sinter(&vec![&value2]).unwrap().iter().collect::<Vec<_>>().len(), 0);
-        assert_eq!(value2.sinter(&vec![&value1]).unwrap().iter().collect::<Vec<_>>().len(), 0);
+        assert_eq!(value1.sinter(&vec![&value2]).unwrap().iter().collect::<Vec<_>>().len(),
+                   0);
+        assert_eq!(value2.sinter(&vec![&value1]).unwrap().iter().collect::<Vec<_>>().len(),
+                   0);
     }
 
     #[test]
@@ -2703,14 +2841,14 @@ mod test_command {
         assert_eq!(value2.sadd(v3.clone(), 100).unwrap(), true);
 
         assert_eq!(value1.sunion(&vec![&value2]).unwrap(),
-                vec![&v1, &v2, &v3].iter().cloned().cloned().collect::<HashSet<_>>());
+                   vec![&v1, &v2, &v3].iter().cloned().cloned().collect::<HashSet<_>>());
 
-        let empty:Vec<&Value> = Vec::new();
+        let empty: Vec<&Value> = Vec::new();
         assert_eq!(value1.sunion(&empty).unwrap(),
-                vec![&v1, &v2].iter().cloned().cloned().collect::<HashSet<_>>());
+                   vec![&v1, &v2].iter().cloned().cloned().collect::<HashSet<_>>());
 
         assert_eq!(value1.sunion(&vec![&value2, &Value::Nil]).unwrap(),
-                vec![&v1, &v2, &v3].iter().cloned().cloned().collect::<HashSet<_>>());
+                   vec![&v1, &v2, &v3].iter().cloned().cloned().collect::<HashSet<_>>());
     }
 
     #[test]
@@ -2726,7 +2864,7 @@ mod test_command {
         assert_eq!(value2.sadd(v3.clone(), 100).unwrap(), true);
 
         assert_eq!(value1.sunion(&vec![&value2]).unwrap(),
-                vec![&v1, &v2, &v3].iter().cloned().cloned().collect::<HashSet<_>>());
+                   vec![&v1, &v2, &v3].iter().cloned().cloned().collect::<HashSet<_>>());
     }
 
     #[test]
@@ -2758,7 +2896,8 @@ mod test_command {
         let mut value = Value::Nil;
         assert_eq!(value.append(vec![0, 0, 0]).unwrap(), 3);
         assert_eq!(value.append(vec![1, 2, 3, 4]).unwrap(), 7);
-        assert_eq!(value, Value::String(ValueString::Data(vec![0u8, 0, 0, 1, 2, 3, 4])));
+        assert_eq!(value,
+                   Value::String(ValueString::Data(vec![0u8, 0, 0, 1, 2, 3, 4])));
     }
 
     #[test]
@@ -2860,51 +2999,57 @@ mod test_command {
         let expected = value.clone();
         assert!(database.get_or_create(0, &key).set(value).is_ok());
         database.set_msexpiration(0, key.clone(), mstime() + 10000);
-        assert_eq!(database.get(0, &key), Some(&Value::String(ValueString::Data(expected))));
+        assert_eq!(database.get(0, &key),
+                   Some(&Value::String(ValueString::Data(expected))));
     }
 
     #[test]
     fn getrange_integer() {
         let value = Value::String(ValueString::Integer(123));
-        assert_eq!(value.getrange(0, -1).unwrap(), "123".to_owned().into_bytes());
-        assert_eq!(value.getrange(-100, -2).unwrap(), "12".to_owned().into_bytes());
+        assert_eq!(value.getrange(0, -1).unwrap(),
+                   "123".to_owned().into_bytes());
+        assert_eq!(value.getrange(-100, -2).unwrap(),
+                   "12".to_owned().into_bytes());
         assert_eq!(value.getrange(1, 1).unwrap(), "2".to_owned().into_bytes());
     }
 
     #[test]
     fn getrange_data() {
-        let value = Value::String(ValueString::Data(vec![1,2,3]));
-        assert_eq!(value.getrange(0, -1).unwrap(), vec![1,2,3]);
-        assert_eq!(value.getrange(-100, -2).unwrap(), vec![1,2]);
+        let value = Value::String(ValueString::Data(vec![1, 2, 3]));
+        assert_eq!(value.getrange(0, -1).unwrap(), vec![1, 2, 3]);
+        assert_eq!(value.getrange(-100, -2).unwrap(), vec![1, 2]);
         assert_eq!(value.getrange(1, 1).unwrap(), vec![2]);
     }
 
     #[test]
     fn setrange_append() {
-        let mut value = Value::String(ValueString::Data(vec![1,2,3]));
+        let mut value = Value::String(ValueString::Data(vec![1, 2, 3]));
         assert_eq!(value.setrange(3, vec![4, 5, 6]).unwrap(), 6);
-        assert_eq!(value, Value::String(ValueString::Data(vec![1,2,3,4,5,6])));
+        assert_eq!(value,
+                   Value::String(ValueString::Data(vec![1, 2, 3, 4, 5, 6])));
     }
 
     #[test]
     fn setrange_create() {
         let mut value = Value::Nil;
         assert_eq!(value.setrange(0, vec![4, 5, 6]).unwrap(), 3);
-        assert_eq!(value, Value::String(ValueString::Data(vec![4,5,6])));
+        assert_eq!(value, Value::String(ValueString::Data(vec![4, 5, 6])));
     }
 
     #[test]
     fn setrange_padding() {
-        let mut value = Value::String(ValueString::Data(vec![1,2,3]));
+        let mut value = Value::String(ValueString::Data(vec![1, 2, 3]));
         assert_eq!(value.setrange(5, vec![6]).unwrap(), 6);
-        assert_eq!(value, Value::String(ValueString::Data(vec![1,2,3,0,0,6])));
+        assert_eq!(value,
+                   Value::String(ValueString::Data(vec![1, 2, 3, 0, 0, 6])));
     }
 
     #[test]
     fn setrange_intermediate() {
-        let mut value = Value::String(ValueString::Data(vec![1,2,3,4,5]));
+        let mut value = Value::String(ValueString::Data(vec![1, 2, 3, 4, 5]));
         assert_eq!(value.setrange(2, vec![13, 14]).unwrap(), 5);
-        assert_eq!(value, Value::String(ValueString::Data(vec![1,2,13,14,5])));
+        assert_eq!(value,
+                   Value::String(ValueString::Data(vec![1, 2, 13, 14, 5])));
     }
 
     #[test]
@@ -2918,7 +3063,7 @@ mod test_command {
 
     #[test]
     fn getbit() {
-        let value = Value::String(ValueString::Data(vec![1,2,3,4,5]));
+        let value = Value::String(ValueString::Data(vec![1, 2, 3, 4, 5]));
         assert_eq!(value.getbit(0).unwrap(), false);
         assert_eq!(value.getbit(23).unwrap(), true);
         assert_eq!(value.getbit(500).unwrap(), false);
@@ -2943,12 +3088,14 @@ mod test_command {
         assert_eq!(zadd!(value, s2, v2), true);
         assert_eq!(zadd!(value, s1, v2), false);
         match value {
-            Value::SortedSet(value) => match value {
-                ValueSortedSet::Data(_, hs) => {
-                    assert_eq!(hs.get(&v1).unwrap(), &s1);
-                    assert_eq!(hs.get(&v2).unwrap(), &s1);
-                },
-            },
+            Value::SortedSet(value) => {
+                match value {
+                    ValueSortedSet::Data(_, hs) => {
+                        assert_eq!(hs.get(&v1).unwrap(), &s1);
+                        assert_eq!(hs.get(&v2).unwrap(), &s1);
+                    }
+                }
+            }
             _ => panic!("Expected zset"),
         }
     }
@@ -2961,17 +3108,23 @@ mod test_command {
         let s2 = 1.0;
         let v2 = vec![5, 6, 7, 8];
 
-        assert_eq!(value.zadd(s1, v1.clone(), true, false, false, false).unwrap(), true);
-        assert_eq!(value.zadd(s1, v1.clone(), true, false, false, false).unwrap(), false);
-        assert_eq!(value.zadd(s2, v2.clone(), true, false, false, false).unwrap(), true);
-        assert_eq!(value.zadd(s1, v2.clone(), true, false, false, false).unwrap(), false);
+        assert_eq!(value.zadd(s1, v1.clone(), true, false, false, false).unwrap(),
+                   true);
+        assert_eq!(value.zadd(s1, v1.clone(), true, false, false, false).unwrap(),
+                   false);
+        assert_eq!(value.zadd(s2, v2.clone(), true, false, false, false).unwrap(),
+                   true);
+        assert_eq!(value.zadd(s1, v2.clone(), true, false, false, false).unwrap(),
+                   false);
         match value {
-            Value::SortedSet(value) => match value {
-                ValueSortedSet::Data(_, hs) => {
-                    assert_eq!(hs.get(&v1).unwrap(), &s1);
-                    assert_eq!(hs.get(&v2).unwrap(), &s2);
-                },
-            },
+            Value::SortedSet(value) => {
+                match value {
+                    ValueSortedSet::Data(_, hs) => {
+                        assert_eq!(hs.get(&v1).unwrap(), &s1);
+                        assert_eq!(hs.get(&v2).unwrap(), &s2);
+                    }
+                }
+            }
             _ => panic!("Expected zset"),
         }
     }
@@ -2983,15 +3136,19 @@ mod test_command {
         let v1 = vec![1, 2, 3, 4];
         let s2 = 2.0;
 
-        assert_eq!(value.zadd(s1, v1.clone(), false, true, false, false).unwrap(), false);
+        assert_eq!(value.zadd(s1, v1.clone(), false, true, false, false).unwrap(),
+                   false);
         assert_eq!(zadd!(value, s1, v1), true);
-        assert_eq!(value.zadd(s2, v1.clone(), false, true, false, false).unwrap(), false);
+        assert_eq!(value.zadd(s2, v1.clone(), false, true, false, false).unwrap(),
+                   false);
         match value {
-            Value::SortedSet(value) => match value {
-                ValueSortedSet::Data(_, hs) => {
-                    assert_eq!(hs.get(&v1).unwrap(), &s2);
-                },
-            },
+            Value::SortedSet(value) => {
+                match value {
+                    ValueSortedSet::Data(_, hs) => {
+                        assert_eq!(hs.get(&v1).unwrap(), &s2);
+                    }
+                }
+            }
             _ => panic!("Expected zset"),
         }
     }
@@ -3003,15 +3160,19 @@ mod test_command {
         let v1 = vec![1, 2, 3, 4];
         let s2 = 2.0;
 
-        assert_eq!(value.zadd(s1, v1.clone(), false, false, true, false).unwrap(), true);
+        assert_eq!(value.zadd(s1, v1.clone(), false, false, true, false).unwrap(),
+                   true);
         assert_eq!(zadd!(value, s1, v1), false);
-        assert_eq!(value.zadd(s2, v1.clone(), false, false, true, false).unwrap(), true);
+        assert_eq!(value.zadd(s2, v1.clone(), false, false, true, false).unwrap(),
+                   true);
         match value {
-            Value::SortedSet(value) => match value {
-                ValueSortedSet::Data(_, hs) => {
-                    assert_eq!(hs.get(&v1).unwrap(), &s2);
-                },
-            },
+            Value::SortedSet(value) => {
+                match value {
+                    ValueSortedSet::Data(_, hs) => {
+                        assert_eq!(hs.get(&v1).unwrap(), &s2);
+                    }
+                }
+            }
             _ => panic!("Expected zset"),
         }
     }
@@ -3026,11 +3187,16 @@ mod test_command {
 
         assert_eq!(zadd!(value, s1, v1), true);
         assert_eq!(zadd!(value, s2, v2), true);
-        assert_eq!(value.zcount(Bound::Included(0.0), Bound::Included(5.0)).unwrap(), 2);
-        assert_eq!(value.zcount(Bound::Included(1.0), Bound::Included(2.0)).unwrap(), 2);
-        assert_eq!(value.zcount(Bound::Excluded(1.0), Bound::Excluded(2.0)).unwrap(), 0);
-        assert_eq!(value.zcount(Bound::Included(1.5), Bound::Included(2.0)).unwrap(), 1);
-        assert_eq!(value.zcount(Bound::Included(5.0), Bound::Included(10.0)).unwrap(), 0);
+        assert_eq!(value.zcount(Bound::Included(0.0), Bound::Included(5.0)).unwrap(),
+                   2);
+        assert_eq!(value.zcount(Bound::Included(1.0), Bound::Included(2.0)).unwrap(),
+                   2);
+        assert_eq!(value.zcount(Bound::Excluded(1.0), Bound::Excluded(2.0)).unwrap(),
+                   0);
+        assert_eq!(value.zcount(Bound::Included(1.5), Bound::Included(2.0)).unwrap(),
+                   1);
+        assert_eq!(value.zcount(Bound::Included(5.0), Bound::Included(10.0)).unwrap(),
+                   0);
     }
 
     #[test]
@@ -3041,11 +3207,16 @@ mod test_command {
 
         assert_eq!(zadd!(value, 0.0, v1), true);
         assert_eq!(zadd!(value, 0.0, v2), true);
-        assert_eq!(value.zlexcount(Bound::Included(vec![0]), Bound::Included(vec![5])).unwrap(), 2);
-        assert_eq!(value.zlexcount(Bound::Included(vec![1]), Bound::Included(vec![2])).unwrap(), 2);
-        assert_eq!(value.zlexcount(Bound::Excluded(vec![1]), Bound::Excluded(vec![2])).unwrap(), 0);
-        assert_eq!(value.zlexcount(Bound::Included(vec![1, 5]), Bound::Included(vec![2])).unwrap(), 1);
-        assert_eq!(value.zlexcount(Bound::Included(vec![5]), Bound::Included(vec![10])).unwrap(), 0);
+        assert_eq!(value.zlexcount(Bound::Included(vec![0]), Bound::Included(vec![5])).unwrap(),
+                   2);
+        assert_eq!(value.zlexcount(Bound::Included(vec![1]), Bound::Included(vec![2])).unwrap(),
+                   2);
+        assert_eq!(value.zlexcount(Bound::Excluded(vec![1]), Bound::Excluded(vec![2])).unwrap(),
+                   0);
+        assert_eq!(value.zlexcount(Bound::Included(vec![1, 5]), Bound::Included(vec![2])).unwrap(),
+                   1);
+        assert_eq!(value.zlexcount(Bound::Included(vec![5]), Bound::Included(vec![10])).unwrap(),
+                   0);
     }
 
     #[test]
@@ -3061,12 +3232,14 @@ mod test_command {
         assert_eq!(zadd!(value, s1, v1), true);
         assert_eq!(zadd!(value, s3, v3), true);
         assert_eq!(zadd!(value, s2, v2), true);
-        assert_eq!(value.zrange(0, -1, true, false).unwrap(), vec![
+        assert_eq!(value.zrange(0, -1, true, false).unwrap(),
+                   vec![
                 vec![1, 2, 3, 4], b"0".to_vec(),
                 vec![5, 6, 7, 8], b"0".to_vec(),
                 vec![9, 10, 11, 12], b"0".to_vec(),
                 ]);
-        assert_eq!(value.zrange(1, 1, true, false).unwrap(), vec![
+        assert_eq!(value.zrange(1, 1, true, false).unwrap(),
+                   vec![
                 vec![5, 6, 7, 8], b"0".to_vec(),
                 ]);
         assert_eq!(value.zrange(2, 0, true, false).unwrap().len(), 0);
@@ -3085,16 +3258,19 @@ mod test_command {
         assert_eq!(zadd!(value, s1, v1), true);
         assert_eq!(zadd!(value, s3, v3), true);
         assert_eq!(zadd!(value, s2, v2), true);
-        assert_eq!(value.zrange(0, -1, true, true).unwrap(), vec![
+        assert_eq!(value.zrange(0, -1, true, true).unwrap(),
+                   vec![
                 v3.clone(), b"0".to_vec(),
                 v2.clone(), b"0".to_vec(),
                 v1.clone(), b"0".to_vec(),
                 ]);
-        assert_eq!(value.zrange(1, 1, true, true).unwrap(), vec![
+        assert_eq!(value.zrange(1, 1, true, true).unwrap(),
+                   vec![
                 v2.clone(), b"0".to_vec(),
                 ]);
         assert_eq!(value.zrange(2, 0, true, true).unwrap().len(), 0);
-        assert_eq!(value.zrange(2, 2, true, true).unwrap(), vec![
+        assert_eq!(value.zrange(2, 2, true, true).unwrap(),
+                   vec![
                 v1.clone(), b"0".to_vec(),
                 ]);
     }
@@ -3112,25 +3288,88 @@ mod test_command {
         assert_eq!(zadd!(value, s1, v1), true);
         assert_eq!(zadd!(value, s3, v3), true);
         assert_eq!(zadd!(value, s2, v2), true);
-        assert_eq!(value.zrangebyscore(Bound::Unbounded, Bound::Unbounded, true, 0, usize::MAX, false).unwrap(), vec![
+        assert_eq!(value.zrangebyscore(Bound::Unbounded,
+                                      Bound::Unbounded,
+                                      true,
+                                      0,
+                                      usize::MAX,
+                                      false)
+                       .unwrap(),
+                   vec![
                 vec![1, 2, 3, 4], b"10".to_vec(),
                 vec![5, 6, 7, 8], b"20".to_vec(),
                 vec![9, 10, 11, 12], b"30".to_vec(),
                 ]);
-        assert_eq!(value.zrangebyscore(Bound::Excluded(10.0), Bound::Included(20.0), true, 0, usize::MAX, false).unwrap(), vec![
+        assert_eq!(value.zrangebyscore(Bound::Excluded(10.0),
+                                      Bound::Included(20.0),
+                                      true,
+                                      0,
+                                      usize::MAX,
+                                      false)
+                       .unwrap(),
+                   vec![
                 vec![5, 6, 7, 8], b"20".to_vec(),
                 ]);
-        assert_eq!(value.zrangebyscore(Bound::Included(20.0), Bound::Excluded(30.0), true, 0, usize::MAX, false).unwrap(), vec![
+        assert_eq!(value.zrangebyscore(Bound::Included(20.0),
+                                      Bound::Excluded(30.0),
+                                      true,
+                                      0,
+                                      usize::MAX,
+                                      false)
+                       .unwrap(),
+                   vec![
                 vec![5, 6, 7, 8], b"20".to_vec(),
                 ]);
-        assert_eq!(value.zrangebyscore(Bound::Unbounded, Bound::Unbounded, true, 1, 1, false).unwrap(), vec![
+        assert_eq!(value.zrangebyscore(Bound::Unbounded, Bound::Unbounded, true, 1, 1, false)
+                       .unwrap(),
+                   vec![
                 vec![5, 6, 7, 8], b"20".to_vec(),
                 ]);
-        assert_eq!(value.zrangebyscore(Bound::Excluded(30.0), Bound::Included(20.0), false, 0, usize::MAX, false).unwrap().len(), 0);
-        assert_eq!(value.zrangebyscore(Bound::Excluded(30.0), Bound::Excluded(30.0), false, 0, usize::MAX, false).unwrap().len(), 0);
-        assert_eq!(value.zrangebyscore(Bound::Included(30.0), Bound::Included(30.0), false, 0, usize::MAX, false).unwrap().len(), 1);
-        assert_eq!(value.zrangebyscore(Bound::Included(30.0), Bound::Excluded(30.0), false, 0, usize::MAX, false).unwrap().len(), 0);
-        assert_eq!(value.zrangebyscore(Bound::Included(21.0), Bound::Included(22.0), false, 0, usize::MAX, false).unwrap().len(), 0);
+        assert_eq!(value.zrangebyscore(Bound::Excluded(30.0),
+                                      Bound::Included(20.0),
+                                      false,
+                                      0,
+                                      usize::MAX,
+                                      false)
+                       .unwrap()
+                       .len(),
+                   0);
+        assert_eq!(value.zrangebyscore(Bound::Excluded(30.0),
+                                      Bound::Excluded(30.0),
+                                      false,
+                                      0,
+                                      usize::MAX,
+                                      false)
+                       .unwrap()
+                       .len(),
+                   0);
+        assert_eq!(value.zrangebyscore(Bound::Included(30.0),
+                                      Bound::Included(30.0),
+                                      false,
+                                      0,
+                                      usize::MAX,
+                                      false)
+                       .unwrap()
+                       .len(),
+                   1);
+        assert_eq!(value.zrangebyscore(Bound::Included(30.0),
+                                      Bound::Excluded(30.0),
+                                      false,
+                                      0,
+                                      usize::MAX,
+                                      false)
+                       .unwrap()
+                       .len(),
+                   0);
+        assert_eq!(value.zrangebyscore(Bound::Included(21.0),
+                                      Bound::Included(22.0),
+                                      false,
+                                      0,
+                                      usize::MAX,
+                                      false)
+                       .unwrap()
+                       .len(),
+                   0);
     }
 
     #[test]
@@ -3146,25 +3385,88 @@ mod test_command {
         assert_eq!(zadd!(value, s1, v1), true);
         assert_eq!(zadd!(value, s3, v3), true);
         assert_eq!(zadd!(value, s2, v2), true);
-        assert_eq!(value.zrangebyscore(Bound::Unbounded, Bound::Unbounded, true, 0, usize::MAX, true).unwrap(), vec![
+        assert_eq!(value.zrangebyscore(Bound::Unbounded,
+                                      Bound::Unbounded,
+                                      true,
+                                      0,
+                                      usize::MAX,
+                                      true)
+                       .unwrap(),
+                   vec![
                 vec![9, 10, 11, 12], b"30".to_vec(),
                 vec![5, 6, 7, 8], b"20".to_vec(),
                 vec![1, 2, 3, 4], b"10".to_vec(),
                 ]);
-        assert_eq!(value.zrangebyscore(Bound::Included(20.0), Bound::Excluded(10.0), true, 0, usize::MAX, true).unwrap(), vec![
+        assert_eq!(value.zrangebyscore(Bound::Included(20.0),
+                                      Bound::Excluded(10.0),
+                                      true,
+                                      0,
+                                      usize::MAX,
+                                      true)
+                       .unwrap(),
+                   vec![
                 vec![5, 6, 7, 8], b"20".to_vec(),
                 ]);
-        assert_eq!(value.zrangebyscore(Bound::Excluded(30.0), Bound::Included(20.0), true, 0, usize::MAX, true).unwrap(), vec![
+        assert_eq!(value.zrangebyscore(Bound::Excluded(30.0),
+                                      Bound::Included(20.0),
+                                      true,
+                                      0,
+                                      usize::MAX,
+                                      true)
+                       .unwrap(),
+                   vec![
                 vec![5, 6, 7, 8], b"20".to_vec(),
                 ]);
-        assert_eq!(value.zrangebyscore(Bound::Unbounded, Bound::Unbounded, true, 1, 1, true).unwrap(), vec![
+        assert_eq!(value.zrangebyscore(Bound::Unbounded, Bound::Unbounded, true, 1, 1, true)
+                       .unwrap(),
+                   vec![
                 vec![5, 6, 7, 8], b"20".to_vec(),
                 ]);
-        assert_eq!(value.zrangebyscore(Bound::Included(20.0), Bound::Excluded(30.0), false, 0, usize::MAX, true).unwrap().len(), 0);
-        assert_eq!(value.zrangebyscore(Bound::Excluded(30.0), Bound::Excluded(30.0), false, 0, usize::MAX, true).unwrap().len(), 0);
-        assert_eq!(value.zrangebyscore(Bound::Included(30.0), Bound::Included(30.0), false, 0, usize::MAX, true).unwrap().len(), 1);
-        assert_eq!(value.zrangebyscore(Bound::Excluded(30.0), Bound::Included(30.0), false, 0, usize::MAX, true).unwrap().len(), 0);
-        assert_eq!(value.zrangebyscore(Bound::Included(22.0), Bound::Included(21.0), false, 0, usize::MAX, true).unwrap().len(), 0);
+        assert_eq!(value.zrangebyscore(Bound::Included(20.0),
+                                      Bound::Excluded(30.0),
+                                      false,
+                                      0,
+                                      usize::MAX,
+                                      true)
+                       .unwrap()
+                       .len(),
+                   0);
+        assert_eq!(value.zrangebyscore(Bound::Excluded(30.0),
+                                      Bound::Excluded(30.0),
+                                      false,
+                                      0,
+                                      usize::MAX,
+                                      true)
+                       .unwrap()
+                       .len(),
+                   0);
+        assert_eq!(value.zrangebyscore(Bound::Included(30.0),
+                                      Bound::Included(30.0),
+                                      false,
+                                      0,
+                                      usize::MAX,
+                                      true)
+                       .unwrap()
+                       .len(),
+                   1);
+        assert_eq!(value.zrangebyscore(Bound::Excluded(30.0),
+                                      Bound::Included(30.0),
+                                      false,
+                                      0,
+                                      usize::MAX,
+                                      true)
+                       .unwrap()
+                       .len(),
+                   0);
+        assert_eq!(value.zrangebyscore(Bound::Included(22.0),
+                                      Bound::Included(21.0),
+                                      false,
+                                      0,
+                                      usize::MAX,
+                                      true)
+                       .unwrap()
+                       .len(),
+                   0);
     }
 
     #[test]
@@ -3192,7 +3494,8 @@ mod test_command {
 
         assert_eq!(zadd!(value, s1, v1), true);
         assert_eq!(zadd!(value, s2, v1), false);
-        assert_eq!(value.zrange(0, -1, true, false).unwrap(), vec![
+        assert_eq!(value.zrange(0, -1, true, false).unwrap(),
+                   vec![
                 vec![1, 2, 3, 4], b"1".to_vec(),
                 ]);
     }
@@ -3204,10 +3507,14 @@ mod test_command {
         let incr = 2.0;
         let v1 = vec![1, 2, 3, 4];
 
-        assert_eq!(value.zadd(s1, v1.clone(), false, false, false, true).unwrap(), true);
-        assert_eq!(value.zrange(0, -1, true, false).unwrap(), vec![v1.clone(), b"1".to_vec()]);
-        assert_eq!(value.zadd(incr, v1.clone(), false, false, false, true).unwrap(), false);
-        assert_eq!(value.zrange(0, -1, true, false).unwrap(), vec![v1.clone(), b"3".to_vec()]);
+        assert_eq!(value.zadd(s1, v1.clone(), false, false, false, true).unwrap(),
+                   true);
+        assert_eq!(value.zrange(0, -1, true, false).unwrap(),
+                   vec![v1.clone(), b"1".to_vec()]);
+        assert_eq!(value.zadd(incr, v1.clone(), false, false, false, true).unwrap(),
+                   false);
+        assert_eq!(value.zrange(0, -1, true, false).unwrap(),
+                   vec![v1.clone(), b"3".to_vec()]);
     }
 
     #[test]
@@ -3217,10 +3524,14 @@ mod test_command {
         let incr = 2.0;
         let v1 = vec![1, 2, 3, 4];
 
-        assert_eq!(value.zadd(s1, v1.clone(), false, false, true, true).unwrap(), true);
-        assert_eq!(value.zrange(0, -1, true, false).unwrap(), vec![v1.clone(), b"1".to_vec()]);
-        assert_eq!(value.zadd(incr, v1.clone(), false, false, true, true).unwrap(), true);
-        assert_eq!(value.zrange(0, -1, true, false).unwrap(), vec![v1.clone(), b"3".to_vec()]);
+        assert_eq!(value.zadd(s1, v1.clone(), false, false, true, true).unwrap(),
+                   true);
+        assert_eq!(value.zrange(0, -1, true, false).unwrap(),
+                   vec![v1.clone(), b"1".to_vec()]);
+        assert_eq!(value.zadd(incr, v1.clone(), false, false, true, true).unwrap(),
+                   true);
+        assert_eq!(value.zrange(0, -1, true, false).unwrap(),
+                   vec![v1.clone(), b"3".to_vec()]);
     }
 
     #[test]
@@ -3262,7 +3573,7 @@ mod test_command {
 
         assert_eq!(value.zincrby(s1.clone(), v1.clone()).unwrap(), s1);
         assert_eq!(value.zincrby(s2.clone(), v1.clone()).unwrap(), s1 + s2);
-        assert_eq!(value.zincrby(- s1.clone(), v1.clone()).unwrap(), s2);
+        assert_eq!(value.zincrby(-s1.clone(), v1.clone()).unwrap(), s2);
     }
 
     #[test]
@@ -3274,11 +3585,15 @@ mod test_command {
         let v2 = vec![5, 6, 7, 8];
         let v3 = vec![0, 9, 1, 2];
 
-        assert_eq!(value1.zadd(1.1, v1.clone(), false, false, false, false).unwrap(), true);
-        assert_eq!(value1.zadd(2.1, v2.clone(), false, false, false, false).unwrap(), true);
+        assert_eq!(value1.zadd(1.1, v1.clone(), false, false, false, false).unwrap(),
+                   true);
+        assert_eq!(value1.zadd(2.1, v2.clone(), false, false, false, false).unwrap(),
+                   true);
 
-        assert_eq!(value2.zadd(1.2, v1.clone(), false, false, false, false).unwrap(), true);
-        assert_eq!(value2.zadd(3.2, v3.clone(), false, false, false, false).unwrap(), true);
+        assert_eq!(value2.zadd(1.2, v1.clone(), false, false, false, false).unwrap(),
+                   true);
+        assert_eq!(value2.zadd(3.2, v3.clone(), false, false, false, false).unwrap(),
+                   true);
 
         value3 = value3.zunion(&vec![&value1, &value2], None, zset::Aggregate::Sum).unwrap();
         assert_eq!(value3.zcard().unwrap(), 3);
@@ -3296,11 +3611,15 @@ mod test_command {
         let v2 = vec![5, 6, 7, 8];
         let v3 = vec![0, 9, 1, 2];
 
-        assert_eq!(value1.zadd(1.1, v1.clone(), false, false, false, false).unwrap(), true);
-        assert_eq!(value1.zadd(2.1, v2.clone(), false, false, false, false).unwrap(), true);
+        assert_eq!(value1.zadd(1.1, v1.clone(), false, false, false, false).unwrap(),
+                   true);
+        assert_eq!(value1.zadd(2.1, v2.clone(), false, false, false, false).unwrap(),
+                   true);
 
-        assert_eq!(value2.zadd(1.2, v1.clone(), false, false, false, false).unwrap(), true);
-        assert_eq!(value2.zadd(3.2, v3.clone(), false, false, false, false).unwrap(), true);
+        assert_eq!(value2.zadd(1.2, v1.clone(), false, false, false, false).unwrap(),
+                   true);
+        assert_eq!(value2.zadd(3.2, v3.clone(), false, false, false, false).unwrap(),
+                   true);
 
         value3 = value3.zunion(&vec![&value1, &value2], None, zset::Aggregate::Min).unwrap();
         assert_eq!(value3.zcard().unwrap(), 3);
@@ -3318,11 +3637,15 @@ mod test_command {
         let v2 = vec![5, 6, 7, 8];
         let v3 = vec![0, 9, 1, 2];
 
-        assert_eq!(value1.zadd(1.1, v1.clone(), false, false, false, false).unwrap(), true);
-        assert_eq!(value1.zadd(2.1, v2.clone(), false, false, false, false).unwrap(), true);
+        assert_eq!(value1.zadd(1.1, v1.clone(), false, false, false, false).unwrap(),
+                   true);
+        assert_eq!(value1.zadd(2.1, v2.clone(), false, false, false, false).unwrap(),
+                   true);
 
-        assert_eq!(value2.zadd(1.2, v1.clone(), false, false, false, false).unwrap(), true);
-        assert_eq!(value2.zadd(3.2, v3.clone(), false, false, false, false).unwrap(), true);
+        assert_eq!(value2.zadd(1.2, v1.clone(), false, false, false, false).unwrap(),
+                   true);
+        assert_eq!(value2.zadd(3.2, v3.clone(), false, false, false, false).unwrap(),
+                   true);
 
         value3 = value3.zunion(&vec![&value1, &value2], None, zset::Aggregate::Max).unwrap();
         assert_eq!(value3.zcard().unwrap(), 3);
@@ -3340,13 +3663,20 @@ mod test_command {
         let v2 = vec![5, 6, 7, 8];
         let v3 = vec![0, 9, 1, 2];
 
-        assert_eq!(value1.zadd(1.1, v1.clone(), false, false, false, false).unwrap(), true);
-        assert_eq!(value1.zadd(2.1, v2.clone(), false, false, false, false).unwrap(), true);
+        assert_eq!(value1.zadd(1.1, v1.clone(), false, false, false, false).unwrap(),
+                   true);
+        assert_eq!(value1.zadd(2.1, v2.clone(), false, false, false, false).unwrap(),
+                   true);
 
-        assert_eq!(value2.zadd(1.2, v1.clone(), false, false, false, false).unwrap(), true);
-        assert_eq!(value2.zadd(3.2, v3.clone(), false, false, false, false).unwrap(), true);
+        assert_eq!(value2.zadd(1.2, v1.clone(), false, false, false, false).unwrap(),
+                   true);
+        assert_eq!(value2.zadd(3.2, v3.clone(), false, false, false, false).unwrap(),
+                   true);
 
-        value3 = value3.zunion(&vec![&value1, &value2], Some(vec![100.0, 200.0]), zset::Aggregate::Max).unwrap();
+        value3 = value3.zunion(&vec![&value1, &value2],
+                    Some(vec![100.0, 200.0]),
+                    zset::Aggregate::Max)
+            .unwrap();
         assert_eq!(value3.zcard().unwrap(), 3);
         assert!((value3.zscore(v1.clone()).unwrap().unwrap() - 240.0).abs() < 0.01);
         assert!((value3.zscore(v2.clone()).unwrap().unwrap() - 210.0).abs() < 0.01);
@@ -3362,11 +3692,15 @@ mod test_command {
         let v2 = vec![5, 6, 7, 8];
         let v3 = vec![0, 9, 1, 2];
 
-        assert_eq!(value1.zadd(1.1, v1.clone(), false, false, false, false).unwrap(), true);
-        assert_eq!(value1.zadd(2.1, v2.clone(), false, false, false, false).unwrap(), true);
+        assert_eq!(value1.zadd(1.1, v1.clone(), false, false, false, false).unwrap(),
+                   true);
+        assert_eq!(value1.zadd(2.1, v2.clone(), false, false, false, false).unwrap(),
+                   true);
 
-        assert_eq!(value2.zadd(1.2, v1.clone(), false, false, false, false).unwrap(), true);
-        assert_eq!(value2.zadd(3.2, v3.clone(), false, false, false, false).unwrap(), true);
+        assert_eq!(value2.zadd(1.2, v1.clone(), false, false, false, false).unwrap(),
+                   true);
+        assert_eq!(value2.zadd(3.2, v3.clone(), false, false, false, false).unwrap(),
+                   true);
 
         value3 = value3.zinter(&vec![&value1, &value2], None, zset::Aggregate::Sum).unwrap();
         assert_eq!(value3.zcard().unwrap(), 1);
@@ -3382,11 +3716,15 @@ mod test_command {
         let v2 = vec![5, 6, 7, 8];
         let v3 = vec![0, 9, 1, 2];
 
-        assert_eq!(value1.zadd(1.1, v1.clone(), false, false, false, false).unwrap(), true);
-        assert_eq!(value1.zadd(2.1, v2.clone(), false, false, false, false).unwrap(), true);
+        assert_eq!(value1.zadd(1.1, v1.clone(), false, false, false, false).unwrap(),
+                   true);
+        assert_eq!(value1.zadd(2.1, v2.clone(), false, false, false, false).unwrap(),
+                   true);
 
-        assert_eq!(value2.zadd(1.2, v1.clone(), false, false, false, false).unwrap(), true);
-        assert_eq!(value2.zadd(3.2, v3.clone(), false, false, false, false).unwrap(), true);
+        assert_eq!(value2.zadd(1.2, v1.clone(), false, false, false, false).unwrap(),
+                   true);
+        assert_eq!(value2.zadd(3.2, v3.clone(), false, false, false, false).unwrap(),
+                   true);
 
         value3 = value3.zinter(&vec![&value1, &value2], None, zset::Aggregate::Min).unwrap();
         assert_eq!(value3.zcard().unwrap(), 1);
@@ -3402,11 +3740,15 @@ mod test_command {
         let v2 = vec![5, 6, 7, 8];
         let v3 = vec![0, 9, 1, 2];
 
-        assert_eq!(value1.zadd(1.1, v1.clone(), false, false, false, false).unwrap(), true);
-        assert_eq!(value1.zadd(2.1, v2.clone(), false, false, false, false).unwrap(), true);
+        assert_eq!(value1.zadd(1.1, v1.clone(), false, false, false, false).unwrap(),
+                   true);
+        assert_eq!(value1.zadd(2.1, v2.clone(), false, false, false, false).unwrap(),
+                   true);
 
-        assert_eq!(value2.zadd(1.2, v1.clone(), false, false, false, false).unwrap(), true);
-        assert_eq!(value2.zadd(3.2, v3.clone(), false, false, false, false).unwrap(), true);
+        assert_eq!(value2.zadd(1.2, v1.clone(), false, false, false, false).unwrap(),
+                   true);
+        assert_eq!(value2.zadd(3.2, v3.clone(), false, false, false, false).unwrap(),
+                   true);
 
         value3 = value3.zinter(&vec![&value1, &value2], None, zset::Aggregate::Max).unwrap();
         assert_eq!(value3.zcard().unwrap(), 1);
@@ -3422,13 +3764,20 @@ mod test_command {
         let v2 = vec![5, 6, 7, 8];
         let v3 = vec![0, 9, 1, 2];
 
-        assert_eq!(value1.zadd(1.1, v1.clone(), false, false, false, false).unwrap(), true);
-        assert_eq!(value1.zadd(2.1, v2.clone(), false, false, false, false).unwrap(), true);
+        assert_eq!(value1.zadd(1.1, v1.clone(), false, false, false, false).unwrap(),
+                   true);
+        assert_eq!(value1.zadd(2.1, v2.clone(), false, false, false, false).unwrap(),
+                   true);
 
-        assert_eq!(value2.zadd(1.2, v1.clone(), false, false, false, false).unwrap(), true);
-        assert_eq!(value2.zadd(3.2, v3.clone(), false, false, false, false).unwrap(), true);
+        assert_eq!(value2.zadd(1.2, v1.clone(), false, false, false, false).unwrap(),
+                   true);
+        assert_eq!(value2.zadd(3.2, v3.clone(), false, false, false, false).unwrap(),
+                   true);
 
-        value3 = value3.zinter(&vec![&value1, &value2], Some(vec![100.0, 200.0]), zset::Aggregate::Max).unwrap();
+        value3 = value3.zinter(&vec![&value1, &value2],
+                    Some(vec![100.0, 200.0]),
+                    zset::Aggregate::Max)
+            .unwrap();
         assert_eq!(value3.zcard().unwrap(), 1);
         assert!((value3.zscore(v1.clone()).unwrap().unwrap() - 240.0).abs() < 0.01);
     }
@@ -3442,7 +3791,8 @@ mod test_command {
         let (tx, rx) = channel();
         database.subscribe(channel_name.clone(), tx);
         database.publish(&channel_name, &message);
-        assert_eq!(rx.recv().unwrap(), Some(PubsubEvent::Message(channel_name, None, message).as_response()));
+        assert_eq!(rx.recv().unwrap(),
+                   Some(PubsubEvent::Message(channel_name, None, message).as_response()));
     }
 
     #[test]
@@ -3467,7 +3817,11 @@ mod test_command {
         let (tx, rx) = channel();
         database.psubscribe(channel_name.clone(), tx);
         database.publish(&channel_name, &message);
-        assert_eq!(rx.recv().unwrap(), Some(PubsubEvent::Message(channel_name.clone(), Some(channel_name.clone()), message).as_response()));
+        assert_eq!(rx.recv().unwrap(),
+                   Some(PubsubEvent::Message(channel_name.clone(),
+                                             Some(channel_name.clone()),
+                                             message)
+                       .as_response()));
     }
 
     #[test]
@@ -3518,18 +3872,22 @@ mod test_command {
         assert_eq!(value.sadd(v1.clone(), 2).unwrap(), true);
         assert_eq!(value.sadd(v2.clone(), 2).unwrap(), true);
         match value {
-            Value::Set(ref set) => match *set {
-                ValueSet::Integer(_) => (),
-                _ => panic!("Must be int set"),
-            },
+            Value::Set(ref set) => {
+                match *set {
+                    ValueSet::Integer(_) => (),
+                    _ => panic!("Must be int set"),
+                }
+            }
             _ => panic!("Must be set"),
         }
         assert_eq!(value.sadd(v3.clone(), 2).unwrap(), true);
         match value {
-            Value::Set(ref set) => match *set {
-                ValueSet::Data(_) => (),
-                _ => panic!("Must be data set"),
-            },
+            Value::Set(ref set) => {
+                match *set {
+                    ValueSet::Data(_) => (),
+                    _ => panic!("Must be data set"),
+                }
+            }
             _ => panic!("Must be set"),
         }
     }
@@ -3541,8 +3899,10 @@ mod test_command {
         config.rename_commands.insert("source".to_owned(), Some("target".to_owned()));
         let database = Database::new(config);
         assert_eq!(database.mapped_command(&"disabled".to_owned()), None);
-        assert_eq!(database.mapped_command(&"source".to_owned()), Some("target".to_owned()));
-        assert_eq!(database.mapped_command(&"other".to_owned()), Some("other".to_owned()));
+        assert_eq!(database.mapped_command(&"source".to_owned()),
+                   Some("target".to_owned()));
+        assert_eq!(database.mapped_command(&"other".to_owned()),
+                   Some("other".to_owned()));
     }
 
     #[test]
@@ -3614,7 +3974,9 @@ mod test_command {
         let (tx, rx) = channel();
         database.monitor_add(tx.clone());
         database.monitor_add(tx.clone());
-        database.log_command(0, &ParsedCommand::new(b"1", vec![Argument {pos: 0, len: 1}]), true);
+        database.log_command(0,
+                             &ParsedCommand::new(b"1", vec![Argument { pos: 0, len: 1 }]),
+                             true);
         assert_eq!(rx.try_recv().unwrap(), "\"1\" ".to_owned());
         assert_eq!(rx.try_recv().unwrap(), "\"1\" ".to_owned());
         assert!(rx.try_recv().is_err())

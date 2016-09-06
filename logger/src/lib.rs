@@ -1,6 +1,8 @@
-#[cfg(unix)]extern crate syslog;
+#[cfg(unix)]
+extern crate syslog;
 
-#[cfg(unix)] use std::ascii::AsciiExt;
+#[cfg(unix)]
+use std::ascii::AsciiExt;
 use std::io;
 use std::io::{Write, stderr, stdout};
 use std::iter::FromIterator;
@@ -92,7 +94,10 @@ impl Debug for Output {
 impl Write for Output {
     fn write(&mut self, data: &[u8]) -> io::Result<usize> {
         match *self {
-            Output::Channel(ref v) => { v.send(Vec::from_iter(data.iter().cloned())).unwrap(); Ok(data.len()) },
+            Output::Channel(ref v) => {
+                v.send(Vec::from_iter(data.iter().cloned())).unwrap();
+                Ok(data.len())
+            }
             Output::Stderr => stderr().write(data),
             Output::Stdout => stdout().write(data),
             Output::File(ref mut v, _) => v.write(data),
@@ -115,7 +120,10 @@ impl Clone for Output {
             Output::Channel(ref v) => Output::Channel(v.clone()),
             Output::Stderr => Output::Stderr,
             Output::Stdout => Output::Stdout,
-            Output::File(_, ref path) => Output::File(OpenOptions::new().write(true).create(true).open(path).unwrap(), path.clone()),
+            Output::File(_, ref path) => {
+                Output::File(OpenOptions::new().write(true).create(true).open(path).unwrap(),
+                             path.clone())
+            }
         }
     }
 }
@@ -163,7 +171,11 @@ pub struct Logger {
     /// To log a message send `(None, Some(Level), Some(String), None)` where the
     /// level is the message level
     /// If the last parameter is not none, it will exit the process with that exit code
-    tx: Sender<(Option<Output>, Option<Level>, Option<String>, Option<Option<Box<syslog::Logger>>>, Option<i32>)>,
+    tx: Sender<(Option<Output>,
+                    Option<Level>,
+                    Option<String>,
+                    Option<Option<Box<syslog::Logger>>>,
+                    Option<i32>)>,
 }
 
 #[derive(Clone)]
@@ -181,11 +193,15 @@ impl Logger {
     /// Creates a new `Logger` for a given `Output` and severity `Level`.
     #[cfg(unix)]
     fn create(level: Level, output: Output) -> Logger {
-        let (tx, rx) = channel::<(Option<Output>, Option<Level>, Option<String>, Option<Option<Box<syslog::Logger>>>, Option<i32>)>();
+        let (tx, rx) = channel::<(Option<Output>,
+                                  Option<Level>,
+                                  Option<String>,
+                                  Option<Option<Box<syslog::Logger>>>,
+                                  Option<i32>)>();
         {
             let mut level = level;
             let mut output = output;
-            let mut syslog_writer:Option<Box<syslog::Logger>> = None;
+            let mut syslog_writer: Option<Box<syslog::Logger>> = None;
             thread::spawn(move || {
                 loop {
                     let (_output, _level, _msg, _syslog_writer, _code) = match rx.recv() {
@@ -193,7 +209,7 @@ impl Logger {
                         Err(_) => break,
                     };
                     if _msg.is_some() {
-                        let lvl =_level.unwrap();
+                        let lvl = _level.unwrap();
                         if level.contains(&lvl) {
                             let msg = _msg.unwrap();
                             match write!(output, "{}", format!("{}\n", msg)) {
@@ -206,11 +222,14 @@ impl Logger {
                             };
                             if let Some(ref mut w) = syslog_writer {
                                 match w.send_3164(match lvl {
-                                    Level::Debug => syslog::Severity::LOG_DEBUG,
-                                    Level::Verbose => syslog::Severity::LOG_INFO,
-                                    Level::Notice => syslog::Severity::LOG_NOTICE,
-                                    Level::Warning => syslog::Severity::LOG_WARNING,
-                                }, msg.clone()) {
+                                                      Level::Debug => syslog::Severity::LOG_DEBUG,
+                                                      Level::Verbose => syslog::Severity::LOG_INFO,
+                                                      Level::Notice => syslog::Severity::LOG_NOTICE,
+                                                      Level::Warning => {
+                                                          syslog::Severity::LOG_WARNING
+                                                      }
+                                                  },
+                                                  msg.clone()) {
                                     Ok(_) => (),
                                     Err(e) => {
                                         // failing to log a message... will write straight to stderr
@@ -227,23 +246,23 @@ impl Logger {
                     } else if _syslog_writer.is_some() {
                         syslog_writer = _syslog_writer.unwrap();
                     } else {
-                        panic!("Unknown message {:?}", (_output, _level, _msg, _syslog_writer.is_some()));
+                        panic!("Unknown message {:?}",
+                               (_output, _level, _msg, _syslog_writer.is_some()));
                     }
                     if let Some(code) = _code {
                         process::exit(code);
                     }
-                };
+                }
             });
         }
 
-        Logger {
-            tx: tx,
-        }
+        Logger { tx: tx }
     }
 
     #[cfg(not(unix))]
     fn create(level: Level, output: Output) -> Logger {
-        let (tx, rx) = channel::<(Option<Output>, Option<Level>, Option<String>, Option<()>, Option<i32>)>();
+        let (tx, rx) =
+            channel::<(Option<Output>, Option<Level>, Option<String>, Option<()>, Option<i32>)>();
         {
             let mut level = level;
             let mut output = output;
@@ -254,7 +273,7 @@ impl Logger {
                         Err(_) => break,
                     };
                     if _msg.is_some() {
-                        let lvl =_level.unwrap();
+                        let lvl = _level.unwrap();
                         if level.contains(&lvl) {
                             let msg = _msg.unwrap();
                             match write!(output, "{}", format!("{}\n", msg)) {
@@ -276,13 +295,11 @@ impl Logger {
                     if let Some(code) = _code {
                         process::exit(code);
                     }
-                };
+                }
             });
         }
 
-        Logger {
-            tx: tx,
-        }
+        Logger { tx: tx }
     }
 
     /// Creates a new logger that writes in the standard output.
@@ -329,7 +346,8 @@ impl Logger {
 
     /// Creates a new logger that writes in a file.
     pub fn file(level: Level, path: &str) -> io::Result<Self> {
-        Ok(Self::create(level, Output::File(try!(File::create(Path::new(path))), path.to_owned())))
+        Ok(Self::create(level,
+                        Output::File(try!(File::create(Path::new(path))), path.to_owned())))
     }
 
     /// Disables syslog
@@ -339,30 +357,29 @@ impl Logger {
     }
 
     #[cfg(not(unix))]
-    pub fn disable_syslog(&mut self) {
-    }
+    pub fn disable_syslog(&mut self) {}
 
     /// Enables syslog.
     #[cfg(unix)]
     pub fn set_syslog(&mut self, ident: &String, facility: &String) {
         let mut w = syslog::unix(match &*(&*facility.clone()).to_ascii_lowercase() {
-            "local0" => syslog::Facility::LOG_LOCAL0,
-            "local1" => syslog::Facility::LOG_LOCAL1,
-            "local2" => syslog::Facility::LOG_LOCAL2,
-            "local3" => syslog::Facility::LOG_LOCAL3,
-            "local4" => syslog::Facility::LOG_LOCAL4,
-            "local5" => syslog::Facility::LOG_LOCAL5,
-            "local6" => syslog::Facility::LOG_LOCAL6,
-            "local7" => syslog::Facility::LOG_LOCAL7,
-            _ => syslog::Facility::LOG_USER,
-        }).unwrap();
+                "local0" => syslog::Facility::LOG_LOCAL0,
+                "local1" => syslog::Facility::LOG_LOCAL1,
+                "local2" => syslog::Facility::LOG_LOCAL2,
+                "local3" => syslog::Facility::LOG_LOCAL3,
+                "local4" => syslog::Facility::LOG_LOCAL4,
+                "local5" => syslog::Facility::LOG_LOCAL5,
+                "local6" => syslog::Facility::LOG_LOCAL6,
+                "local7" => syslog::Facility::LOG_LOCAL7,
+                _ => syslog::Facility::LOG_USER,
+            })
+            .unwrap();
         w.set_process_name(ident.clone());
         self.tx.send((None, None, None, Some(Some(w)), None)).unwrap();
     }
 
     #[cfg(not(unix))]
-    pub fn set_syslog(&mut self, _: &String, _: &String) {
-    }
+    pub fn set_syslog(&mut self, _: &String, _: &String) {}
 
     /// Changes the output to be a file in `path`.
     pub fn set_logfile(&mut self, path: &str) -> io::Result<()> {
