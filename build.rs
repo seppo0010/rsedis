@@ -12,7 +12,11 @@ fn main() {
             .arg("--head")
             .arg("--hash=8")
             .output() {
-                Ok(o) => String::from(from_utf8(&o.stdout[0..8]).unwrap()),
+                Ok(o) => if o.stdout.len() >= 8 {
+                    String::from(from_utf8(&o.stdout[0..8]).unwrap())
+                } else {
+                    String::from("00000000")
+                },
                 Err(_) => String::from("00000000"),
             };
         write!(f, "pub const GIT_SHA1: &'static str = \"{}\";\n", &hash[0..8]).unwrap();
