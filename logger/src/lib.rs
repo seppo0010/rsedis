@@ -1,8 +1,6 @@
 #[cfg(unix)]
 extern crate syslog;
 
-#[cfg(unix)]
-use std::ascii::AsciiExt;
 use std::fmt::{Debug, Error, Formatter};
 use std::fs::{File, OpenOptions};
 use std::io;

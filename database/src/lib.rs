@@ -1968,7 +1968,7 @@ impl Database {
     /// is called and automatically unsubscribe.
     pub fn key_subscribe(&mut self, index: usize, key: &Vec<u8>, sender: Sender<bool>) -> usize {
         self.ensure_key_subscribers(index, key);
-        let mut key_subscribers = self.key_subscribers[index].get_mut(key).unwrap();
+        let key_subscribers = self.key_subscribers[index].get_mut(key).unwrap();
         let subscriber_id = self.subscriber_id;
         key_subscribers.insert(subscriber_id, sender);
         self.subscriber_id += 1;
@@ -2058,7 +2058,7 @@ impl Database {
     /// ```
     pub fn subscribe(&mut self, channel: Vec<u8>, sender: Sender<Option<Response>>) -> usize {
         self.ensure_channel(&channel);
-        let mut channelsubscribers = self.subscribers.get_mut(&channel).unwrap();
+        let channelsubscribers = self.subscribers.get_mut(&channel).unwrap();
         let subscriber_id = self.subscriber_id;
         channelsubscribers.insert(subscriber_id, sender);
         self.subscriber_id += 1;
@@ -2086,7 +2086,7 @@ impl Database {
         if !self.subscribers.contains_key(&channel) {
             return false;
         }
-        let mut channelsubscribers = self.subscribers.get_mut(&channel).unwrap();
+        let channelsubscribers = self.subscribers.get_mut(&channel).unwrap();
         channelsubscribers.remove(&subscriber_id).is_some()
     }
 
@@ -2121,7 +2121,7 @@ impl Database {
     /// ```
     pub fn psubscribe(&mut self, pattern: Vec<u8>, sender: Sender<Option<Response>>) -> usize {
         self.pensure_channel(&pattern);
-        let mut channelsubscribers = self.pattern_subscribers.get_mut(&pattern).unwrap();
+        let channelsubscribers = self.pattern_subscribers.get_mut(&pattern).unwrap();
         let subscriber_id = self.subscriber_id;
         channelsubscribers.insert(subscriber_id, sender);
         self.subscriber_id += 1;
@@ -2134,7 +2134,7 @@ impl Database {
         if !self.pattern_subscribers.contains_key(&pattern) {
             return false;
         }
-        let mut channelsubscribers = self.pattern_subscribers.get_mut(&pattern).unwrap();
+        let channelsubscribers = self.pattern_subscribers.get_mut(&pattern).unwrap();
         channelsubscribers.remove(&subscriber_id).is_some()
     }
 

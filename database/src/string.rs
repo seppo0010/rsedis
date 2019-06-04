@@ -152,7 +152,7 @@ impl ValueString {
             ValueString::Integer(i) => *self = ValueString::Data(format!("{}", i).into_bytes()),
             ValueString::Data(_) => (),
         };
-        let mut d = match *self {
+        let d = match *self {
             ValueString::Data(ref mut d) => d,
             _ => panic!("Value should be data"),
         };
@@ -205,7 +205,7 @@ impl ValueString {
             ValueString::Data(_) => (),
         }
 
-        let mut d = match self {
+        let d = match self {
             &mut ValueString::Data(ref mut s) => s,
             _ => panic!("String must be data"),
         };

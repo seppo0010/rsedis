@@ -1,4 +1,3 @@
-use std::ascii::AsciiExt;
 use std::collections::{Bound, HashMap, HashSet};
 use std::io::Write;
 use std::mem::replace;

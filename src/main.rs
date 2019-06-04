@@ -1,10 +1,4 @@
-extern crate compat;
-extern crate config;
-extern crate logger;
-extern crate networking;
-extern crate rsedis;
-
-mod release;
+pub mod release;
 
 use std::env::args;
 use std::process::exit;

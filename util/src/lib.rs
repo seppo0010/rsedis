@@ -2,7 +2,6 @@ extern crate libc;
 extern crate rand;
 extern crate time;
 
-use std::ascii::AsciiExt;
 use std::fmt;
 
 use libc::types::os::arch::c95::c_int;
