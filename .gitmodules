@@ -1,0 +1,3 @@
+[submodule "rust-skiplist"]
+	path = rust-skiplist
+	url = https://github.com/JP-Ellis/rust-skiplist.git
