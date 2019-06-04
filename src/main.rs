@@ -9,11 +9,11 @@ mod release;
 use std::env::args;
 use std::process::exit;
 
+use crate::release::*;
 use compat::getpid;
 use config::Config;
 use logger::{Level, Logger};
 use networking::Server;
-use release::*;
 
 fn main() {
     let mut config = Config::new(Logger::new(Level::Notice));
