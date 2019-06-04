@@ -687,6 +687,7 @@ mod test_networking {
     use logger::{Level, Logger};
 
     use super::Server;
+    use std::time::Duration;
 
     #[test]
     fn parse_ping() {
@@ -767,10 +768,10 @@ mod test_networking {
 
         let addr = format!("127.0.0.1:{}", port);
         let _ = TcpStream::connect(&*addr);
-        thread::sleep_ms(100);
+        thread::sleep(Duration::from_millis(100));
         assert_eq!(*server.next_id.lock().unwrap(), 1);
         let _ = TcpStream::connect(&*addr);
-        thread::sleep_ms(100);
+        thread::sleep(Duration::from_millis(100));
         assert_eq!(*server.next_id.lock().unwrap(), 2);
         server.stop();
     }

@@ -126,7 +126,6 @@ impl<'a> ParsedCommand<'a> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(collections_bound)]
     /// # use std::collections::Bound;
     /// # use parser::{ParsedCommand, Argument};
     /// let parser = ParsedCommand::new(b"+inf", vec![Argument { pos: 0, len: 4 }]);
@@ -134,7 +133,6 @@ impl<'a> ParsedCommand<'a> {
     /// ```
     ///
     /// ```
-    /// # #![feature(collections_bound)]
     /// # use std::collections::Bound;
     /// # use parser::{ParsedCommand, Argument};
     /// let parser = ParsedCommand::new(b"1.23", vec![Argument { pos: 0, len: 4 }]);
@@ -142,7 +140,6 @@ impl<'a> ParsedCommand<'a> {
     /// ```
     ///
     /// ```
-    /// # #![feature(collections_bound)]
     /// # use std::collections::Bound;
     /// # use parser::{ParsedCommand, Argument};
     /// let parser = ParsedCommand::new(b"(1.23", vec![Argument { pos: 0, len: 5 }]);

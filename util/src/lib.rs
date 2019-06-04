@@ -364,15 +364,16 @@ pub fn get_random_hex_chars(len: usize) -> String {
 
 #[cfg(test)]
 mod test_util {
-    use std::thread::sleep_ms;
+    use std::thread::sleep;
     use std::{u32, u8};
 
     use super::{glob_match, htonl, mstime, splitargs};
+    use std::time::Duration;
 
     #[test]
     fn mstime_sleep() {
         let start = mstime();
-        sleep_ms(100);
+        sleep(Duration::from_millis(100));
         let end = mstime();
         assert!(start < end && start + 100 <= end && start + 500 > end);
     }

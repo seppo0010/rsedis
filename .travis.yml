@@ -1,6 +1,6 @@
 language: rust
 sudo: false
-rust: nightly
+rust: stable
 
 addons:
   apt:

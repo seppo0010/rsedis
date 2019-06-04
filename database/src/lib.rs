@@ -1222,7 +1222,6 @@ impl Value {
     ///
     /// # Examples
     /// ```
-    /// #![feature(collections_bound)]
     /// use database::Value;
     /// use std::collections::Bound;
     ///
@@ -1246,7 +1245,6 @@ impl Value {
     ///
     /// # Examples
     /// ```
-    /// #![feature(collections_bound)]
     /// use database::Value;
     /// use std::collections::Bound;
     ///
@@ -1325,7 +1323,6 @@ impl Value {
     ///
     /// # Examples
     /// ```
-    /// #![feature(collections_bound)]
     /// use database::Value;
     /// use std::collections::Bound;
     ///
@@ -1370,7 +1367,6 @@ impl Value {
     ///
     /// # Examples
     /// ```
-    /// #![feature(collections_bound)]
     /// use database::Value;
     /// use std::collections::Bound;
     ///
@@ -1429,7 +1425,6 @@ impl Value {
     ///
     /// # Examples
     /// ```
-    /// #![feature(collections_bound)]
     /// use database::Value;
     /// use std::collections::Bound;
     ///
@@ -1458,7 +1453,6 @@ impl Value {
     ///
     /// # Examples
     /// ```
-    /// #![feature(collections_bound)]
     /// use database::Value;
     /// use std::collections::Bound;
     ///
@@ -1487,7 +1481,6 @@ impl Value {
     ///
     /// # Examples
     /// ```
-    /// #![feature(collections_bound)]
     /// use database::Value;
     /// use std::collections::Bound;
     ///

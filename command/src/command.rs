@@ -2918,6 +2918,7 @@ mod test_command {
     use util::mstime;
 
     use super::{command, Client};
+    use std::time::Duration;
 
     fn getstr(database: &Database, key: &[u8]) -> String {
         match database.get(0, &key.to_vec()).unwrap() {
@@ -3965,7 +3966,7 @@ mod test_command {
             _ => panic!("Unexpected response"),
         };
         assert!(receiver.try_recv().is_err());
-        thread::sleep_ms(1400);
+        thread::sleep(Duration::from_millis(1400));
         assert_eq!(receiver.try_recv().unwrap().is_some(), false);
     }
 
@@ -4053,7 +4054,7 @@ mod test_command {
             _ => panic!("Unexpected response"),
         };
         assert!(receiver.try_recv().is_err());
-        thread::sleep_ms(1400);
+        thread::sleep(Duration::from_millis(1400));
         assert_eq!(receiver.try_recv().unwrap().is_some(), false);
     }
 
