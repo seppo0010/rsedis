@@ -5,7 +5,7 @@ use std::io::Write;
 use dbutil::normalize_position;
 use error::OperationError;
 use rdbutil::constants::*;
-use rdbutil::{encode_slice_u8, encode_len};
+use rdbutil::{encode_len, encode_slice_u8};
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum ValueList {
@@ -55,18 +55,16 @@ impl ValueList {
 
     pub fn linsert(&mut self, before: bool, pivot: Vec<u8>, newvalue: Vec<u8>) -> Option<usize> {
         match *self {
-            ValueList::Data(ref mut list) => {
-                match list.iter().position(|x| x == &pivot) {
-                    Some(_pos) => {
-                        let pos = if before { _pos } else { _pos + 1 };
-                        let mut right = list.split_off(pos);
-                        list.push_back(newvalue);
-                        list.append(&mut right);
-                        Some(list.len())
-                    }
-                    None => return None,
+            ValueList::Data(ref mut list) => match list.iter().position(|x| x == &pivot) {
+                Some(_pos) => {
+                    let pos = if before { _pos } else { _pos + 1 };
+                    let mut right = list.split_off(pos);
+                    list.push_back(newvalue);
+                    list.append(&mut right);
+                    Some(list.len())
                 }
-            }
+                None => return None,
+            },
         }
     }
 
@@ -169,7 +167,6 @@ impl ValueList {
         }
     }
 
-
     pub fn ltrim(&mut self, _start: i64, _stop: i64) -> Result<(), OperationError> {
         let list = match *self {
             ValueList::Data(ref mut list) => {
@@ -214,9 +211,13 @@ impl ValueList {
                 }
             }
         };
-        let data =
-            [vec![TYPE_LIST], v, vec![(VERSION & 0xff) as u8], vec![((VERSION >> 8) & 0xff) as u8]]
-                .concat();
+        let data = [
+            vec![TYPE_LIST],
+            v,
+            vec![(VERSION & 0xff) as u8],
+            vec![((VERSION >> 8) & 0xff) as u8],
+        ]
+        .concat();
         writer.write(&*data)
     }
 
@@ -226,11 +227,12 @@ impl ValueList {
         let encoding = match *self {
             ValueList::Data(_) => "linkedlist",
         };
-        format!("Value at:0x0000000000 refcount:1 encoding:{} serializedlength:{} lru:0 \
-                 lru_seconds_idle:0",
-                encoding,
-                serialized)
-            .to_owned()
+        format!(
+            "Value at:0x0000000000 refcount:1 encoding:{} serializedlength:{} lru:0 \
+             lru_seconds_idle:0",
+            encoding, serialized
+        )
+        .to_owned()
     }
 }
 

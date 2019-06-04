@@ -1,9 +1,9 @@
 #[cfg(unix)]
 extern crate libc;
 #[cfg(unix)]
-pub mod utsname;
-#[cfg(unix)]
 pub mod unix;
+#[cfg(unix)]
+pub mod utsname;
 #[cfg(unix)]
 pub use unix::*;
 

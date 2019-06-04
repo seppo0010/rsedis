@@ -1,8 +1,8 @@
-extern crate rsedis;
+extern crate compat;
 extern crate config;
 extern crate logger;
 extern crate networking;
-extern crate compat;
+extern crate rsedis;
 
 mod release;
 
@@ -11,8 +11,8 @@ use std::process::exit;
 
 use compat::getpid;
 use config::Config;
+use logger::{Level, Logger};
 use networking::Server;
-use logger::{Logger, Level};
 use release::*;
 
 fn main() {
@@ -22,7 +22,7 @@ fn main() {
             Ok(_) => (),
             Err(_) => {
                 exit(1);
-            },
+            }
         },
         None => (),
     }

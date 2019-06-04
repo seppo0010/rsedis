@@ -5,7 +5,6 @@ extern crate time;
 use std::ascii::AsciiExt;
 use std::fmt;
 
-use libc::funcs::c95::ctype::isprint;
 use libc::types::os::arch::c95::c_int;
 use rand::{thread_rng, Rng};
 use time::get_time;
@@ -65,9 +64,11 @@ pub fn glob_match(pattern: &Vec<u8>, element: &Vec<u8>, ignore_case: bool) -> bo
                     return true;
                 }
                 for i in elementpos..(element.len() + 1) {
-                    if glob_match(&pattern[patternpos + 1..].to_vec(),
-                                  &element[i..].to_vec(),
-                                  ignore_case) {
+                    if glob_match(
+                        &pattern[patternpos + 1..].to_vec(),
+                        &element[i..].to_vec(),
+                        ignore_case,
+                    ) {
                         return true;
                     }
                 }
@@ -107,8 +108,9 @@ pub fn glob_match(pattern: &Vec<u8>, element: &Vec<u8>, ignore_case: bool) -> bo
                     } else if patternpos >= pattern.len() {
                         patternpos += 1;
                         break;
-                    } else if pattern.len() >= patternpos + 3 &&
-                              pattern[patternpos + 1] == ('-' as u8) {
+                    } else if pattern.len() >= patternpos + 3
+                        && pattern[patternpos + 1] == ('-' as u8)
+                    {
                         let mut start = pattern[patternpos];
                         let mut end = pattern[patternpos + 2];
                         let mut c = element[elementpos];
@@ -285,10 +287,12 @@ pub fn splitargs(args: &[u8]) -> Result<Vec<Vec<u8>>, ()> {
 /// Creates an array of four `u8` from a `u32`.
 pub fn htonl(v: u32) -> [u8; 4] {
     // maybe it should use C api instead?
-    [((v >> 24) & 0xFF) as u8,
-     ((v >> 16) & 0xFF) as u8,
-     ((v >> 8) & 0xFF) as u8,
-     ((v >> 0) & 0xFF) as u8]
+    [
+        ((v >> 24) & 0xFF) as u8,
+        ((v >> 16) & 0xFF) as u8,
+        ((v >> 8) & 0xFF) as u8,
+        ((v >> 0) & 0xFF) as u8,
+    ]
 }
 
 fn is_print(c: char) -> bool {
@@ -361,10 +365,10 @@ pub fn get_random_hex_chars(len: usize) -> String {
 
 #[cfg(test)]
 mod test_util {
-    use std::{u8, u32};
     use std::thread::sleep_ms;
+    use std::{u32, u8};
 
-    use super::{mstime, splitargs, glob_match, htonl};
+    use super::{glob_match, htonl, mstime, splitargs};
 
     #[test]
     fn mstime_sleep() {
@@ -384,10 +388,26 @@ mod test_util {
         assert!(glob_match(&b"*".to_vec(), &b"".to_vec(), true));
         assert!(glob_match(&b"*".to_vec(), &b"hello world".to_vec(), true));
         assert!(glob_match(&b"**".to_vec(), &b"hello world".to_vec(), true));
-        assert!(glob_match(&b"hello*".to_vec(), &b"hello world".to_vec(), true));
-        assert!(glob_match(&b"*world".to_vec(), &b"hello world".to_vec(), true));
-        assert!(!glob_match(&b"foo*".to_vec(), &b"hello world".to_vec(), true));
-        assert!(!glob_match(&b"*bar".to_vec(), &b"hello world".to_vec(), true));
+        assert!(glob_match(
+            &b"hello*".to_vec(),
+            &b"hello world".to_vec(),
+            true
+        ));
+        assert!(glob_match(
+            &b"*world".to_vec(),
+            &b"hello world".to_vec(),
+            true
+        ));
+        assert!(!glob_match(
+            &b"foo*".to_vec(),
+            &b"hello world".to_vec(),
+            true
+        ));
+        assert!(!glob_match(
+            &b"*bar".to_vec(),
+            &b"hello world".to_vec(),
+            true
+        ));
         assert!(!glob_match(&b"*bar".to_vec(), &b"".to_vec(), true));
     }
 
@@ -419,34 +439,50 @@ mod test_util {
 
     #[test]
     fn splitargs_quotes() {
-        assert_eq!(splitargs(&b"\"\\x9f\"".to_vec()).unwrap(),
-                   vec![vec![159u8]]);
+        assert_eq!(
+            splitargs(&b"\"\\x9f\"".to_vec()).unwrap(),
+            vec![vec![159u8]]
+        );
         assert_eq!(splitargs(&b"\"\"".to_vec()).unwrap(), vec![vec![]]);
-        assert_eq!(splitargs(&b"\"\\thello\\n\"".to_vec()).unwrap(),
-                   vec![b"\thello\n".to_vec()]);
+        assert_eq!(
+            splitargs(&b"\"\\thello\\n\"".to_vec()).unwrap(),
+            vec![b"\thello\n".to_vec()]
+        );
         assert!(splitargs(&b"\"a".to_vec()).is_err());
     }
 
     #[test]
     fn splitargs_singlequotes() {
-        assert_eq!(splitargs(&b"\'\\x9f\'".to_vec()).unwrap(),
-                   vec![b"\\x9f".to_vec()]);
+        assert_eq!(
+            splitargs(&b"\'\\x9f\'".to_vec()).unwrap(),
+            vec![b"\\x9f".to_vec()]
+        );
         assert_eq!(splitargs(&b"\'\'".to_vec()).unwrap(), vec![vec![]]);
-        assert_eq!(splitargs(&b"\'\\\'\'".to_vec()).unwrap(),
-                   vec![b"'".to_vec()]);
-        assert_eq!(splitargs(&b"\'\\thello\\n\'".to_vec()).unwrap(),
-                   vec![b"\\thello\\n".to_vec()]);
+        assert_eq!(
+            splitargs(&b"\'\\\'\'".to_vec()).unwrap(),
+            vec![b"'".to_vec()]
+        );
+        assert_eq!(
+            splitargs(&b"\'\\thello\\n\'".to_vec()).unwrap(),
+            vec![b"\\thello\\n".to_vec()]
+        );
         assert!(splitargs(&b"\'a".to_vec()).is_err());
     }
 
     #[test]
     fn splitargs_misc() {
-        assert_eq!(splitargs(&b"hello world".to_vec()).unwrap(),
-                   vec![b"hello".to_vec(), b"world".to_vec()]);
-        assert_eq!(splitargs(&b"\'hello\' world".to_vec()).unwrap(),
-                   vec![b"hello".to_vec(), b"world".to_vec()]);
-        assert_eq!(splitargs(&b"\"hello\" world".to_vec()).unwrap(),
-                   vec![b"hello".to_vec(), b"world".to_vec()]);
+        assert_eq!(
+            splitargs(&b"hello world".to_vec()).unwrap(),
+            vec![b"hello".to_vec(), b"world".to_vec()]
+        );
+        assert_eq!(
+            splitargs(&b"\'hello\' world".to_vec()).unwrap(),
+            vec![b"hello".to_vec(), b"world".to_vec()]
+        );
+        assert_eq!(
+            splitargs(&b"\"hello\" world".to_vec()).unwrap(),
+            vec![b"hello".to_vec(), b"world".to_vec()]
+        );
         assert!(splitargs(&b"\"hello\"world".to_vec()).is_err());
         assert!(splitargs(&b"\'hello\'world".to_vec()).is_err());
     }

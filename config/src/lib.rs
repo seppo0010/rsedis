@@ -16,8 +16,8 @@ use std::str::from_utf8;
 use std::str::FromStr;
 use std::str::Utf8Error;
 
+use logger::{Level, Logger};
 use util::splitargs;
-use logger::{Logger, Level};
 
 pub struct Config {
     pub logger: Logger,
@@ -62,7 +62,8 @@ fn read_string(args: Vec<Vec<u8>>) -> Result<String, ConfigError> {
 }
 
 fn read_parse<T>(args: Vec<Vec<u8>>) -> Result<T, ConfigError>
-    where T: FromStr
+where
+    T: FromStr,
 {
     let s = try!(read_string(args));
     match s.parse() {
@@ -117,11 +118,13 @@ impl Config {
         let file = BufReader::new(match File::open(&path) {
             Ok(f) => f,
             Err(_) => {
-                log_and_exit!(self.logger,
-                              Warning,
-                              1,
-                              "Fatal error, can't open config file '{}'",
-                              fname);
+                log_and_exit!(
+                    self.logger,
+                    Warning,
+                    1,
+                    "Fatal error, can't open config file '{}'",
+                    fname
+                );
                 return Err(ConfigError::FileNotFound);
             }
         });
@@ -143,12 +146,13 @@ impl Config {
 
             match &*args[0] {
                 b"bind" => {
-                    self.bind.extend(args[1..].iter().filter(|x| x.len() > 0).map(|x| {
-                        match from_utf8(x) {
-                            Ok(s) => s.to_owned(),
-                            Err(_) => "".to_owned(), // TODO: return ConfigError
-                        }
-                    }))
+                    self.bind
+                        .extend(args[1..].iter().filter(|x| x.len() > 0).map(|x| {
+                            match from_utf8(x) {
+                                Ok(s) => s.to_owned(),
+                                Err(_) => "".to_owned(), // TODO: return ConfigError
+                            }
+                        }))
                 }
                 b"port" => self.port = try!(read_parse(args)),
                 b"activerehashing" => self.active_rehashing = try!(read_bool(args)),
@@ -169,15 +173,13 @@ impl Config {
                         try!(self.logger.set_logfile(&*logfile))
                     }
                 }
-                b"loglevel" => {
-                    self.logger.set_loglevel(match &*try!(read_string(args)) {
-                        "debug" => Level::Debug,
-                        "verbose" => Level::Verbose,
-                        "notice" => Level::Notice,
-                        "warning" => Level::Warning,
-                        _ => return Err(ConfigError::InvalidParameter),
-                    })
-                }
+                b"loglevel" => self.logger.set_loglevel(match &*try!(read_string(args)) {
+                    "debug" => Level::Debug,
+                    "verbose" => Level::Verbose,
+                    "notice" => Level::Notice,
+                    "warning" => Level::Warning,
+                    _ => return Err(ConfigError::InvalidParameter),
+                }),
                 b"rename-command" => {
                     if args.len() != 3 {
                         return Err(ConfigError::InvalidFormat);
@@ -185,8 +187,10 @@ impl Config {
                         let command = try!(from_utf8(&*args[1])).to_owned();
                         let newname = try!(from_utf8(&*args[2])).to_owned();
                         if newname.len() > 0 {
-                            self.rename_commands.insert(newname.to_lowercase(),
-                                                        Some(command.clone().to_lowercase()));
+                            self.rename_commands.insert(
+                                newname.to_lowercase(),
+                                Some(command.clone().to_lowercase()),
+                            );
                         }
                         self.rename_commands.insert(command.to_lowercase(), None);
                     }
@@ -211,7 +215,8 @@ impl Config {
             };
         }
         if self.syslog_enabled {
-            self.logger.set_syslog(&self.syslog_ident, &self.syslog_facility);
+            self.logger
+                .set_syslog(&self.syslog_ident, &self.syslog_facility);
         }
 
         Ok(())
@@ -221,7 +226,10 @@ impl Config {
         if self.bind.len() == 0 {
             vec![("127.0.0.1".to_owned(), self.port)]
         } else {
-            self.bind.iter().map(|s| (s.clone(), self.port)).collect::<Vec<_>>()
+            self.bind
+                .iter()
+                .map(|s| (s.clone(), self.port))
+                .collect::<Vec<_>>()
         }
     }
 }
@@ -248,26 +256,32 @@ impl From<Utf8Error> for ConfigError {
 mod tests {
     use super::*;
     use std::collections::HashMap;
-    use std::fs::File;
     use std::fs::create_dir;
+    use std::fs::File;
     use std::io::Write;
 
     use rand::random;
 
-    use logger::{Logger, Level};
+    use logger::{Level, Logger};
     use util::mstime;
 
     macro_rules! config {
-        ($str: expr, $logger: expr) => ({
+        ($str: expr, $logger: expr) => {{
             let dirpath = format!("tmp/{}", mstime());
             let filepath = format!("{}/{}.conf", dirpath, random::<u64>());
-            match create_dir("tmp") { _ => () }
-            match create_dir(dirpath) { _ => () }
-            match File::create(filepath.clone()).unwrap().write_all($str) { _ => () }
+            match create_dir("tmp") {
+                _ => (),
+            }
+            match create_dir(dirpath) {
+                _ => (),
+            }
+            match File::create(filepath.clone()).unwrap().write_all($str) {
+                _ => (),
+            }
             let mut config = Config::new($logger);
             config.parsefile(filepath).unwrap();
             config
-        })
+        }};
     }
 
     #[test]
@@ -335,8 +349,10 @@ mod tests {
 
     #[test]
     fn parse_set_max_intset_entries() {
-        let config = config!(b"set-max-intset-entries 123456",
-                             Logger::new(Level::Warning));
+        let config = config!(
+            b"set-max-intset-entries 123456",
+            Logger::new(Level::Warning)
+        );
         assert_eq!(config.set_max_intset_entries, 123456);
     }
 
@@ -348,16 +364,20 @@ mod tests {
 
     #[test]
     fn parse_unixsocket() {
-        let config = config!(b"unixsocket /dev/null\nunixsocketperm 777",
-                             Logger::new(Level::Warning));
+        let config = config!(
+            b"unixsocket /dev/null\nunixsocketperm 777",
+            Logger::new(Level::Warning)
+        );
         assert_eq!(config.unixsocket, Some("/dev/null".to_owned()));
         assert_eq!(config.unixsocketperm, 511);
     }
 
     #[test]
     fn parse_rename_commands() {
-        let config = config!(b"rename-command C1 C2\nrename-command HELLO world",
-                             Logger::new(Level::Warning));
+        let config = config!(
+            b"rename-command C1 C2\nrename-command HELLO world",
+            Logger::new(Level::Warning)
+        );
         let mut h = HashMap::new();
         h.insert("c2".to_owned(), Some("c1".to_owned()));
         h.insert("c1".to_owned(), None);
@@ -368,8 +388,10 @@ mod tests {
 
     #[test]
     fn parse_requirepass() {
-        let config = config!(b"requirepass THISISASTRONGPASSWORD",
-                             Logger::new(Level::Warning));
+        let config = config!(
+            b"requirepass THISISASTRONGPASSWORD",
+            Logger::new(Level::Warning)
+        );
         assert_eq!(config.requirepass, Some("THISISASTRONGPASSWORD".to_owned()));
     }
 }

@@ -4,41 +4,41 @@ extern crate libc;
 extern crate unix_socket;
 #[macro_use(log, sendlog)]
 extern crate logger;
+extern crate command;
 extern crate config;
-extern crate util;
+extern crate database;
+extern crate net2;
 extern crate parser;
 extern crate response;
-extern crate database;
-extern crate command;
-extern crate net2;
+extern crate util;
 
-use std::time::Duration;
 use std::io;
 use std::io::{Read, Write};
-use std::net::{SocketAddr, ToSocketAddrs, TcpStream};
+use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex, MutexGuard};
-use std::sync::mpsc::{Receiver, Sender, channel};
 use std::thread;
+use std::time::Duration;
 
-#[cfg(unix)]
-use std::path::Path;
 #[cfg(unix)]
 use std::fs::File;
+#[cfg(unix)]
+use std::path::Path;
 
 #[cfg(unix)]
-use libc::funcs::posix88::unistd::fork;
-#[cfg(unix)]
 use libc::funcs::c95::stdlib::exit;
+#[cfg(unix)]
+use libc::funcs::posix88::unistd::fork;
 #[cfg(unix)]
 use libc::funcs::posix88::unistd::getpid;
 use net2::{TcpBuilder, TcpStreamExt};
 #[cfg(unix)]
-use unix_socket::{UnixStream, UnixListener};
+use unix_socket::{UnixListener, UnixStream};
 
 use config::Config;
 use database::Database;
 use logger::Level;
-use parser::{OwnedParsedCommand, Parser, ParseError};
+use parser::{OwnedParsedCommand, ParseError, Parser};
 use response::{Response, ResponseError};
 
 /// A stream connection.
@@ -210,33 +210,25 @@ impl Client {
     }
 
     /// Creates a thread that writes into the client stream each response received
-    fn create_writer_thread(&self,
-                            sender: Sender<(Level, String)>,
-                            rx: Receiver<Option<Response>>) {
+    fn create_writer_thread(
+        &self,
+        sender: Sender<(Level, String)>,
+        rx: Receiver<Option<Response>>,
+    ) {
         let mut stream = self.stream.try_clone().unwrap();
-        thread::spawn(move || {
-            loop {
-                match rx.recv() {
-                    Ok(m) => {
-                        match m {
-                            Some(msg) => {
-                                match stream.write(&*msg.as_bytes()) {
-                                    Ok(_) => (),
-                                    Err(e) => {
-                                        sendlog!(sender,
-                                                 Warning,
-                                                 "Error writing to client: {:?}",
-                                                 e)
-                                            .unwrap()
-                                    }
-                                }
-                            }
-                            None => break,
+        thread::spawn(move || loop {
+            match rx.recv() {
+                Ok(m) => match m {
+                    Some(msg) => match stream.write(&*msg.as_bytes()) {
+                        Ok(_) => (),
+                        Err(e) => {
+                            sendlog!(sender, Warning, "Error writing to client: {:?}", e).unwrap()
                         }
-                    }
-                    Err(_) => break,
-                };
-            }
+                    },
+                    None => break,
+                },
+                Err(_) => break,
+            };
         });
     }
 
@@ -301,10 +293,12 @@ impl Client {
                                     break;
                                 }
                                 _ => {
-                                    sendlog!(sender,
-                                             Verbose,
-                                             "Protocol error from client: {:?}",
-                                             err);
+                                    sendlog!(
+                                        sender,
+                                        Verbose,
+                                        "Protocol error from client: {:?}",
+                                        err
+                                    );
                                     break;
                                 }
                             }
@@ -343,12 +337,10 @@ impl Client {
                             // if we receive a None, send a nil, otherwise execute the command
                             match receiver.recv().unwrap() {
                                 Some(cmd) => next_command = Some(cmd),
-                                None => {
-                                    match stream_tx.send(Some(Response::Nil)) {
-                                        Ok(_) => (),
-                                        Err(_) => error = true,
-                                    }
-                                }
+                                None => match stream_tx.send(Some(Response::Nil)) {
+                                    Ok(_) => (),
+                                    Err(_) => error = true,
+                                },
                             }
                         }
                     }
@@ -378,14 +370,14 @@ impl Client {
 }
 
 macro_rules! handle_listener {
-    ($logger: expr, $listener: expr, $server: expr, $rx: expr, $tcp_keepalive: expr, $timeout: expr, $t: ident) => ({
+    ($logger: expr, $listener: expr, $server: expr, $rx: expr, $tcp_keepalive: expr, $timeout: expr, $t: ident) => {{
         let db = $server.db.clone();
         let sender = $logger.sender();
         let next_id = $server.next_id.clone();
         thread::spawn(move || {
             for stream in $listener.incoming() {
                 if $rx.try_recv().is_ok() {
-// any new message should break
+                    // any new message should break
                     break;
                 }
                 match stream {
@@ -400,17 +392,40 @@ macro_rules! handle_listener {
                         };
                         thread::spawn(move || {
                             let mut client = Client::$t(stream, db1, id);
-                            client.stream.set_keepalive(if $tcp_keepalive > 0 { Some(Duration::from_secs($tcp_keepalive as u64)) } else { None }).unwrap();
-                            client.stream.set_read_timeout(if $timeout > 0 { Some(Duration::new($timeout, 0)) } else { None }).unwrap();
-                            client.stream.set_write_timeout(if $timeout > 0 { Some(Duration::new($timeout, 0)) } else { None }).unwrap();
+                            client
+                                .stream
+                                .set_keepalive(if $tcp_keepalive > 0 {
+                                    Some(Duration::from_secs($tcp_keepalive as u64))
+                                } else {
+                                    None
+                                })
+                                .unwrap();
+                            client
+                                .stream
+                                .set_read_timeout(if $timeout > 0 {
+                                    Some(Duration::new($timeout, 0))
+                                } else {
+                                    None
+                                })
+                                .unwrap();
+                            client
+                                .stream
+                                .set_write_timeout(if $timeout > 0 {
+                                    Some(Duration::new($timeout, 0))
+                                } else {
+                                    None
+                                })
+                                .unwrap();
                             client.run(mysender);
                         });
                     }
-                    Err(e) => sendlog!(sender, Warning, "Accepting client connection: {:?}", e).unwrap(),
+                    Err(e) => {
+                        sendlog!(sender, Warning, "Accepting client connection: {:?}", e).unwrap()
+                    }
                 }
             }
         })
-    })
+    }};
 }
 
 impl Server {
@@ -497,12 +512,13 @@ impl Server {
     }
 
     /// Listens to a socket address.
-    fn listen<T: ToSocketAddrs>(&mut self,
-                                t: T,
-                                tcp_keepalive: u32,
-                                timeout: u64,
-                                tcp_backlog: i32)
-                                -> io::Result<()> {
+    fn listen<T: ToSocketAddrs>(
+        &mut self,
+        t: T,
+        tcp_keepalive: u32,
+        timeout: u64,
+        tcp_backlog: i32,
+    ) -> io::Result<()> {
         for addr in try!(t.to_socket_addrs()) {
             let (tx, rx) = channel();
             let builder = try!(match addr {
@@ -515,13 +531,15 @@ impl Server {
             self.listener_channels.push(tx);
             {
                 let db = self.db.lock().unwrap();
-                let th = handle_listener!(db.config.logger,
-                                          listener,
-                                          self,
-                                          rx,
-                                          tcp_keepalive,
-                                          timeout,
-                                          tcp);
+                let th = handle_listener!(
+                    db.config.logger,
+                    listener,
+                    self,
+                    rx,
+                    tcp_keepalive,
+                    timeout,
+                    tcp
+                );
                 self.listener_threads.push(th);
             }
         }
@@ -532,28 +550,34 @@ impl Server {
     pub fn start(&mut self) {
         let (tcp_keepalive, timeout, addresses, tcp_backlog) = {
             let db = self.db.lock().unwrap();
-            (db.config.tcp_keepalive.clone(),
-             db.config.timeout.clone(),
-             db.config.addresses().clone(),
-             db.config.tcp_backlog.clone())
+            (
+                db.config.tcp_keepalive.clone(),
+                db.config.timeout.clone(),
+                db.config.addresses().clone(),
+                db.config.tcp_backlog.clone(),
+            )
         };
         for (host, port) in addresses {
             match self.listen((&host[..], port), tcp_keepalive, timeout, tcp_backlog) {
                 Ok(_) => {
                     let db = self.db.lock().unwrap();
-                    log!(db.config.logger,
-                         Notice,
-                         "The server is now ready to accept connections on port {}",
-                         port);
+                    log!(
+                        db.config.logger,
+                        Notice,
+                        "The server is now ready to accept connections on port {}",
+                        port
+                    );
                 }
                 Err(err) => {
                     let db = self.db.lock().unwrap();
-                    log!(db.config.logger,
-                         Warning,
-                         "Creating Server TCP listening socket {}:{}: {:?}",
-                         host,
-                         port,
-                         err);
+                    log!(
+                        db.config.logger,
+                        Warning,
+                        "Creating Server TCP listening socket {}:{}: {:?}",
+                        host,
+                        port,
+                        err
+                    );
                     continue;
                 }
             }
@@ -594,21 +618,25 @@ impl Server {
             let listener = match UnixListener::bind(unixsocket) {
                 Ok(l) => l,
                 Err(err) => {
-                    log!(db.config.logger,
-                         Warning,
-                         "Creating Server Unix socket {}: {:?}",
-                         unixsocket,
-                         err);
+                    log!(
+                        db.config.logger,
+                        Warning,
+                        "Creating Server Unix socket {}: {:?}",
+                        unixsocket,
+                        err
+                    );
                     return;
                 }
             };
-            let th = handle_listener!(db.config.logger,
-                                      listener,
-                                      self,
-                                      rx,
-                                      tcp_keepalive,
-                                      timeout,
-                                      unix);
+            let th = handle_listener!(
+                db.config.logger,
+                listener,
+                self,
+                rx,
+                tcp_keepalive,
+                timeout,
+                unix
+            );
             self.listener_threads.push(th);
         }
     }
@@ -617,8 +645,10 @@ impl Server {
     fn handle_unixsocket(&mut self) {
         let db = self.db.lock().unwrap();
         if db.config.unixsocket.is_some() {
-            let _ = writeln!(&mut std::io::stderr(),
-                             "Ignoring unixsocket in non unix environment\n");
+            let _ = writeln!(
+                &mut std::io::stderr(),
+                "Ignoring unixsocket in non unix environment\n"
+            );
         }
     }
 
@@ -654,7 +684,7 @@ mod test_networking {
     use std::thread;
 
     use config::Config;
-    use logger::{Logger, Level};
+    use logger::{Level, Logger};
 
     use super::Server;
 

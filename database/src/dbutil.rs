@@ -62,7 +62,9 @@ pub fn usize_to_vec(i: usize) -> Vec<u8> {
 pub fn vec_to_usize(data: &Vec<u8>) -> Result<usize, OperationError> {
     // "01" should not be transformed into 1
     if data.len() == 0 || (data.len() > 1 && data[0] as char == '0') {
-        return Err(OperationError::ValueError("ERR value is not an integer".to_owned()));
+        return Err(OperationError::ValueError(
+            "ERR value is not an integer".to_owned(),
+        ));
     }
     let res = try!(from_utf8(&data));
     Ok(try!(res.parse::<usize>()))

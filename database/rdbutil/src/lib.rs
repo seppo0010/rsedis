@@ -1,11 +1,12 @@
 extern crate util;
 pub mod constants;
 
-use std::u32;
 use std::i64;
 use std::io;
 use std::str::from_utf8;
-#[cfg(test)] use std::usize;
+use std::u32;
+#[cfg(test)]
+use std::usize;
 
 use util::htonl;
 
@@ -30,24 +31,20 @@ impl From<io::Error> for EncodeError {
 // For now, the caller will have to explicitely cast or implement a wrapper function
 pub fn encode_i64<W: io::Write>(value: i64, enc: &mut W) -> Result<usize, EncodeError> {
     Ok(try!(if value >= -(1 << 7) && value <= (1 << 7) - 1 {
-        enc.write(
-                &[
-                    (ENCVAL << 6) | ENC_INT8,
-                    (value & 0xFF) as u8
-                ])
+        enc.write(&[(ENCVAL << 6) | ENC_INT8, (value & 0xFF) as u8])
     } else if value >= -(1 << 15) && value <= (1 << 15) - 1 {
         enc.write(&[
-                (ENCVAL << 6) | ENC_INT16,
-                (value & 0xFF) as u8,
-                ((value >> 8) & 0xFF) as u8,
+            (ENCVAL << 6) | ENC_INT16,
+            (value & 0xFF) as u8,
+            ((value >> 8) & 0xFF) as u8,
         ])
     } else if value >= -(1 << 31) && value <= (1 << 31) - 1 {
         enc.write(&[
-                (ENCVAL<<6) | ENC_INT32,
-                (value & 0xFF) as u8,
-                ((value >> 8) & 0xFF) as u8,
-                ((value >> 16) & 0xFF) as u8,
-                ((value >> 24) & 0xFF) as u8,
+            (ENCVAL << 6) | ENC_INT32,
+            (value & 0xFF) as u8,
+            ((value >> 8) & 0xFF) as u8,
+            ((value >> 16) & 0xFF) as u8,
+            ((value >> 24) & 0xFF) as u8,
         ])
     } else {
         return Err(EncodeError::OverflowError);
@@ -80,37 +77,37 @@ pub fn encode_i32<W: io::Write>(value: i32, enc: &mut W) -> Result<usize, Encode
 
 pub fn encode_usize<W: io::Write>(value: usize, enc: &mut W) -> Result<usize, EncodeError> {
     if value > i64::MAX as usize {
-        return Err(EncodeError::OverflowError)
+        return Err(EncodeError::OverflowError);
     }
     Ok(try!(encode_i64(value as i64, enc)))
 }
 
 pub fn encode_u16_to_slice_u8<W: io::Write>(value: u16, enc: &mut W) -> Result<usize, EncodeError> {
     Ok(try!(enc.write(&[
-            (value & 0xFF) as u8,
-            ((value >> 8) & 0xFF) as u8,
+        (value & 0xFF) as u8,
+        ((value >> 8) & 0xFF) as u8,
     ])))
 }
 
 pub fn encode_u32_to_slice_u8<W: io::Write>(value: u32, enc: &mut W) -> Result<usize, EncodeError> {
     Ok(try!(enc.write(&[
-            (value & 0xFF) as u8,
-            ((value >> 8) & 0xFF) as u8,
-            ((value >> 16) & 0xFF) as u8,
-            ((value >> 24) & 0xFF) as u8,
+        (value & 0xFF) as u8,
+        ((value >> 8) & 0xFF) as u8,
+        ((value >> 16) & 0xFF) as u8,
+        ((value >> 24) & 0xFF) as u8,
     ])))
 }
 
 pub fn encode_u64_to_slice_u8<W: io::Write>(value: u64, enc: &mut W) -> Result<usize, EncodeError> {
     Ok(try!(enc.write(&[
-            (value & 0xFF) as u8,
-            ((value >> 8) & 0xFF) as u8,
-            ((value >> 16) & 0xFF) as u8,
-            ((value >> 24) & 0xFF) as u8,
-            ((value >> 32) & 0xFF) as u8,
-            ((value >> 40) & 0xFF) as u8,
-            ((value >> 48) & 0xFF) as u8,
-            ((value >> 56) & 0xFF) as u8,
+        (value & 0xFF) as u8,
+        ((value >> 8) & 0xFF) as u8,
+        ((value >> 16) & 0xFF) as u8,
+        ((value >> 24) & 0xFF) as u8,
+        ((value >> 32) & 0xFF) as u8,
+        ((value >> 40) & 0xFF) as u8,
+        ((value >> 48) & 0xFF) as u8,
+        ((value >> 56) & 0xFF) as u8,
     ])))
 }
 
@@ -123,8 +120,8 @@ pub fn encode_len<W: io::Write>(len: usize, enc: &mut W) -> Result<usize, Encode
         Ok(try!(enc.write(&[((len & 0xFF) as u8) | (BITLEN6 << 6)])))
     } else if len < (1 << 14) {
         Ok(try!(enc.write(&[
-                (((len >> 8) as u8) & 0xFF) | (BITLEN14 << 6),
-                (len & 0xFF) as u8,
+            (((len >> 8) as u8) & 0xFF) | (BITLEN14 << 6),
+            (len & 0xFF) as u8,
         ])))
     } else {
         let mut s = try!(enc.write(&[BITLEN32 << 6]));
@@ -133,7 +130,11 @@ pub fn encode_len<W: io::Write>(len: usize, enc: &mut W) -> Result<usize, Encode
     }
 }
 
-pub fn encode_slice_u8<W: io::Write>(data: &[u8], enc: &mut W, as_int: bool) -> Result<usize, io::Error> {
+pub fn encode_slice_u8<W: io::Write>(
+    data: &[u8],
+    enc: &mut W,
+    as_int: bool,
+) -> Result<usize, io::Error> {
     if as_int && data.len() <= 11 {
         if let Ok(s) = from_utf8(data) {
             if let Ok(i) = s.parse::<i64>() {
