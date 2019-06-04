@@ -1,79 +1,87 @@
-use std::ascii::AsciiExt;
 use std::collections::{Bound, HashMap, HashSet};
-use std::time::Duration;
 use std::io::Write;
 use std::mem::replace;
-use std::sync::mpsc::Sender;
 use std::sync::mpsc::channel;
+use std::sync::mpsc::Sender;
 use std::thread;
+use std::time::Duration;
 use std::usize;
 
-use compat::{getpid, getos};
-use database::{PubsubEvent, Database, Value, zset};
+use compat::{getos, getpid};
+use database::{zset, Database, PubsubEvent, Value};
+use parser::{Argument, OwnedParsedCommand, ParsedCommand};
 use response::{Response, ResponseError};
-use parser::{OwnedParsedCommand, ParsedCommand, Argument};
 use util::mstime;
 
 macro_rules! opt_validate {
-    ($expr: expr, $err: expr) => (
+    ($expr: expr, $err: expr) => {
         if !($expr) {
             return Ok(Response::Error($err.to_string()));
         }
-    )
+    };
 }
 
 macro_rules! try_opt_validate {
-    ($expr: expr, $err: expr) => ({
+    ($expr: expr, $err: expr) => {{
         match $expr {
             Ok(r) => r,
             Err(_) => return Ok(Response::Error($err.to_string())),
         }
-    })
+    }};
 }
 
 macro_rules! validate_arguments_exact {
     ($parser: expr, $expected: expr) => {
         if $parser.argv.len() != $expected {
-            return Response::Error(format!("ERR wrong number of arguments for '{}' command", $parser.get_str(0).unwrap()));
+            return Response::Error(format!(
+                "ERR wrong number of arguments for '{}' command",
+                $parser.get_str(0).unwrap()
+            ));
         }
-    }
+    };
 }
 
 macro_rules! validate_arguments_gte {
     ($parser: expr, $expected: expr) => {
         if $parser.argv.len() < $expected {
-            return Response::Error(format!("ERR wrong number of arguments for '{}' command", $parser.get_str(0).unwrap()));
+            return Response::Error(format!(
+                "ERR wrong number of arguments for '{}' command",
+                $parser.get_str(0).unwrap()
+            ));
         }
-    }
+    };
 }
 
 macro_rules! validate_arguments_lte {
     ($parser: expr, $expected: expr) => {
         if $parser.argv.len() > $expected {
-            return Response::Error(format!("ERR wrong number of arguments for '{}' command", $parser.get_str(0).unwrap()));
+            return Response::Error(format!(
+                "ERR wrong number of arguments for '{}' command",
+                $parser.get_str(0).unwrap()
+            ));
         }
-    }
+    };
 }
 
 macro_rules! validate {
-    ($expr: expr, $err: expr) => (
+    ($expr: expr, $err: expr) => {
         if !($expr) {
             return Response::Error($err.to_string());
         }
-    )
+    };
 }
 
 macro_rules! try_validate {
-    ($expr: expr, $err: expr) => ({
+    ($expr: expr, $err: expr) => {{
         match $expr {
             Ok(r) => r,
             Err(_) => return Response::Error($err.to_string()),
         }
-    })
+    }};
 }
 
 macro_rules! get_values {
-    ($start: expr, $stop: expr, $parser: expr, $db: expr, $dbindex: expr, $default: expr) => ({
+    ($start: expr, $stop: expr, $parser: expr, $db: expr, $dbindex: expr, $default: expr) => {{
         validate_arguments_gte!($parser, $start);
         validate_arguments_gte!($parser, $stop);
         let mut sets = Vec::with_capacity($parser.argv.len() - $start);
@@ -85,17 +93,18 @@ macro_rules! get_values {
             };
         }
         sets
-    })
+    }};
 }
 
-fn generic_set(db: &mut Database,
-               dbindex: usize,
-               key: Vec<u8>,
-               val: Vec<u8>,
-               nx: bool,
-               xx: bool,
-               expiration: Option<i64>)
-               -> Result<bool, Response> {
+fn generic_set(
+    db: &mut Database,
+    dbindex: usize,
+    key: Vec<u8>,
+    val: Vec<u8>,
+    nx: bool,
+    xx: bool,
+    expiration: Option<i64>,
+) -> Result<bool, Response> {
     if nx && db.get(dbindex, &key).is_some() {
         return Ok(false);
     }
@@ -251,12 +260,10 @@ fn dump(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Respon
 
     let obj = db.get(dbindex, &key);
     match obj {
-        Some(value) => {
-            match value.dump(&mut data) {
-                Ok(_) => Response::Data(data),
-                Err(err) => Response::Error(err.to_string()),
-            }
-        }
+        Some(value) => match value.dump(&mut data) {
+            Ok(_) => Response::Data(data),
+            Err(err) => Response::Error(err.to_string()),
+        },
         None => Response::Nil,
     }
 }
@@ -308,12 +315,10 @@ fn flushdb(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Res
 
 fn generic_ttl(db: &mut Database, dbindex: usize, key: &Vec<u8>, divisor: i64) -> Response {
     Response::Integer(match db.get(dbindex, key) {
-        Some(_) => {
-            match db.get_msexpiration(dbindex, key) {
-                Some(exp) => (exp - mstime()) / divisor,
-                None => -1,
-            }
-        }
+        Some(_) => match db.get_msexpiration(dbindex, key) {
+            Some(exp) => (exp - mstime()) / divisor,
+            None => -1,
+        },
         None => -2,
     })
 }
@@ -345,15 +350,13 @@ fn dbtype(parser: &mut ParsedCommand, db: &Database, dbindex: usize) -> Response
     validate_arguments_exact!(parser, 2);
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     match db.get(dbindex, &key) {
-        Some(value) => {
-            match value {
-                &Value::Nil => Response::Data("none".to_owned().into_bytes()),
-                &Value::String(_) => Response::Data("string".to_owned().into_bytes()),
-                &Value::List(_) => Response::Data("list".to_owned().into_bytes()),
-                &Value::Set(_) => Response::Data("set".to_owned().into_bytes()),
-                &Value::SortedSet(_) => Response::Data("zset".to_owned().into_bytes()),
-            }
-        }
+        Some(value) => match value {
+            &Value::Nil => Response::Data("none".to_owned().into_bytes()),
+            &Value::String(_) => Response::Data("string".to_owned().into_bytes()),
+            &Value::List(_) => Response::Data("list".to_owned().into_bytes()),
+            &Value::Set(_) => Response::Data("set".to_owned().into_bytes()),
+            &Value::SortedSet(_) => Response::Data("zset".to_owned().into_bytes()),
+        },
         None => Response::Data("none".to_owned().into_bytes()),
     }
 }
@@ -374,8 +377,10 @@ fn append(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Resp
             Ok(len) => len,
             Err(err) => return Response::Error(err.to_string()),
         };
-        validate!(oldlen + val.len() <= 512 * 1024 * 1024,
-                  "ERR string exceeds maximum allowed size (512MB)");
+        validate!(
+            oldlen + val.len() <= 512 * 1024 * 1024,
+            "ERR string exceeds maximum allowed size (512MB)"
+        );
         match oldval.append(val) {
             Ok(len) => Response::Integer(len as i64),
             Err(err) => Response::Error(err.to_string()),
@@ -388,18 +393,16 @@ fn append(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Resp
 fn generic_get(db: &Database, dbindex: usize, key: Vec<u8>, err_on_wrongtype: bool) -> Response {
     let obj = db.get(dbindex, &key);
     match obj {
-        Some(value) => {
-            match value.get() {
-                Ok(r) => Response::Data(r),
-                Err(err) => {
-                    if err_on_wrongtype {
-                        Response::Error(err.to_string())
-                    } else {
-                        Response::Nil
-                    }
+        Some(value) => match value.get() {
+            Ok(r) => Response::Data(r),
+            Err(err) => {
+                if err_on_wrongtype {
+                    Response::Error(err.to_string())
+                } else {
+                    Response::Nil
                 }
             }
-        }
+        },
         None => Response::Nil,
     }
 }
@@ -427,12 +430,10 @@ fn getrange(parser: &mut ParsedCommand, db: &Database, dbindex: usize) -> Respon
     let stop = try_validate!(parser.get_i64(3), "Invalid range");
     let obj = db.get(dbindex, &key);
     match obj {
-        Some(value) => {
-            match value.getrange(start, stop) {
-                Ok(r) => Response::Data(r),
-                Err(e) => Response::Error(e.to_string()),
-            }
-        }
+        Some(value) => match value.getrange(start, stop) {
+            Ok(r) => Response::Data(r),
+            Err(e) => Response::Error(e.to_string()),
+        },
         None => return Response::Nil,
     }
 }
@@ -453,8 +454,10 @@ fn setrange(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Re
             return Response::Integer(0);
         }
         let oldval = db.get_or_create(dbindex, &key);
-        validate!(index + value.len() <= 512 * 1024 * 1024,
-                  "ERR string exceeds maximum allowed size (512MB)");
+        validate!(
+            index + value.len() <= 512 * 1024 * 1024,
+            "ERR string exceeds maximum allowed size (512MB)"
+        );
         match oldval.setrange(index, value) {
             Ok(s) => Response::Integer(s as i64),
             Err(e) => Response::Error(e.to_string()),
@@ -467,15 +470,26 @@ fn setrange(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Re
 fn setbit(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate_arguments_exact!(parser, 4);
     let key = try_validate!(parser.get_vec(1), "Invalid key");
-    let index = try_validate!(parser.get_i64(2),
-                              "ERR bit offset is not an integer or out of range");
-    validate!(index >= 0 && index < 4 * 1024 * 1024 * 1024,
-              "ERR bit offset is not an integer or out of range");
-    let value = try_validate!(parser.get_i64(3),
-                              "ERR bit is not an integer or out of range");
-    validate!(value == 0 || value == 1,
-              "ERR bit is not an integer or out of range");
-    let r = match db.get_or_create(dbindex, &key).setbit(index as usize, value == 1) {
+    let index = try_validate!(
+        parser.get_i64(2),
+        "ERR bit offset is not an integer or out of range"
+    );
+    validate!(
+        index >= 0 && index < 4 * 1024 * 1024 * 1024,
+        "ERR bit offset is not an integer or out of range"
+    );
+    let value = try_validate!(
+        parser.get_i64(3),
+        "ERR bit is not an integer or out of range"
+    );
+    validate!(
+        value == 0 || value == 1,
+        "ERR bit is not an integer or out of range"
+    );
+    let r = match db
+        .get_or_create(dbindex, &key)
+        .setbit(index as usize, value == 1)
+    {
         Ok(s) => Response::Integer(if s { 1 } else { 0 }),
         Err(e) => Response::Error(e.to_string()),
     };
@@ -489,12 +503,10 @@ fn getbit(parser: &mut ParsedCommand, db: &Database, dbindex: usize) -> Response
     let index = try_validate!(parser.get_i64(2), "Invalid index");
     validate!(index >= 0, "Invalid index");
     match db.get(dbindex, &key) {
-        Some(v) => {
-            match v.getbit(index as usize) {
-                Ok(s) => Response::Integer(if s { 1 } else { 0 }),
-                Err(e) => Response::Error(e.to_string()),
-            }
-        }
+        Some(v) => match v.getbit(index as usize) {
+            Ok(s) => Response::Integer(if s { 1 } else { 0 }),
+            Err(e) => Response::Error(e.to_string()),
+        },
         None => Response::Integer(0),
     }
 }
@@ -504,21 +516,20 @@ fn strlen(parser: &mut ParsedCommand, db: &Database, dbindex: usize) -> Response
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let obj = db.get(dbindex, &key);
     match obj {
-        Some(value) => {
-            match value.strlen() {
-                Ok(r) => Response::Integer(r as i64),
-                Err(err) => Response::Error(err.to_string()),
-            }
-        }
+        Some(value) => match value.strlen() {
+            Ok(r) => Response::Integer(r as i64),
+            Err(err) => Response::Error(err.to_string()),
+        },
         None => return Response::Integer(0),
     }
 }
 
-fn generic_incr(parser: &mut ParsedCommand,
-                db: &mut Database,
-                dbindex: usize,
-                increment: i64)
-                -> Response {
+fn generic_incr(
+    parser: &mut ParsedCommand,
+    db: &mut Database,
+    dbindex: usize,
+    increment: i64,
+) -> Response {
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let r = match db.get_or_create(dbindex, &key).incr(increment) {
         Ok(val) => Response::Integer(val),
@@ -586,12 +597,10 @@ fn pfcount(parser: &ParsedCommand, db: &Database, dbindex: usize) -> Response {
     if parser.argv.len() == 2 {
         let key = try_validate!(parser.get_vec(1), "Invalid key");
         Response::Integer(match db.get(dbindex, &key) {
-            Some(v) => {
-                match v.pfcount() {
-                    Ok(val) => val as i64,
-                    Err(err) => return Response::Error(err.to_string()),
-                }
-            }
+            Some(v) => match v.pfcount() {
+                Ok(val) => val as i64,
+                Err(err) => return Response::Error(err.to_string()),
+            },
             None => 0,
         })
     } else {
@@ -647,12 +656,13 @@ fn pfmerge(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Respons
     r
 }
 
-fn generic_push(parser: &mut ParsedCommand,
-                db: &mut Database,
-                dbindex: usize,
-                right: bool,
-                create: bool)
-                -> Response {
+fn generic_push(
+    parser: &mut ParsedCommand,
+    db: &mut Database,
+    dbindex: usize,
+    right: bool,
+    create: bool,
+) -> Response {
     validate!(parser.argv.len() >= 3, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let mut r = Response::Nil;
@@ -692,26 +702,23 @@ fn rpushx(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Resp
     return generic_push(parser, db, dbindex, true, false);
 }
 
-fn generic_pop(parser: &mut ParsedCommand,
-               db: &mut Database,
-               dbindex: usize,
-               right: bool)
-               -> Response {
+fn generic_pop(
+    parser: &mut ParsedCommand,
+    db: &mut Database,
+    dbindex: usize,
+    right: bool,
+) -> Response {
     validate_arguments_exact!(parser, 2);
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let r = {
         match db.get_mut(dbindex, &key) {
-            Some(mut list) => {
-                match list.pop(right) {
-                    Ok(el) => {
-                        match el {
-                            Some(val) => Response::Data(val),
-                            None => Response::Nil,
-                        }
-                    }
-                    Err(err) => Response::Error(err.to_string()),
-                }
-            }
+            Some(mut list) => match list.pop(right) {
+                Ok(el) => match el {
+                    Some(val) => Response::Data(val),
+                    None => Response::Nil,
+                },
+                Err(err) => Response::Error(err.to_string()),
+            },
             None => Response::Nil,
         }
     };
@@ -727,20 +734,19 @@ fn rpop(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Respon
     return generic_pop(parser, db, dbindex, true);
 }
 
-fn generic_rpoplpush(db: &mut Database,
-                     dbindex: usize,
-                     source: &Vec<u8>,
-                     destination: &Vec<u8>)
-                     -> Response {
+fn generic_rpoplpush(
+    db: &mut Database,
+    dbindex: usize,
+    source: &Vec<u8>,
+    destination: &Vec<u8>,
+) -> Response {
     #![allow(unused_must_use)]
 
     match db.get(dbindex, destination) {
-        Some(el) => {
-            match el.llen() {
-                Ok(_) => (),
-                Err(_) => return Response::Error("WRONGTYPE Destination is not a list".to_owned()),
-            }
-        }
+        Some(el) => match el.llen() {
+            Ok(_) => (),
+            Err(_) => return Response::Error("WRONGTYPE Destination is not a list".to_owned()),
+        },
         None => (),
     }
 
@@ -755,12 +761,10 @@ fn generic_rpoplpush(db: &mut Database,
             None => return Response::Nil,
         };
         match sourcelist.pop(true) {
-            Ok(el) => {
-                match el {
-                    Some(el) => el,
-                    None => return Response::Nil,
-                }
-            }
+            Ok(el) => match el {
+                Some(el) => el,
+                None => return Response::Nil,
+            },
             Err(err) => return Response::Error(err.to_string()),
         }
     };
@@ -782,10 +786,11 @@ fn rpoplpush(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> R
     generic_rpoplpush(db, dbindex, &source, &destination)
 }
 
-fn brpoplpush(parser: &mut ParsedCommand,
-              db: &mut Database,
-              dbindex: usize)
-              -> Result<Response, ResponseError> {
+fn brpoplpush(
+    parser: &mut ParsedCommand,
+    db: &mut Database,
+    dbindex: usize,
+) -> Result<Response, ResponseError> {
     #![allow(unused_must_use)]
     opt_validate!(parser.argv.len() == 4, "Wrong number of parameters");
 
@@ -851,11 +856,12 @@ fn brpoplpush(parser: &mut ParsedCommand,
     return Err(ResponseError::Wait(rxcommand));
 }
 
-fn generic_bpop(parser: &mut ParsedCommand,
-                db: &mut Database,
-                dbindex: usize,
-                right: bool)
-                -> Result<Response, ResponseError> {
+fn generic_bpop(
+    parser: &mut ParsedCommand,
+    db: &mut Database,
+    dbindex: usize,
+    right: bool,
+) -> Result<Response, ResponseError> {
     #![allow(unused_must_use)]
     opt_validate!(parser.argv.len() >= 3, "Wrong number of parameters");
     let time = mstime();
@@ -864,27 +870,27 @@ fn generic_bpop(parser: &mut ParsedCommand,
     for i in 1..parser.argv.len() - 1 {
         let key = try_opt_validate!(parser.get_vec(i), "Invalid key");
         let val = match db.get_mut(dbindex, &key) {
-            Some(mut list) => {
-                match list.pop(right) {
-                    Ok(el) => el,
-                    Err(err) => return Ok(Response::Error(err.to_string())),
-                }
-            }
+            Some(mut list) => match list.pop(right) {
+                Ok(el) => el,
+                Err(err) => return Ok(Response::Error(err.to_string())),
+            },
             None => None,
         };
         match val {
             Some(val) => {
                 db.key_updated(dbindex, &key);
                 return Ok(Response::Array(vec![
-                        Response::Data(key),
-                        Response::Data(val),
-                        ]));
+                    Response::Data(key),
+                    Response::Data(val),
+                ]));
             }
             None => keys.push(key),
         }
     }
-    let timeout = try_opt_validate!(parser.get_i64(parser.argv.len() - 1),
-                                    "ERR timeout is not an integer");
+    let timeout = try_opt_validate!(
+        parser.get_i64(parser.argv.len() - 1),
+        "ERR timeout is not an integer"
+    );
 
     let (txkey, rxkey) = channel();
     let (txcommand, rxcommand) = channel();
@@ -937,17 +943,19 @@ fn generic_bpop(parser: &mut ParsedCommand,
     return Err(ResponseError::Wait(rxcommand));
 }
 
-fn brpop(parser: &mut ParsedCommand,
-         db: &mut Database,
-         dbindex: usize)
-         -> Result<Response, ResponseError> {
+fn brpop(
+    parser: &mut ParsedCommand,
+    db: &mut Database,
+    dbindex: usize,
+) -> Result<Response, ResponseError> {
     generic_bpop(parser, db, dbindex, true)
 }
 
-fn blpop(parser: &mut ParsedCommand,
-         db: &mut Database,
-         dbindex: usize)
-         -> Result<Response, ResponseError> {
+fn blpop(
+    parser: &mut ParsedCommand,
+    db: &mut Database,
+    dbindex: usize,
+) -> Result<Response, ResponseError> {
     generic_bpop(parser, db, dbindex, false)
 }
 
@@ -956,17 +964,13 @@ fn lindex(parser: &mut ParsedCommand, db: &Database, dbindex: usize) -> Response
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let index = try_validate!(parser.get_i64(2), "Invalid index");
     return match db.get(dbindex, &key) {
-        Some(el) => {
-            match el.lindex(index) {
-                Ok(el) => {
-                    match el {
-                        Some(val) => Response::Data(val.clone()),
-                        None => Response::Nil,
-                    }
-                }
-                Err(err) => Response::Error(err.to_string()),
-            }
-        }
+        Some(el) => match el.lindex(index) {
+            Ok(el) => match el {
+                Some(val) => Response::Data(val.clone()),
+                None => Response::Nil,
+            },
+            Err(err) => Response::Error(err.to_string()),
+        },
         None => Response::Nil,
     };
 }
@@ -984,17 +988,13 @@ fn linsert(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Res
         _ => return Response::Error("ERR syntax error".to_owned()),
     };
     let r = match db.get_mut(dbindex, &key) {
-        Some(mut el) => {
-            match el.linsert(before, pivot, value) {
-                Ok(r) => {
-                    match r {
-                        Some(listsize) => Response::Integer(listsize as i64),
-                        None => Response::Integer(-1),
-                    }
-                }
-                Err(err) => Response::Error(err.to_string()),
-            }
-        }
+        Some(mut el) => match el.linsert(before, pivot, value) {
+            Ok(r) => match r {
+                Some(listsize) => Response::Integer(listsize as i64),
+                None => Response::Integer(-1),
+            },
+            Err(err) => Response::Error(err.to_string()),
+        },
         None => Response::Integer(-1),
     };
     db.key_updated(dbindex, &key);
@@ -1005,12 +1005,10 @@ fn llen(parser: &mut ParsedCommand, db: &Database, dbindex: usize) -> Response {
     validate_arguments_exact!(parser, 2);
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     return match db.get(dbindex, &key) {
-        Some(el) => {
-            match el.llen() {
-                Ok(listsize) => Response::Integer(listsize as i64),
-                Err(err) => Response::Error(err.to_string()),
-            }
-        }
+        Some(el) => match el.llen() {
+            Ok(listsize) => Response::Integer(listsize as i64),
+            Err(err) => Response::Error(err.to_string()),
+        },
         None => Response::Integer(0),
     };
 }
@@ -1021,14 +1019,12 @@ fn lrange(parser: &mut ParsedCommand, db: &Database, dbindex: usize) -> Response
     let start = try_validate!(parser.get_i64(2), "Invalid range");
     let stop = try_validate!(parser.get_i64(3), "Invalid range");
     return match db.get(dbindex, &key) {
-        Some(el) => {
-            match el.lrange(start, stop) {
-                Ok(items) => {
-                    Response::Array(items.iter().map(|i| Response::Data(i.to_vec())).collect())
-                }
-                Err(err) => Response::Error(err.to_string()),
+        Some(el) => match el.lrange(start, stop) {
+            Ok(items) => {
+                Response::Array(items.iter().map(|i| Response::Data(i.to_vec())).collect())
             }
-        }
+            Err(err) => Response::Error(err.to_string()),
+        },
         None => Response::Array(Vec::new()),
     };
 }
@@ -1039,12 +1035,10 @@ fn lrem(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Respon
     let count = try_validate!(parser.get_i64(2), "Invalid count");
     let value = try_validate!(parser.get_vec(3), "Invalid value");
     let r = match db.get_mut(dbindex, &key) {
-        Some(ref mut el) => {
-            match el.lrem(count < 0, count.abs() as usize, value) {
-                Ok(removed) => Response::Integer(removed as i64),
-                Err(err) => Response::Error(err.to_string()),
-            }
-        }
+        Some(ref mut el) => match el.lrem(count < 0, count.abs() as usize, value) {
+            Ok(removed) => Response::Integer(removed as i64),
+            Err(err) => Response::Error(err.to_string()),
+        },
         None => Response::Array(Vec::new()),
     };
     db.key_updated(dbindex, &key);
@@ -1057,12 +1051,10 @@ fn lset(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Respon
     let index = try_validate!(parser.get_i64(2), "Invalid index");
     let value = try_validate!(parser.get_vec(3), "Invalid value");
     let r = match db.get_mut(dbindex, &key) {
-        Some(ref mut el) => {
-            match el.lset(index, value) {
-                Ok(()) => Response::Status("OK".to_owned()),
-                Err(err) => Response::Error(err.to_string()),
-            }
-        }
+        Some(ref mut el) => match el.lset(index, value) {
+            Ok(()) => Response::Status("OK".to_owned()),
+            Err(err) => Response::Error(err.to_string()),
+        },
         None => Response::Error("ERR no such key".to_owned()),
     };
     db.key_updated(dbindex, &key);
@@ -1075,12 +1067,10 @@ fn ltrim(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Respo
     let start = try_validate!(parser.get_i64(2), "Invalid start");
     let stop = try_validate!(parser.get_i64(3), "Invalid stop");
     let r = match db.get_mut(dbindex, &key) {
-        Some(ref mut el) => {
-            match el.ltrim(start, stop) {
-                Ok(()) => Response::Status("OK".to_owned()),
-                Err(err) => Response::Error(err.to_string()),
-            }
-        }
+        Some(ref mut el) => match el.ltrim(start, stop) {
+            Ok(()) => Response::Status("OK".to_owned()),
+            Err(err) => Response::Error(err.to_string()),
+        },
         None => Response::Status("OK".to_owned()),
     };
     db.key_updated(dbindex, &key);
@@ -1137,12 +1127,16 @@ fn sismember(parser: &mut ParsedCommand, db: &Database, dbindex: usize) -> Respo
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let member = try_validate!(parser.get_vec(2), "Invalid key");
     Response::Integer(match db.get(dbindex, &key) {
-        Some(el) => {
-            match el.sismember(&member) {
-                Ok(e) => if e { 1 } else { 0 },
-                Err(err) => return Response::Error(err.to_string()),
+        Some(el) => match el.sismember(&member) {
+            Ok(e) => {
+                if e {
+                    1
+                } else {
+                    0
+                }
             }
-        }
+            Err(err) => return Response::Error(err.to_string()),
+        },
         None => 0,
     })
 }
@@ -1175,13 +1169,19 @@ fn srandmember(parser: &mut ParsedCommand, db: &Database, dbindex: usize) -> Res
     } else {
         let _count = try_validate!(parser.get_i64(2), "Invalid count");
         let count = {
-            if _count < 0 { -_count } else { _count }
+            if _count < 0 {
+                -_count
+            } else {
+                _count
+            }
         } as usize;
         let allow_duplicates = _count < 0;
         match value.srandmember(count, allow_duplicates) {
-            Ok(els) => {
-                Response::Array(els.iter().map(|x| Response::Data(x.clone())).collect::<Vec<_>>())
-            }
+            Ok(els) => Response::Array(
+                els.iter()
+                    .map(|x| Response::Data(x.clone()))
+                    .collect::<Vec<_>>(),
+            ),
             Err(err) => Response::Error(err.to_string()),
         }
     }
@@ -1195,9 +1195,11 @@ fn smembers(parser: &mut ParsedCommand, db: &Database, dbindex: usize) -> Respon
         None => return Response::Array(vec![]),
     };
     match value.smembers() {
-        Ok(els) => {
-            Response::Array(els.iter().map(|x| Response::Data(x.clone())).collect::<Vec<_>>())
-        }
+        Ok(els) => Response::Array(
+            els.iter()
+                .map(|x| Response::Data(x.clone()))
+                .collect::<Vec<_>>(),
+        ),
         Err(err) => Response::Error(err.to_string()),
     }
 }
@@ -1231,11 +1233,11 @@ fn spop(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Respon
         } else {
             let count = try_validate!(parser.get_i64(2), "Invalid count");
             match value.spop(count as usize) {
-                Ok(els) => {
-                    Response::Array(els.iter()
+                Ok(els) => Response::Array(
+                    els.iter()
                         .map(|x| Response::Data(x.clone()))
-                        .collect::<Vec<_>>())
-                }
+                        .collect::<Vec<_>>(),
+                ),
                 Err(err) => Response::Error(err.to_string()),
             }
         }
@@ -1254,9 +1256,11 @@ fn smove(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Respo
         match db.get(dbindex, &destination_key) {
             Some(e) => {
                 if !e.is_set() {
-                    return Response::Error("WRONGTYPE Operation against a key holding the wrong \
-                                            kind of value"
-                        .to_owned());
+                    return Response::Error(
+                        "WRONGTYPE Operation against a key holding the wrong \
+                         kind of value"
+                            .to_owned(),
+                    );
                 }
             }
             None => (),
@@ -1315,9 +1319,11 @@ fn sdiff(parser: &mut ParsedCommand, db: &Database, dbindex: usize) -> Response 
     let sets = get_values!(2, parser.argv.len(), parser, db, dbindex, &nil);
 
     match el.sdiff(&sets) {
-        Ok(set) => {
-            Response::Array(set.iter().map(|x| Response::Data(x.clone())).collect::<Vec<_>>())
-        }
+        Ok(set) => Response::Array(
+            set.iter()
+                .map(|x| Response::Data(x.clone()))
+                .collect::<Vec<_>>(),
+        ),
         Err(err) => Response::Error(err.to_string()),
     }
 }
@@ -1355,9 +1361,11 @@ fn sinter(parser: &mut ParsedCommand, db: &Database, dbindex: usize) -> Response
     let nil = Value::Nil;
     let sets = get_values!(2, parser.argv.len(), parser, db, dbindex, &nil);
     return match el.sinter(&sets) {
-        Ok(set) => {
-            Response::Array(set.iter().map(|x| Response::Data(x.clone())).collect::<Vec<_>>())
-        }
+        Ok(set) => Response::Array(
+            set.iter()
+                .map(|x| Response::Data(x.clone()))
+                .collect::<Vec<_>>(),
+        ),
         Err(err) => Response::Error(err.to_string()),
     };
 }
@@ -1396,9 +1404,11 @@ fn sunion(parser: &mut ParsedCommand, db: &Database, dbindex: usize) -> Response
     let nil = Value::Nil;
     let sets = get_values!(2, parser.argv.len(), parser, db, dbindex, &nil);
     return match el.sunion(&sets) {
-        Ok(set) => {
-            Response::Array(set.iter().map(|x| Response::Data(x.clone())).collect::<Vec<_>>())
-        }
+        Ok(set) => Response::Array(
+            set.iter()
+                .map(|x| Response::Data(x.clone()))
+                .collect::<Vec<_>>(),
+        ),
         Err(err) => Response::Error(err.to_string()),
     };
 }
@@ -1471,8 +1481,10 @@ fn zadd(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Respon
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let mut count = 0;
     for j in 0..((len - i) / 2) {
-        validate!(parser.get_f64(i + j * 2).is_ok(),
-                  "ERR value is not a valid float");
+        validate!(
+            parser.get_f64(i + j * 2).is_ok(),
+            "ERR value is not a valid float"
+        );
     }
     {
         let el = db.get_or_create(dbindex, &key);
@@ -1518,12 +1530,10 @@ fn zscore(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Resp
         None => return Response::Nil,
     };
     return match el.zscore(element) {
-        Ok(s) => {
-            match s {
-                Some(score) => Response::Data(format!("{}", score).into_bytes()),
-                None => Response::Nil,
-            }
-        }
+        Ok(s) => match s {
+            Some(score) => Response::Data(format!("{}", score).into_bytes()),
+            None => Response::Nil,
+        },
         Err(err) => return Response::Error(err.to_string()),
     };
 }
@@ -1596,16 +1606,20 @@ fn zremrangebylex(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize)
     validate_arguments_exact!(parser, 4);
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let min = {
-        let m = try_validate!(parser.get_vec(2),
-                              "ERR min or max not valid string range item");
+        let m = try_validate!(
+            parser.get_vec(2),
+            "ERR min or max not valid string range item"
+        );
         match get_vec_bound(m) {
             Ok(v) => v,
             Err(e) => return e,
         }
     };
     let max = {
-        let m = try_validate!(parser.get_vec(3),
-                              "ERR min or max not valid string range item");
+        let m = try_validate!(
+            parser.get_vec(3),
+            "ERR min or max not valid string range item"
+        );
         match get_vec_bound(m) {
             Ok(v) => v,
             Err(e) => return e,
@@ -1663,11 +1677,12 @@ fn zcount(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Resp
     }
 }
 
-fn generic_zrange(parser: &mut ParsedCommand,
-                  db: &mut Database,
-                  dbindex: usize,
-                  rev: bool)
-                  -> Response {
+fn generic_zrange(
+    parser: &mut ParsedCommand,
+    db: &mut Database,
+    dbindex: usize,
+    rev: bool,
+) -> Response {
     validate_arguments_gte!(parser, 4);
     validate_arguments_lte!(parser, 5);
     let key = try_validate!(parser.get_vec(1), "Invalid key");
@@ -1683,7 +1698,11 @@ fn generic_zrange(parser: &mut ParsedCommand,
         None => return Response::Array(Vec::new()),
     };
     match el.zrange(start, stop, withscores, rev) {
-        Ok(r) => Response::Array(r.iter().map(|x| Response::Data(x.clone())).collect::<Vec<_>>()),
+        Ok(r) => Response::Array(
+            r.iter()
+                .map(|x| Response::Data(x.clone()))
+                .collect::<Vec<_>>(),
+        ),
         Err(err) => Response::Error(err.to_string()),
     }
 }
@@ -1696,11 +1715,12 @@ fn zrevrange(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> R
     generic_zrange(parser, db, dbindex, true)
 }
 
-fn generic_zrangebyscore(parser: &mut ParsedCommand,
-                         db: &mut Database,
-                         dbindex: usize,
-                         rev: bool)
-                         -> Response {
+fn generic_zrangebyscore(
+    parser: &mut ParsedCommand,
+    db: &mut Database,
+    dbindex: usize,
+    rev: bool,
+) -> Response {
     let len = parser.argv.len();
     validate!(len >= 4, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
@@ -1732,7 +1752,11 @@ fn generic_zrangebyscore(parser: &mut ParsedCommand,
         None => return Response::Array(Vec::new()),
     };
     match el.zrangebyscore(min, max, withscores, offset, count, rev) {
-        Ok(r) => Response::Array(r.iter().map(|x| Response::Data(x.clone())).collect::<Vec<_>>()),
+        Ok(r) => Response::Array(
+            r.iter()
+                .map(|x| Response::Data(x.clone()))
+                .collect::<Vec<_>>(),
+        ),
         Err(err) => Response::Error(err.to_string()),
     }
 }
@@ -1748,7 +1772,9 @@ fn zrevrangebyscore(parser: &mut ParsedCommand, db: &mut Database, dbindex: usiz
 fn get_vec_bound(_m: Vec<u8>) -> Result<Bound<Vec<u8>>, Response> {
     let mut m = _m;
     if m.len() == 0 {
-        return Err(Response::Error("ERR min or max not valid string range item".to_string()));
+        return Err(Response::Error(
+            "ERR min or max not valid string range item".to_string(),
+        ));
     }
     // FIXME: unnecessary memory move?
     Ok(match m.remove(0) as char {
@@ -1756,41 +1782,52 @@ fn get_vec_bound(_m: Vec<u8>) -> Result<Bound<Vec<u8>>, Response> {
         '[' => Bound::Included(m),
         '-' => {
             if m.len() > 0 {
-                return Err(Response::Error("ERR min or max not valid string range item"
-                    .to_string()));
+                return Err(Response::Error(
+                    "ERR min or max not valid string range item".to_string(),
+                ));
             }
             Bound::Unbounded
         }
         '+' => {
             if m.len() > 0 {
-                return Err(Response::Error("ERR min or max not valid string range item"
-                    .to_string()));
+                return Err(Response::Error(
+                    "ERR min or max not valid string range item".to_string(),
+                ));
             }
             Bound::Unbounded
         }
-        _ => return Err(Response::Error("ERR min or max not valid string range item".to_string())),
+        _ => {
+            return Err(Response::Error(
+                "ERR min or max not valid string range item".to_string(),
+            ))
+        }
     })
 }
 
-fn generic_zrangebylex(parser: &mut ParsedCommand,
-                       db: &mut Database,
-                       dbindex: usize,
-                       rev: bool)
-                       -> Response {
+fn generic_zrangebylex(
+    parser: &mut ParsedCommand,
+    db: &mut Database,
+    dbindex: usize,
+    rev: bool,
+) -> Response {
     let len = parser.argv.len();
     validate!(len == 4 || len == 7, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let min = {
-        let m = try_validate!(parser.get_vec(2),
-                              "ERR min or max not valid string range item");
+        let m = try_validate!(
+            parser.get_vec(2),
+            "ERR min or max not valid string range item"
+        );
         match get_vec_bound(m) {
             Ok(v) => v,
             Err(e) => return e,
         }
     };
     let max = {
-        let m = try_validate!(parser.get_vec(3),
-                              "ERR min or max not valid string range item");
+        let m = try_validate!(
+            parser.get_vec(3),
+            "ERR min or max not valid string range item"
+        );
         match get_vec_bound(m) {
             Ok(v) => v,
             Err(e) => return e,
@@ -1812,7 +1849,11 @@ fn generic_zrangebylex(parser: &mut ParsedCommand,
         None => return Response::Array(Vec::new()),
     };
     match el.zrangebylex(min, max, offset, count, rev) {
-        Ok(r) => Response::Array(r.iter().map(|x| Response::Data(x.clone())).collect::<Vec<_>>()),
+        Ok(r) => Response::Array(
+            r.iter()
+                .map(|x| Response::Data(x.clone()))
+                .collect::<Vec<_>>(),
+        ),
         Err(err) => Response::Error(err.to_string()),
     }
 }
@@ -1829,16 +1870,20 @@ fn zlexcount(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> R
     validate_arguments_exact!(parser, 4);
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let min = {
-        let m = try_validate!(parser.get_vec(2),
-                              "ERR min or max not valid string range item");
+        let m = try_validate!(
+            parser.get_vec(2),
+            "ERR min or max not valid string range item"
+        );
         match get_vec_bound(m) {
             Ok(v) => v,
             Err(e) => return e,
         }
     };
     let max = {
-        let m = try_validate!(parser.get_vec(3),
-                              "ERR min or max not valid string range item");
+        let m = try_validate!(
+            parser.get_vec(3),
+            "ERR min or max not valid string range item"
+        );
         match get_vec_bound(m) {
             Ok(v) => v,
             Err(e) => return e,
@@ -1854,12 +1899,13 @@ fn zlexcount(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> R
     }
 }
 
-fn generic_zrank(db: &mut Database,
-                 dbindex: usize,
-                 key: &Vec<u8>,
-                 member: Vec<u8>,
-                 rev: bool)
-                 -> Response {
+fn generic_zrank(
+    db: &mut Database,
+    dbindex: usize,
+    key: &Vec<u8>,
+    member: Vec<u8>,
+    rev: bool,
+) -> Response {
     let el = match db.get(dbindex, key) {
         Some(e) => e,
         None => return Response::Nil,
@@ -1869,12 +1915,10 @@ fn generic_zrank(db: &mut Database,
         Err(err) => return Response::Error(err.to_string()),
     };
     match el.zrank(member) {
-        Ok(r) => {
-            match r {
-                Some(v) => return Response::Integer(if rev { card - v - 1 } else { v } as i64),
-                None => return Response::Nil,
-            }
-        }
+        Ok(r) => match r {
+            Some(v) => return Response::Integer(if rev { card - v - 1 } else { v } as i64),
+            None => return Response::Nil,
+        },
         Err(err) => return Response::Error(err.to_string()),
     }
 }
@@ -1893,20 +1937,23 @@ fn zrevrank(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Re
     generic_zrank(db, dbindex, &key, member, true)
 }
 
-fn zinter_union_store(parser: &mut ParsedCommand,
-                      db: &mut Database,
-                      dbindex: usize,
-                      union: bool)
-                      -> Response {
+fn zinter_union_store(
+    parser: &mut ParsedCommand,
+    db: &mut Database,
+    dbindex: usize,
+    union: bool,
+) -> Response {
     validate!(parser.argv.len() >= 4, "Wrong number of parameters");
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let value = {
         let numkeys = {
             let n = try_validate!(parser.get_i64(2), "Invalid number of keys");
             if n <= 0 {
-                return Response::Error("at least 1 input key is needed for \
-                                        ZUNIONSTORE/ZINTERSTORE"
-                    .to_string());
+                return Response::Error(
+                    "at least 1 input key is needed for \
+                     ZUNIONSTORE/ZINTERSTORE"
+                        .to_string(),
+                );
             }
             n as usize
         };
@@ -1919,12 +1966,16 @@ fn zinter_union_store(parser: &mut ParsedCommand,
             let arg = try_validate!(parser.get_str(pos), "syntax error");
             if arg.to_ascii_lowercase() == "weights" {
                 pos += 1;
-                validate!(parser.argv.len() >= pos + numkeys,
-                          "Wrong number of parameters");
+                validate!(
+                    parser.argv.len() >= pos + numkeys,
+                    "Wrong number of parameters"
+                );
                 let mut w = Vec::with_capacity(numkeys);
                 for i in 0..numkeys {
-                    w.push(try_validate!(parser.get_f64(pos + i),
-                                         "ERR weight value is not a float"));
+                    w.push(try_validate!(
+                        parser.get_f64(pos + i),
+                        "ERR weight value is not a float"
+                    ));
                 }
                 weights = Some(w);
                 pos += numkeys;
@@ -1936,7 +1987,8 @@ fn zinter_union_store(parser: &mut ParsedCommand,
                 pos += 1;
                 validate!(parser.argv.len() != pos, "Wrong number of parameters");
                 aggregate = match &*try_validate!(parser.get_str(pos), "syntax error")
-                    .to_ascii_lowercase() {
+                    .to_ascii_lowercase()
+                {
                     "sum" => zset::Aggregate::Sum,
                     "max" => zset::Aggregate::Max,
                     "min" => zset::Aggregate::Min,
@@ -1975,9 +2027,13 @@ fn zinterstore(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) ->
 
 fn ping(parser: &mut ParsedCommand, client: &mut Client) -> Response {
     #![allow(unused_variables)]
-    validate!(parser.argv.len() <= 2,
-              format!("ERR wrong number of arguments for '{}' command",
-                      parser.get_str(0).unwrap()));
+    validate!(
+        parser.argv.len() <= 2,
+        format!(
+            "ERR wrong number of arguments for '{}' command",
+            parser.get_str(0).unwrap()
+        )
+    );
     if client.subscriptions.len() > 0 {
         if parser.argv.len() == 2 {
             match parser.get_vec(1) {
@@ -1985,7 +2041,10 @@ fn ping(parser: &mut ParsedCommand, client: &mut Client) -> Response {
                 Err(err) => Response::Error(err.to_string()),
             }
         } else {
-            Response::Array(vec![Response::Data(b"pong".to_vec()), Response::Data(vec![])])
+            Response::Array(vec![
+                Response::Data(b"pong".to_vec()),
+                Response::Data(vec![]),
+            ])
         }
     } else {
         if parser.argv.len() == 2 {
@@ -1999,12 +2058,13 @@ fn ping(parser: &mut ParsedCommand, client: &mut Client) -> Response {
     }
 }
 
-fn subscribe(parser: &mut ParsedCommand,
-             db: &mut Database,
-             subscriptions: &mut HashMap<Vec<u8>, usize>,
-             pattern_subscriptions_len: usize,
-             sender: &Sender<Option<Response>>)
-             -> Result<Response, ResponseError> {
+fn subscribe(
+    parser: &mut ParsedCommand,
+    db: &mut Database,
+    subscriptions: &mut HashMap<Vec<u8>, usize>,
+    pattern_subscriptions_len: usize,
+    sender: &Sender<Option<Response>>,
+) -> Result<Response, ResponseError> {
     opt_validate!(parser.argv.len() >= 2, "Wrong number of parameters");
     for i in 1..parser.argv.len() {
         let channel_name = try_opt_validate!(parser.get_vec(i), "Invalid channel");
@@ -2012,10 +2072,13 @@ fn subscribe(parser: &mut ParsedCommand,
             let subscriber_id = db.subscribe(channel_name.clone(), sender.clone());
             subscriptions.insert(channel_name.clone(), subscriber_id);
         }
-        match sender.send(Some(PubsubEvent::Subscription(channel_name.clone(),
-                                                         pattern_subscriptions_len +
-                                                         subscriptions.len())
-            .as_response())) {
+        match sender.send(Some(
+            PubsubEvent::Subscription(
+                channel_name.clone(),
+                pattern_subscriptions_len + subscriptions.len(),
+            )
+            .as_response(),
+        )) {
             Ok(_) => None,
             Err(_) => subscriptions.remove(&channel_name),
         };
@@ -2023,23 +2086,25 @@ fn subscribe(parser: &mut ParsedCommand,
     Err(ResponseError::NoReply)
 }
 
-fn unsubscribe(parser: &mut ParsedCommand,
-               db: &mut Database,
-               subscriptions: &mut HashMap<Vec<u8>, usize>,
-               pattern_subscriptions_len: usize,
-               sender: &Sender<Option<Response>>)
-               -> Result<Response, ResponseError> {
+fn unsubscribe(
+    parser: &mut ParsedCommand,
+    db: &mut Database,
+    subscriptions: &mut HashMap<Vec<u8>, usize>,
+    pattern_subscriptions_len: usize,
+    sender: &Sender<Option<Response>>,
+) -> Result<Response, ResponseError> {
     if parser.argv.len() == 1 {
         if subscriptions.len() == 0 {
-            let _ = sender.send(Some(PubsubEvent::Unsubscription(vec![],
-                                                                 pattern_subscriptions_len)
-                .as_response()));
+            let _ = sender.send(Some(
+                PubsubEvent::Unsubscription(vec![], pattern_subscriptions_len).as_response(),
+            ));
         } else {
             for (channel_name, subscriber_id) in subscriptions.drain() {
                 db.unsubscribe(channel_name.clone(), subscriber_id);
-                let _ = sender.send(Some(PubsubEvent::Unsubscription(channel_name,
-                                                                     pattern_subscriptions_len)
-                    .as_response()));
+                let _ = sender.send(Some(
+                    PubsubEvent::Unsubscription(channel_name, pattern_subscriptions_len)
+                        .as_response(),
+                ));
             }
         }
     } else {
@@ -2051,30 +2116,37 @@ fn unsubscribe(parser: &mut ParsedCommand,
                 }
                 None => (),
             }
-            let _ = sender.send(Some(PubsubEvent::Unsubscription(channel_name,
-                                                                 pattern_subscriptions_len +
-                                                                 subscriptions.len())
-                .as_response()));
+            let _ = sender.send(Some(
+                PubsubEvent::Unsubscription(
+                    channel_name,
+                    pattern_subscriptions_len + subscriptions.len(),
+                )
+                .as_response(),
+            ));
         }
     }
     Err(ResponseError::NoReply)
 }
 
-fn psubscribe(parser: &mut ParsedCommand,
-              db: &mut Database,
-              subscriptions_len: usize,
-              pattern_subscriptions: &mut HashMap<Vec<u8>, usize>,
-              sender: &Sender<Option<Response>>)
-              -> Result<Response, ResponseError> {
+fn psubscribe(
+    parser: &mut ParsedCommand,
+    db: &mut Database,
+    subscriptions_len: usize,
+    pattern_subscriptions: &mut HashMap<Vec<u8>, usize>,
+    sender: &Sender<Option<Response>>,
+) -> Result<Response, ResponseError> {
     opt_validate!(parser.argv.len() >= 2, "Wrong number of parameters");
     for i in 1..parser.argv.len() {
         let pattern = try_opt_validate!(parser.get_vec(i), "Invalid channel");
         let subscriber_id = db.psubscribe(pattern.clone(), sender.clone());
         pattern_subscriptions.insert(pattern.clone(), subscriber_id);
-        match sender.send(Some(PubsubEvent::PatternSubscription(pattern.clone(),
-                                                                subscriptions_len +
-                                                                pattern_subscriptions.len())
-            .as_response())) {
+        match sender.send(Some(
+            PubsubEvent::PatternSubscription(
+                pattern.clone(),
+                subscriptions_len + pattern_subscriptions.len(),
+            )
+            .as_response(),
+        )) {
             Ok(_) => None,
             Err(_) => pattern_subscriptions.remove(&pattern),
         };
@@ -2082,24 +2154,24 @@ fn psubscribe(parser: &mut ParsedCommand,
     Err(ResponseError::NoReply)
 }
 
-fn punsubscribe(parser: &mut ParsedCommand,
-                db: &mut Database,
-                subscriptions_len: usize,
-                pattern_subscriptions: &mut HashMap<Vec<u8>, usize>,
-                sender: &Sender<Option<Response>>)
-                -> Result<Response, ResponseError> {
+fn punsubscribe(
+    parser: &mut ParsedCommand,
+    db: &mut Database,
+    subscriptions_len: usize,
+    pattern_subscriptions: &mut HashMap<Vec<u8>, usize>,
+    sender: &Sender<Option<Response>>,
+) -> Result<Response, ResponseError> {
     if parser.argv.len() == 1 {
         if pattern_subscriptions.len() == 0 {
-            let _ = sender.send(Some(PubsubEvent::PatternUnsubscription(vec![],
-                                                                        subscriptions_len)
-                .as_response()));
+            let _ = sender.send(Some(
+                PubsubEvent::PatternUnsubscription(vec![], subscriptions_len).as_response(),
+            ));
         } else {
             for (pattern, subscriber_id) in pattern_subscriptions.drain() {
                 db.punsubscribe(pattern.clone(), subscriber_id);
-                let _ =
-                    sender.send(Some(PubsubEvent::PatternUnsubscription(pattern,
-                                                                        subscriptions_len)
-                        .as_response()));
+                let _ = sender.send(Some(
+                    PubsubEvent::PatternUnsubscription(pattern, subscriptions_len).as_response(),
+                ));
             }
         }
     } else {
@@ -2111,10 +2183,13 @@ fn punsubscribe(parser: &mut ParsedCommand,
                 }
                 None => (),
             }
-            let _ = sender.send(Some(PubsubEvent::PatternUnsubscription(pattern,
-                                                              subscriptions_len +
-                                                              pattern_subscriptions.len())
-                    .as_response()));
+            let _ = sender.send(Some(
+                PubsubEvent::PatternUnsubscription(
+                    pattern,
+                    subscriptions_len + pattern_subscriptions.len(),
+                )
+                .as_response(),
+            ));
         }
     }
     Err(ResponseError::NoReply)
@@ -2127,23 +2202,22 @@ fn publish(parser: &mut ParsedCommand, db: &mut Database) -> Response {
     Response::Integer(db.publish(&channel_name, &message) as i64)
 }
 
-fn monitor(parser: &mut ParsedCommand,
-           db: &mut Database,
-           rawsender: Sender<Option<Response>>)
-           -> Response {
+fn monitor(
+    parser: &mut ParsedCommand,
+    db: &mut Database,
+    rawsender: Sender<Option<Response>>,
+) -> Response {
     validate_arguments_exact!(parser, 1);
     let (tx, rx) = channel();
     db.monitor_add(tx);
-    thread::spawn(move || {
-        loop {
-            let r = match rx.recv() {
-                Ok(r) => r,
-                Err(_) => break,
-            };
-            match rawsender.send(Some(Response::Status(r))) {
-                Ok(_) => (),
-                Err(_) => break,
-            }
+    thread::spawn(move || loop {
+        let r = match rx.recv() {
+            Ok(r) => r,
+            Err(_) => break,
+        };
+        match rawsender.send(Some(Response::Status(r))) {
+            Ok(_) => (),
+            Err(_) => break,
         }
     });
     Response::Status("OK".to_owned())
@@ -2167,22 +2241,25 @@ fn info(parser: &mut ParsedCommand, db: &Database) -> Response {
         // TODO: cache getos() result
         let os = getos();
         let uptime = db.uptime();
-        try_validate!(write!(out, "\
-                # Server\r\n\
-                rsedis_version:{}\r\n\
-                rsedis_git_sha1:{}\r\n\
-                rsedis_git_dirty:{}\r\n\
-                os:{} {} {}\r\n\
-                arch_bits:{}\r\n\
-                multiplexing_api:no\r\n\
-                rustc_version:{}\r\n\
-                process_id:{}\r\n\
-                run_id:{}\r\n\
-                tcp_port:{}\r\n\
-                uptime_in_seconds:{}\r\n\
-                uptime_in_days:{}\r\n\
-                \r\n\
-                ",
+        try_validate!(
+            write!(
+                out,
+                "\
+                 # Server\r\n\
+                 rsedis_version:{}\r\n\
+                 rsedis_git_sha1:{}\r\n\
+                 rsedis_git_dirty:{}\r\n\
+                 os:{} {} {}\r\n\
+                 arch_bits:{}\r\n\
+                 multiplexing_api:no\r\n\
+                 rustc_version:{}\r\n\
+                 process_id:{}\r\n\
+                 run_id:{}\r\n\
+                 tcp_port:{}\r\n\
+                 uptime_in_seconds:{}\r\n\
+                 uptime_in_days:{}\r\n\
+                 \r\n\
+                 ",
                 db.version,
                 db.git_sha1,
                 if db.git_dirty { 1 } else { 0 },
@@ -2196,8 +2273,9 @@ fn info(parser: &mut ParsedCommand, db: &Database) -> Response {
                 db.config.port,
                 uptime / 1000,
                 uptime / (1000 * 60 * 60 * 24),
-                ),
-                      "ERR unexpected");
+            ),
+            "ERR unexpected"
+        );
     }
 
     if section == "default" || section == "all" || section == "keyspace" {
@@ -2205,12 +2283,16 @@ fn info(parser: &mut ParsedCommand, db: &Database) -> Response {
         for dbindex in 0..(db.config.databases as usize) {
             let dbsize = db.dbsize(dbindex);
             if dbsize > 0 {
-                try_validate!(write!(out,
-                                     "db{}:keys={};expires={}\r\n",
-                                     dbindex,
-                                     dbsize,
-                                     db.db_expire_size(dbindex)),
-                              "ERR unexpected");
+                try_validate!(
+                    write!(
+                        out,
+                        "db{}:keys={};expires={}\r\n",
+                        dbindex,
+                        dbsize,
+                        db.db_expire_size(dbindex)
+                    ),
+                    "ERR unexpected"
+                );
             }
         }
     }
@@ -2260,12 +2342,13 @@ fn keys(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Respon
     Response::Array(responses.into_iter().map(|i| Response::Data(i)).collect())
 }
 
-fn watch(parser: &mut ParsedCommand,
-         db: &mut Database,
-         dbindex: usize,
-         client_id: usize,
-         watched_keys: &mut HashSet<(usize, Vec<u8>)>)
-         -> Response {
+fn watch(
+    parser: &mut ParsedCommand,
+    db: &mut Database,
+    dbindex: usize,
+    client_id: usize,
+    watched_keys: &mut HashSet<(usize, Vec<u8>)>,
+) -> Response {
     validate!(parser.argv.len() >= 2, "Wrong number of parameters");
 
     for i in 1..parser.argv.len() {
@@ -2277,10 +2360,11 @@ fn watch(parser: &mut ParsedCommand,
     Response::Status("OK".to_owned())
 }
 
-fn generic_unwatch(db: &mut Database,
-                   client_id: usize,
-                   watched_keys: &mut HashSet<(usize, Vec<u8>)>)
-                   -> bool {
+fn generic_unwatch(
+    db: &mut Database,
+    client_id: usize,
+    watched_keys: &mut HashSet<(usize, Vec<u8>)>,
+) -> bool {
     let mut watched_verified = true;
     for (index, key) in watched_keys.drain().into_iter() {
         if !db.key_watch_verify(index, &key, client_id) {
@@ -2291,11 +2375,12 @@ fn generic_unwatch(db: &mut Database,
     watched_verified
 }
 
-fn unwatch(parser: &mut ParsedCommand,
-           db: &mut Database,
-           client_id: usize,
-           watched_keys: &mut HashSet<(usize, Vec<u8>)>)
-           -> Response {
+fn unwatch(
+    parser: &mut ParsedCommand,
+    db: &mut Database,
+    client_id: usize,
+    watched_keys: &mut HashSet<(usize, Vec<u8>)>,
+) -> Response {
     validate!(parser.argv.len() == 1, "Wrong number of parameters");
 
     generic_unwatch(db, client_id, watched_keys);
@@ -2319,7 +2404,11 @@ fn exec(db: &mut Database, client: &mut Client) -> Response {
     if !generic_unwatch(db, client.id, &mut client.watched_keys) {
         return Response::Nil;
     }
-    Response::Array(c.iter().map(|c| command(c.get_command(), db, client).unwrap()).collect())
+    Response::Array(
+        c.iter()
+            .map(|c| command(c.get_command(), db, client).unwrap())
+            .collect(),
+    )
 }
 
 fn discard(db: &mut Database, client: &mut Client) -> Response {
@@ -2572,21 +2661,22 @@ fn command_has_flags_test() {
     assert!(!command_has_flags("append", flags::READONLY));
 }
 
-fn execute_command(parser: &mut ParsedCommand,
-                   db: &mut Database,
-                   client: &mut Client,
-                   log: &mut bool,
-                   write: &mut bool)
-                   -> Result<Response, ResponseError> {
+fn execute_command(
+    parser: &mut ParsedCommand,
+    db: &mut Database,
+    client: &mut Client,
+    log: &mut bool,
+    write: &mut bool,
+) -> Result<Response, ResponseError> {
     if parser.argv.len() == 0 {
         return Err(ResponseError::NoReply);
     }
-    let command_name =
-        &*match db.mapped_command(&try_opt_validate!(parser.get_str(0), "Invalid command")
-            .to_ascii_lowercase()) {
-            Some(c) => c,
-            None => return Ok(Response::Error("unknown command".to_owned())),
-        };
+    let command_name = &*match db.mapped_command(
+        &try_opt_validate!(parser.get_str(0), "Invalid command").to_ascii_lowercase(),
+    ) {
+        Some(c) => c,
+        None => return Ok(Response::Error("unknown command".to_owned())),
+    };
 
     *write = !command_has_flags(command_name, flags::READONLY);
 
@@ -2601,17 +2691,21 @@ fn execute_command(parser: &mut ParsedCommand,
             client.auth = true;
             return Ok(Response::Status("OK".to_owned()));
         } else {
-            return Ok(Response::Error(if db.config.requirepass.is_none() {
+            return Ok(Response::Error(
+                if db.config.requirepass.is_none() {
                     "ERR Client sent AUTH, but no password is set"
                 } else {
                     "ERR invalid password"
                 }
-                .to_owned()));
+                .to_owned(),
+            ));
         }
     }
 
     if !client.auth {
-        return Ok(Response::Error("NOAUTH Authentication required.".to_owned()));
+        return Ok(Response::Error(
+            "NOAUTH Authentication required.".to_owned(),
+        ));
     }
 
     // commands that are not executed inside MULTI
@@ -2623,7 +2717,9 @@ fn execute_command(parser: &mut ParsedCommand,
     }
     if client.multi {
         if command_name == "watch" || command_name == "unwatch" {
-            return Ok(Response::Error("ERR WATCH not allowed inside MULTI".to_owned()));
+            return Ok(Response::Error(
+                "ERR WATCH not allowed inside MULTI".to_owned(),
+            ));
         }
         client.multi_commands.push(parser.to_owned());
         return Ok(Response::Status("QUEUED".to_owned()));
@@ -2731,32 +2827,40 @@ fn execute_command(parser: &mut ParsedCommand,
         "watch" => watch(parser, db, dbindex, client.id, &mut client.watched_keys),
         "unwatch" => unwatch(parser, db, client.id, &mut client.watched_keys),
         "subscribe" => {
-            return subscribe(parser,
-                             db,
-                             &mut client.subscriptions,
-                             client.pattern_subscriptions.len(),
-                             &client.rawsender)
+            return subscribe(
+                parser,
+                db,
+                &mut client.subscriptions,
+                client.pattern_subscriptions.len(),
+                &client.rawsender,
+            )
         }
         "unsubscribe" => {
-            return unsubscribe(parser,
-                               db,
-                               &mut client.subscriptions,
-                               client.pattern_subscriptions.len(),
-                               &client.rawsender)
+            return unsubscribe(
+                parser,
+                db,
+                &mut client.subscriptions,
+                client.pattern_subscriptions.len(),
+                &client.rawsender,
+            )
         }
         "psubscribe" => {
-            return psubscribe(parser,
-                              db,
-                              client.subscriptions.len(),
-                              &mut client.pattern_subscriptions,
-                              &client.rawsender)
+            return psubscribe(
+                parser,
+                db,
+                client.subscriptions.len(),
+                &mut client.pattern_subscriptions,
+                &client.rawsender,
+            )
         }
         "punsubscribe" => {
-            return punsubscribe(parser,
-                                db,
-                                client.subscriptions.len(),
-                                &mut client.pattern_subscriptions,
-                                &client.rawsender)
+            return punsubscribe(
+                parser,
+                db,
+                client.subscriptions.len(),
+                &mut client.pattern_subscriptions,
+                &client.rawsender,
+            )
         }
         "publish" => publish(parser, db),
         "monitor" => {
@@ -2768,10 +2872,11 @@ fn execute_command(parser: &mut ParsedCommand,
     });
 }
 
-pub fn command(mut parser: ParsedCommand,
-               db: &mut Database,
-               client: &mut Client)
-               -> Result<Response, ResponseError> {
+pub fn command(
+    mut parser: ParsedCommand,
+    db: &mut Database,
+    client: &mut Client,
+) -> Result<Response, ResponseError> {
     let mut log = true;
     let mut write = false;
     let r = execute_command(&mut parser, db, client, &mut log, &mut write);
@@ -2783,33 +2888,37 @@ pub fn command(mut parser: ParsedCommand,
 }
 
 macro_rules! parser {
-    ($str: expr) => ({
+    ($str: expr) => {{
         let mut _args = Vec::new();
         let mut pos = 0;
         for segment in $str.split(|x| *x == b' ') {
-            _args.push(Argument { pos: pos, len: segment.len() });
+            _args.push(Argument {
+                pos: pos,
+                len: segment.len(),
+            });
             pos += segment.len() + 1;
         }
         ParsedCommand::new($str, _args)
-    })
+    }};
 }
 
 #[cfg(test)]
 mod test_command {
     use std::collections::HashSet;
     use std::str::from_utf8;
-    use std::sync::{Arc, Mutex};
     use std::sync::mpsc::channel;
+    use std::sync::{Arc, Mutex};
     use std::thread;
 
     use config::Config;
     use database::{Database, Value};
-    use logger::{Logger, Level};
-    use parser::{ParsedCommand, Argument};
+    use logger::{Level, Logger};
+    use parser::{Argument, ParsedCommand};
     use response::{Response, ResponseError};
     use util::mstime;
 
     use super::{command, Client};
+    use std::time::Duration;
 
     fn getstr(database: &Database, key: &[u8]) -> String {
         match database.get(0, &key.to_vec()).unwrap() {
@@ -2832,39 +2941,59 @@ mod test_command {
     #[test]
     fn set_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"set key value"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Status("OK".to_owned()));
+        assert_eq!(
+            command(parser!(b"set key value"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Status("OK".to_owned())
+        );
         assert_eq!("value", getstr(&db, b"key"));
 
-        assert_eq!(command(parser!(b"set key2 value xx"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Nil);
-        assert_eq!(command(parser!(b"get key2"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Nil);
-        assert_eq!(command(parser!(b"set key2 value nx"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Status("OK".to_owned()));
+        assert_eq!(
+            command(parser!(b"set key2 value xx"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Nil
+        );
+        assert_eq!(
+            command(parser!(b"get key2"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Nil
+        );
+        assert_eq!(
+            command(parser!(b"set key2 value nx"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Status("OK".to_owned())
+        );
         assert_eq!("value", getstr(&db, b"key2"));
-        assert_eq!(command(parser!(b"set key2 valuf xx"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Status("OK".to_owned()));
+        assert_eq!(
+            command(parser!(b"set key2 valuf xx"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Status("OK".to_owned())
+        );
         assert_eq!("valuf", getstr(&db, b"key2"));
-        assert_eq!(command(parser!(b"set key2 value nx"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Nil);
+        assert_eq!(
+            command(parser!(b"set key2 value nx"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Nil
+        );
         assert_eq!("valuf", getstr(&db, b"key2"));
 
-        assert_eq!(command(parser!(b"set key3 value px 1234"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Status("OK".to_owned()));
+        assert_eq!(
+            command(
+                parser!(b"set key3 value px 1234"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Status("OK".to_owned())
+        );
         let now = mstime();
         let exp = db.get_msexpiration(0, &b"key3".to_vec()).unwrap().clone();
         assert!(exp >= now + 1000);
         assert!(exp <= now + 1234);
 
-        assert_eq!(command(parser!(b"set key3 value ex 1234"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Status("OK".to_owned()));
+        assert_eq!(
+            command(
+                parser!(b"set key3 value ex 1234"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Status("OK".to_owned())
+        );
         let now = mstime();
         let exp = db.get_msexpiration(0, &b"key3".to_vec()).unwrap().clone();
         assert!(exp >= now + 1233 * 1000);
@@ -2874,22 +3003,30 @@ mod test_command {
     #[test]
     fn setnx_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"setnx key value"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(1));
+        assert_eq!(
+            command(parser!(b"setnx key value"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(1)
+        );
         assert_eq!("value", getstr(&db, b"key"));
-        assert_eq!(command(parser!(b"setnx key valuf"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(0));
+        assert_eq!(
+            command(parser!(b"setnx key valuf"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(0)
+        );
         assert_eq!("value", getstr(&db, b"key"));
     }
 
     #[test]
     fn setex_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"setex key 1234 value"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Status("OK".to_owned()));
+        assert_eq!(
+            command(
+                parser!(b"setex key 1234 value"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Status("OK".to_owned())
+        );
         let now = mstime();
         let exp = db.get_msexpiration(0, &b"key".to_vec()).unwrap().clone();
         assert!(exp >= now + 1233 * 1000);
@@ -2899,11 +3036,15 @@ mod test_command {
     #[test]
     fn psetex_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"psetex key 1234 value"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Status("OK".to_owned()));
+        assert_eq!(
+            command(
+                parser!(b"psetex key 1234 value"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Status("OK".to_owned())
+        );
         let now = mstime();
         let exp = db.get_msexpiration(0, &b"key".to_vec()).unwrap().clone();
         assert!(exp >= now + 1000);
@@ -2913,126 +3054,208 @@ mod test_command {
     #[test]
     fn get_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
-        assert_eq!(command(parser!(b"get key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Data("value".to_owned().into_bytes()));
+        assert!(db
+            .get_or_create(0, &b"key".to_vec())
+            .set(b"value".to_vec())
+            .is_ok());
+        assert_eq!(
+            command(parser!(b"get key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Data("value".to_owned().into_bytes())
+        );
         assert_eq!("value", getstr(&db, b"key"));
     }
 
     #[test]
     fn mget_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
-        assert_eq!(command(parser!(b"mget key key2"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Array(vec![
-                    Response::Data("value".to_owned().into_bytes()),
-                    Response::Nil,
-                ]));
+        assert!(db
+            .get_or_create(0, &b"key".to_vec())
+            .set(b"value".to_vec())
+            .is_ok());
+        assert_eq!(
+            command(parser!(b"mget key key2"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Array(vec![
+                Response::Data("value".to_owned().into_bytes()),
+                Response::Nil,
+            ])
+        );
     }
 
     #[test]
     fn getrange_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
-        assert_eq!(command(parser!(b"getrange key 1 -2"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Data("alu".to_owned().into_bytes()));
+        assert!(db
+            .get_or_create(0, &b"key".to_vec())
+            .set(b"value".to_vec())
+            .is_ok());
+        assert_eq!(
+            command(parser!(b"getrange key 1 -2"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Data("alu".to_owned().into_bytes())
+        );
     }
 
     #[test]
     fn setrange_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
-        assert_eq!(command(parser!(b"setrange key 1 i"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(5));
+        assert!(db
+            .get_or_create(0, &b"key".to_vec())
+            .set(b"value".to_vec())
+            .is_ok());
+        assert_eq!(
+            command(parser!(b"setrange key 1 i"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(5)
+        );
         assert_eq!("vilue", getstr(&db, b"key"));
     }
 
     #[test]
     fn setbit_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"setbit key 1 0"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(0));
-        assert_eq!(command(parser!(b"setbit key 1 1"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(0));
+        assert_eq!(
+            command(parser!(b"setbit key 1 0"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(0)
+        );
+        assert_eq!(
+            command(parser!(b"setbit key 1 1"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(0)
+        );
         assert_eq!("@", getstr(&db, b"key"));
-        assert_eq!(command(parser!(b"setbit key 1 0"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(1));
+        assert_eq!(
+            command(parser!(b"setbit key 1 0"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(1)
+        );
     }
 
     #[test]
     fn getbit_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
-        assert_eq!(command(parser!(b"getbit key 4"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(0));
-        assert_eq!(command(parser!(b"getbit key 5"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(1));
-        assert_eq!(command(parser!(b"getbit key 6"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(1));
-        assert_eq!(command(parser!(b"getbit key 7"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(0));
-        assert_eq!(command(parser!(b"getbit key 800"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(0));
+        assert!(db
+            .get_or_create(0, &b"key".to_vec())
+            .set(b"value".to_vec())
+            .is_ok());
+        assert_eq!(
+            command(parser!(b"getbit key 4"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(0)
+        );
+        assert_eq!(
+            command(parser!(b"getbit key 5"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(1)
+        );
+        assert_eq!(
+            command(parser!(b"getbit key 6"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(1)
+        );
+        assert_eq!(
+            command(parser!(b"getbit key 7"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(0)
+        );
+        assert_eq!(
+            command(parser!(b"getbit key 800"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(0)
+        );
     }
 
     #[test]
     fn strlen_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"strlen key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(0));
-        assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
-        assert_eq!(command(parser!(b"strlen key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(5));
+        assert_eq!(
+            command(parser!(b"strlen key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(0)
+        );
+        assert!(db
+            .get_or_create(0, &b"key".to_vec())
+            .set(b"value".to_vec())
+            .is_ok());
+        assert_eq!(
+            command(parser!(b"strlen key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(5)
+        );
     }
 
     #[test]
     fn del_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
-        assert_eq!(command(parser!(b"del key key2"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(1));
+        assert!(db
+            .get_or_create(0, &b"key".to_vec())
+            .set(b"value".to_vec())
+            .is_ok());
+        assert_eq!(
+            command(parser!(b"del key key2"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(1)
+        );
     }
 
     #[test]
     fn debug_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
-        assert!(command(parser!(b"debug object key"), &mut db, &mut Client::mock())
-            .unwrap()
-            .is_status());
+        assert!(db
+            .get_or_create(0, &b"key".to_vec())
+            .set(b"value".to_vec())
+            .is_ok());
+        assert!(
+            command(parser!(b"debug object key"), &mut db, &mut Client::mock())
+                .unwrap()
+                .is_status()
+        );
     }
 
     #[test]
     fn dbsize_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"dbsize"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(0));
-        assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
-        assert_eq!(command(parser!(b"dbsize"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(1));
-        assert!(db.get_or_create(0, &b"key2".to_vec()).set(b"value".to_vec()).is_ok());
-        assert_eq!(command(parser!(b"dbsize"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(2));
+        assert_eq!(
+            command(parser!(b"dbsize"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(0)
+        );
+        assert!(db
+            .get_or_create(0, &b"key".to_vec())
+            .set(b"value".to_vec())
+            .is_ok());
+        assert_eq!(
+            command(parser!(b"dbsize"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(1)
+        );
+        assert!(db
+            .get_or_create(0, &b"key2".to_vec())
+            .set(b"value".to_vec())
+            .is_ok());
+        assert_eq!(
+            command(parser!(b"dbsize"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(2)
+        );
     }
 
     #[test]
     fn exists_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"exists key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(0));
-        assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
-        assert_eq!(command(parser!(b"exists key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(1));
+        assert_eq!(
+            command(parser!(b"exists key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(0)
+        );
+        assert!(db
+            .get_or_create(0, &b"key".to_vec())
+            .set(b"value".to_vec())
+            .is_ok());
+        assert_eq!(
+            command(parser!(b"exists key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(1)
+        );
     }
 
     #[test]
     fn expire_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"expire key 100"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(0));
-        assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
-        assert_eq!(command(parser!(b"expire key 100"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(1));
+        assert_eq!(
+            command(parser!(b"expire key 100"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(0)
+        );
+        assert!(db
+            .get_or_create(0, &b"key".to_vec())
+            .set(b"value".to_vec())
+            .is_ok());
+        assert_eq!(
+            command(parser!(b"expire key 100"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(1)
+        );
         let now = mstime();
         let exp = db.get_msexpiration(0, &b"key".to_vec()).unwrap().clone();
         assert!(exp >= now);
@@ -3042,11 +3265,18 @@ mod test_command {
     #[test]
     fn pexpire_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"pexpire key 100"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(0));
-        assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
-        assert_eq!(command(parser!(b"pexpire key 100"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(1));
+        assert_eq!(
+            command(parser!(b"pexpire key 100"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(0)
+        );
+        assert!(db
+            .get_or_create(0, &b"key".to_vec())
+            .set(b"value".to_vec())
+            .is_ok());
+        assert_eq!(
+            command(parser!(b"pexpire key 100"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(1)
+        );
         let now = mstime();
         let exp = db.get_msexpiration(0, &b"key".to_vec()).unwrap().clone();
         assert!(exp >= now);
@@ -3060,11 +3290,18 @@ mod test_command {
         let exp_exp = now + 100;
         let qs = format!("expireat key {}", exp_exp);
         let q = qs.as_bytes();
-        assert_eq!(command(parser!(q), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(0));
-        assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
-        assert_eq!(command(parser!(q), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(1));
+        assert_eq!(
+            command(parser!(q), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(0)
+        );
+        assert!(db
+            .get_or_create(0, &b"key".to_vec())
+            .set(b"value".to_vec())
+            .is_ok());
+        assert_eq!(
+            command(parser!(q), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(1)
+        );
         let exp = db.get_msexpiration(0, &b"key".to_vec()).unwrap().clone();
         assert_eq!(exp, exp_exp * 1000);
     }
@@ -3076,11 +3313,18 @@ mod test_command {
         let exp_exp = now + 100;
         let qs = format!("pexpireat key {}", exp_exp);
         let q = qs.as_bytes();
-        assert_eq!(command(parser!(q), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(0));
-        assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
-        assert_eq!(command(parser!(q), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(1));
+        assert_eq!(
+            command(parser!(q), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(0)
+        );
+        assert!(db
+            .get_or_create(0, &b"key".to_vec())
+            .set(b"value".to_vec())
+            .is_ok());
+        assert_eq!(
+            command(parser!(q), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(1)
+        );
         let exp = db.get_msexpiration(0, &b"key".to_vec()).unwrap().clone();
         assert_eq!(exp, exp_exp);
     }
@@ -3088,11 +3332,18 @@ mod test_command {
     #[test]
     fn ttl_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"ttl key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(-2));
-        assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
-        assert_eq!(command(parser!(b"ttl key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(-1));
+        assert_eq!(
+            command(parser!(b"ttl key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(-2)
+        );
+        assert!(db
+            .get_or_create(0, &b"key".to_vec())
+            .set(b"value".to_vec())
+            .is_ok());
+        assert_eq!(
+            command(parser!(b"ttl key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(-1)
+        );
         db.set_msexpiration(0, b"key".to_vec(), mstime() + 100 * 1000);
         match command(parser!(b"ttl key"), &mut db, &mut Client::mock()).unwrap() {
             Response::Integer(i) => assert!(i <= 100 && i > 80),
@@ -3103,11 +3354,18 @@ mod test_command {
     #[test]
     fn pttl_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"pttl key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(-2));
-        assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
-        assert_eq!(command(parser!(b"pttl key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(-1));
+        assert_eq!(
+            command(parser!(b"pttl key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(-2)
+        );
+        assert!(db
+            .get_or_create(0, &b"key".to_vec())
+            .set(b"value".to_vec())
+            .is_ok());
+        assert_eq!(
+            command(parser!(b"pttl key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(-1)
+        );
         db.set_msexpiration(0, b"key".to_vec(), mstime() + 100 * 1000);
         match command(parser!(b"pttl key"), &mut db, &mut Client::mock()).unwrap() {
             Response::Integer(i) => assert!(i <= 100 * 1000 && i > 80 * 1000),
@@ -3118,48 +3376,80 @@ mod test_command {
     #[test]
     fn persist_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"persist key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(0));
-        assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
-        assert_eq!(command(parser!(b"persist key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(0));
+        assert_eq!(
+            command(parser!(b"persist key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(0)
+        );
+        assert!(db
+            .get_or_create(0, &b"key".to_vec())
+            .set(b"value".to_vec())
+            .is_ok());
+        assert_eq!(
+            command(parser!(b"persist key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(0)
+        );
         db.set_msexpiration(0, b"key".to_vec(), mstime() + 100 * 1000);
-        assert_eq!(command(parser!(b"persist key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(1));
+        assert_eq!(
+            command(parser!(b"persist key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(1)
+        );
     }
 
     #[test]
     fn type_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
         let set_max_intset_entries = db.config.set_max_intset_entries;
-        assert_eq!(command(parser!(b"type key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Data(b"none".to_vec()));
+        assert_eq!(
+            command(parser!(b"type key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Data(b"none".to_vec())
+        );
 
-        assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
-        assert_eq!(command(parser!(b"type key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Data(b"string".to_vec()));
-        assert!(db.get_or_create(0, &b"key".to_vec()).set(b"1".to_vec()).is_ok());
-        assert_eq!(command(parser!(b"type key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Data(b"string".to_vec()));
+        assert!(db
+            .get_or_create(0, &b"key".to_vec())
+            .set(b"value".to_vec())
+            .is_ok());
+        assert_eq!(
+            command(parser!(b"type key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Data(b"string".to_vec())
+        );
+        assert!(db
+            .get_or_create(0, &b"key".to_vec())
+            .set(b"1".to_vec())
+            .is_ok());
+        assert_eq!(
+            command(parser!(b"type key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Data(b"string".to_vec())
+        );
 
         assert!(db.remove(0, &b"key".to_vec()).is_some());
-        assert!(db.get_or_create(0, &b"key".to_vec()).push(b"1".to_vec(), true).is_ok());
-        assert_eq!(command(parser!(b"type key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Data(b"list".to_vec()));
+        assert!(db
+            .get_or_create(0, &b"key".to_vec())
+            .push(b"1".to_vec(), true)
+            .is_ok());
+        assert_eq!(
+            command(parser!(b"type key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Data(b"list".to_vec())
+        );
 
         assert!(db.remove(0, &b"key".to_vec()).is_some());
-        assert!(db.get_or_create(0, &b"key".to_vec())
+        assert!(db
+            .get_or_create(0, &b"key".to_vec())
             .sadd(b"1".to_vec(), set_max_intset_entries)
             .is_ok());
-        assert_eq!(command(parser!(b"type key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Data(b"set".to_vec()));
+        assert_eq!(
+            command(parser!(b"type key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Data(b"set".to_vec())
+        );
 
         assert!(db.remove(0, &b"key".to_vec()).is_some());
-        assert!(db.get_or_create(0, &b"key".to_vec())
+        assert!(db
+            .get_or_create(0, &b"key".to_vec())
             .zadd(3.0, b"1".to_vec(), false, false, false, false)
             .is_ok());
-        assert_eq!(command(parser!(b"type key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Data(b"zset".to_vec()));
+        assert_eq!(
+            command(parser!(b"type key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Data(b"zset".to_vec())
+        );
 
         // TODO: hash
     }
@@ -3197,39 +3487,56 @@ mod test_command {
     #[test]
     fn append_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"append key value"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(5));
-        assert_eq!(command(parser!(b"append key value"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(10));
-        assert_eq!(db.get(0, &b"key".to_vec()).unwrap().get().unwrap(),
-                   b"valuevalue".to_vec());
+        assert_eq!(
+            command(parser!(b"append key value"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(5)
+        );
+        assert_eq!(
+            command(parser!(b"append key value"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(10)
+        );
+        assert_eq!(
+            db.get(0, &b"key".to_vec()).unwrap().get().unwrap(),
+            b"valuevalue".to_vec()
+        );
     }
 
     #[test]
     fn incr_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"incr key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(1));
-        assert_eq!(command(parser!(b"incr key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(2));
+        assert_eq!(
+            command(parser!(b"incr key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(1)
+        );
+        assert_eq!(
+            command(parser!(b"incr key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(2)
+        );
     }
 
     #[test]
     fn incrby_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"incrby key 5"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(5));
-        assert_eq!(command(parser!(b"incrby key 5"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(10));
+        assert_eq!(
+            command(parser!(b"incrby key 5"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(5)
+        );
+        assert_eq!(
+            command(parser!(b"incrby key 5"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(10)
+        );
     }
 
     #[test]
     fn incrbyfloat_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        match command(parser!(b"incrbyfloat key 2.1"),
-                      &mut db,
-                      &mut Client::mock())
-            .unwrap() {
+        match command(
+            parser!(b"incrbyfloat key 2.1"),
+            &mut db,
+            &mut Client::mock(),
+        )
+        .unwrap()
+        {
             Response::Data(ref v) => {
                 assert_eq!(v[0], '2' as u8);
                 assert_eq!(v[1], '.' as u8);
@@ -3237,10 +3544,13 @@ mod test_command {
             }
             _ => panic!("Unexpected response"),
         }
-        match command(parser!(b"incrbyfloat key 4.1"),
-                      &mut db,
-                      &mut Client::mock())
-            .unwrap() {
+        match command(
+            parser!(b"incrbyfloat key 4.1"),
+            &mut db,
+            &mut Client::mock(),
+        )
+        .unwrap()
+        {
             Response::Data(ref v) => {
                 assert_eq!(v[0], '6' as u8);
                 assert_eq!(v[1], '.' as u8);
@@ -3253,92 +3563,142 @@ mod test_command {
     #[test]
     fn pfadd_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"PFADD key 1 2 3"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(1));
-        assert_eq!(command(parser!(b"PFADD key 1 2 4"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(1));
-        assert_eq!(command(parser!(b"PFADD key 1 2 3 4"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(0));
+        assert_eq!(
+            command(parser!(b"PFADD key 1 2 3"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(1)
+        );
+        assert_eq!(
+            command(parser!(b"PFADD key 1 2 4"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(1)
+        );
+        assert_eq!(
+            command(parser!(b"PFADD key 1 2 3 4"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(0)
+        );
     }
 
     #[test]
     fn pfcount1_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"PFCOUNT key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(0));
-        assert_eq!(command(parser!(b"PFADD key 1 2 3"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(1));
-        assert_eq!(command(parser!(b"PFCOUNT key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(3));
+        assert_eq!(
+            command(parser!(b"PFCOUNT key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(0)
+        );
+        assert_eq!(
+            command(parser!(b"PFADD key 1 2 3"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(1)
+        );
+        assert_eq!(
+            command(parser!(b"PFCOUNT key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(3)
+        );
     }
 
     #[test]
     fn pfcount2_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"PFADD key1 1 2 3"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(1));
-        assert_eq!(command(parser!(b"PFADD key2 1 2 4"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(1));
-        assert_eq!(command(parser!(b"PFCOUNT key1 key2"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(4));
+        assert_eq!(
+            command(parser!(b"PFADD key1 1 2 3"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(1)
+        );
+        assert_eq!(
+            command(parser!(b"PFADD key2 1 2 4"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(1)
+        );
+        assert_eq!(
+            command(parser!(b"PFCOUNT key1 key2"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(4)
+        );
     }
 
     #[test]
     fn pfmerge_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"PFADD key1 1 2 3"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(1));
-        assert_eq!(command(parser!(b"PFADD key3 1 2 4"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(1));
-        assert_eq!(command(parser!(b"PFADD key4 5 6"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(1));
-        assert_eq!(command(parser!(b"PFMERGE key key1 key2 key3"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Status("OK".to_owned()));
-        assert_eq!(command(parser!(b"PFCOUNT key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(4));
-        assert_eq!(command(parser!(b"PFMERGE key key4"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Status("OK".to_owned()));
-        assert_eq!(command(parser!(b"PFCOUNT key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(6));
+        assert_eq!(
+            command(parser!(b"PFADD key1 1 2 3"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(1)
+        );
+        assert_eq!(
+            command(parser!(b"PFADD key3 1 2 4"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(1)
+        );
+        assert_eq!(
+            command(parser!(b"PFADD key4 5 6"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(1)
+        );
+        assert_eq!(
+            command(
+                parser!(b"PFMERGE key key1 key2 key3"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Status("OK".to_owned())
+        );
+        assert_eq!(
+            command(parser!(b"PFCOUNT key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(4)
+        );
+        assert_eq!(
+            command(parser!(b"PFMERGE key key4"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Status("OK".to_owned())
+        );
+        assert_eq!(
+            command(parser!(b"PFCOUNT key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(6)
+        );
     }
 
     #[test]
     fn decr_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"decr key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(-1));
-        assert_eq!(command(parser!(b"decr key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(-2));
+        assert_eq!(
+            command(parser!(b"decr key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(-1)
+        );
+        assert_eq!(
+            command(parser!(b"decr key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(-2)
+        );
     }
 
     #[test]
     fn decrby_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"decrby key 5"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(-5));
-        assert_eq!(command(parser!(b"decrby key 5"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(-10));
+        assert_eq!(
+            command(parser!(b"decrby key 5"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(-5)
+        );
+        assert_eq!(
+            command(parser!(b"decrby key 5"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(-10)
+        );
     }
 
     #[test]
     fn lpush_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"lpush key value"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(1));
-        assert_eq!(command(parser!(b"lpush key value"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(2));
+        assert_eq!(
+            command(parser!(b"lpush key value"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(1)
+        );
+        assert_eq!(
+            command(parser!(b"lpush key value"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(2)
+        );
     }
 
     #[test]
     fn rpush_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"rpush key value"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(1));
-        assert_eq!(command(parser!(b"rpush key value"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(2));
+        assert_eq!(
+            command(parser!(b"rpush key value"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(1)
+        );
+        assert_eq!(
+            command(parser!(b"rpush key value"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(2)
+        );
     }
 
     #[test]
@@ -3346,12 +3706,18 @@ mod test_command {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
         command(parser!(b"rpush key value"), &mut db, &mut Client::mock()).unwrap();
         command(parser!(b"rpush key valuf"), &mut db, &mut Client::mock()).unwrap();
-        assert_eq!(command(parser!(b"lpop key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Data("value".to_owned().into_bytes()));
-        assert_eq!(command(parser!(b"lpop key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Data("valuf".to_owned().into_bytes()));
-        assert_eq!(command(parser!(b"lpop key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Nil);
+        assert_eq!(
+            command(parser!(b"lpop key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Data("value".to_owned().into_bytes())
+        );
+        assert_eq!(
+            command(parser!(b"lpop key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Data("valuf".to_owned().into_bytes())
+        );
+        assert_eq!(
+            command(parser!(b"lpop key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Nil
+        );
     }
 
     #[test]
@@ -3359,12 +3725,18 @@ mod test_command {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
         command(parser!(b"rpush key value"), &mut db, &mut Client::mock()).unwrap();
         command(parser!(b"rpush key valuf"), &mut db, &mut Client::mock()).unwrap();
-        assert_eq!(command(parser!(b"rpop key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Data("valuf".to_owned().into_bytes()));
-        assert_eq!(command(parser!(b"rpop key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Data("value".to_owned().into_bytes()));
-        assert_eq!(command(parser!(b"rpop key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Nil);
+        assert_eq!(
+            command(parser!(b"rpop key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Data("valuf".to_owned().into_bytes())
+        );
+        assert_eq!(
+            command(parser!(b"rpop key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Data("value".to_owned().into_bytes())
+        );
+        assert_eq!(
+            command(parser!(b"rpop key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Nil
+        );
     }
 
     #[test]
@@ -3372,8 +3744,10 @@ mod test_command {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
         command(parser!(b"rpush key value"), &mut db, &mut Client::mock()).unwrap();
         command(parser!(b"rpush key valuf"), &mut db, &mut Client::mock()).unwrap();
-        assert_eq!(command(parser!(b"lindex key 0"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Data("value".to_owned().into_bytes()));
+        assert_eq!(
+            command(parser!(b"lindex key 0"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Data("value".to_owned().into_bytes())
+        );
     }
 
     #[test]
@@ -3381,11 +3755,15 @@ mod test_command {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
         command(parser!(b"rpush key value"), &mut db, &mut Client::mock()).unwrap();
         command(parser!(b"rpush key valug"), &mut db, &mut Client::mock()).unwrap();
-        assert_eq!(command(parser!(b"linsert key before valug valuf"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(3));
+        assert_eq!(
+            command(
+                parser!(b"linsert key before valug valuf"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(3)
+        );
     }
 
     #[test]
@@ -3393,19 +3771,27 @@ mod test_command {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
         command(parser!(b"rpush key value"), &mut db, &mut Client::mock()).unwrap();
         command(parser!(b"rpush key value"), &mut db, &mut Client::mock()).unwrap();
-        assert_eq!(command(parser!(b"llen key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(2));
+        assert_eq!(
+            command(parser!(b"llen key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(2)
+        );
     }
 
     #[test]
     fn lpushx_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"lpushx key value"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(0));
-        assert_eq!(command(parser!(b"lpush key value"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(1));
-        assert_eq!(command(parser!(b"lpushx key value"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(2));
+        assert_eq!(
+            command(parser!(b"lpushx key value"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(0)
+        );
+        assert_eq!(
+            command(parser!(b"lpush key value"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(1)
+        );
+        assert_eq!(
+            command(parser!(b"lpushx key value"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(2)
+        );
     }
 
     #[test]
@@ -3414,12 +3800,14 @@ mod test_command {
         command(parser!(b"rpush key value"), &mut db, &mut Client::mock()).unwrap();
         command(parser!(b"rpush key valuf"), &mut db, &mut Client::mock()).unwrap();
         command(parser!(b"rpush key valug"), &mut db, &mut Client::mock()).unwrap();
-        assert_eq!(command(parser!(b"lrange key 0 -1"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Array(vec![
-                    Response::Data("value".to_owned().into_bytes()),
-                    Response::Data("valuf".to_owned().into_bytes()),
-                    Response::Data("valug".to_owned().into_bytes()),
-                    ]));
+        assert_eq!(
+            command(parser!(b"lrange key 0 -1"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Array(vec![
+                Response::Data("value".to_owned().into_bytes()),
+                Response::Data("valuf".to_owned().into_bytes()),
+                Response::Data("valug".to_owned().into_bytes()),
+            ])
+        );
     }
 
     #[test]
@@ -3429,10 +3817,14 @@ mod test_command {
         command(parser!(b"rpush key value"), &mut db, &mut Client::mock()).unwrap();
         command(parser!(b"rpush key value"), &mut db, &mut Client::mock()).unwrap();
         command(parser!(b"rpush key value"), &mut db, &mut Client::mock()).unwrap();
-        assert_eq!(command(parser!(b"lrem key 2 value"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(2));
-        assert_eq!(command(parser!(b"llen key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(2));
+        assert_eq!(
+            command(parser!(b"lrem key 2 value"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(2)
+        );
+        assert_eq!(
+            command(parser!(b"llen key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(2)
+        );
     }
 
     #[test]
@@ -3442,12 +3834,14 @@ mod test_command {
         command(parser!(b"rpush key value"), &mut db, &mut Client::mock()).unwrap();
         command(parser!(b"rpush key value"), &mut db, &mut Client::mock()).unwrap();
         command(parser!(b"rpush key value"), &mut db, &mut Client::mock()).unwrap();
-        assert_eq!(command(parser!(b"lset key 2 valuf"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Status("OK".to_owned()));
-        assert_eq!(command(parser!(b"lrange key 2 2"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Array(vec![
-                    Response::Data("valuf".to_owned().into_bytes()),
-                    ]));
+        assert_eq!(
+            command(parser!(b"lset key 2 valuf"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Status("OK".to_owned())
+        );
+        assert_eq!(
+            command(parser!(b"lrange key 2 2"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Array(vec![Response::Data("valuf".to_owned().into_bytes()),])
+        );
     }
 
     #[test]
@@ -3455,20 +3849,34 @@ mod test_command {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
         command(parser!(b"rpush key value"), &mut db, &mut Client::mock()).unwrap();
         command(parser!(b"rpush key valuf"), &mut db, &mut Client::mock()).unwrap();
-        assert_eq!(command(parser!(b"llen key2"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(0));
-        assert_eq!(command(parser!(b"rpoplpush key key2"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Data("valuf".to_owned().into_bytes()));
-        assert_eq!(command(parser!(b"llen key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(1));
-        assert_eq!(command(parser!(b"llen key2"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(1));
-        assert_eq!(command(parser!(b"rpoplpush key key2"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Data("value".to_owned().into_bytes()));
-        assert_eq!(command(parser!(b"llen key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(0));
-        assert_eq!(command(parser!(b"llen key2"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(2));
+        assert_eq!(
+            command(parser!(b"llen key2"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(0)
+        );
+        assert_eq!(
+            command(parser!(b"rpoplpush key key2"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Data("valuf".to_owned().into_bytes())
+        );
+        assert_eq!(
+            command(parser!(b"llen key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(1)
+        );
+        assert_eq!(
+            command(parser!(b"llen key2"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(1)
+        );
+        assert_eq!(
+            command(parser!(b"rpoplpush key key2"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Data("value".to_owned().into_bytes())
+        );
+        assert_eq!(
+            command(parser!(b"llen key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(0)
+        );
+        assert_eq!(
+            command(parser!(b"llen key2"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(2)
+        );
     }
 
     #[test]
@@ -3476,25 +3884,36 @@ mod test_command {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
         command(parser!(b"rpush key value"), &mut db, &mut Client::mock()).unwrap();
         command(parser!(b"rpush key valuf"), &mut db, &mut Client::mock()).unwrap();
-        assert_eq!(command(parser!(b"llen key2"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(0));
-        assert_eq!(command(parser!(b"brpoplpush key key2 0"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Data("valuf".to_owned().into_bytes()));
+        assert_eq!(
+            command(parser!(b"llen key2"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(0)
+        );
+        assert_eq!(
+            command(
+                parser!(b"brpoplpush key key2 0"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Data("valuf".to_owned().into_bytes())
+        );
     }
 
     #[test]
     fn brpoplpush_waiting() {
-        let db = Arc::new(Mutex::new(Database::new(Config::new(Logger::new(Level::Warning)))));
+        let db = Arc::new(Mutex::new(Database::new(Config::new(Logger::new(
+            Level::Warning,
+        )))));
         let (tx, rx) = channel();
         let db2 = db.clone();
         thread::spawn(move || {
-            let r = match command(parser!(b"brpoplpush key1 key2 0"),
-                                  &mut db.lock().unwrap(),
-                                  &mut Client::mock())
-                .unwrap_err() {
+            let r = match command(
+                parser!(b"brpoplpush key1 key2 0"),
+                &mut db.lock().unwrap(),
+                &mut Client::mock(),
+            )
+            .unwrap_err()
+            {
                 ResponseError::Wait(receiver) => {
                     tx.send(1).unwrap();
                     receiver
@@ -3502,66 +3921,83 @@ mod test_command {
                 _ => panic!("Unexpected error"),
             };
             r.recv().unwrap();
-            assert_eq!(command(parser!(b"brpoplpush key1 key2 0"),
-                               &mut db.lock().unwrap(),
-                               &mut Client::mock())
-                           .unwrap(),
-                       Response::Data("value".to_owned().into_bytes()));
+            assert_eq!(
+                command(
+                    parser!(b"brpoplpush key1 key2 0"),
+                    &mut db.lock().unwrap(),
+                    &mut Client::mock()
+                )
+                .unwrap(),
+                Response::Data("value".to_owned().into_bytes())
+            );
             tx.send(2).unwrap();
         });
         assert_eq!(rx.recv().unwrap(), 1);
 
-        command(parser!(b"rpush key1 value"),
-                &mut db2.lock().unwrap(),
-                &mut Client::mock())
-            .unwrap();
+        command(
+            parser!(b"rpush key1 value"),
+            &mut db2.lock().unwrap(),
+            &mut Client::mock(),
+        )
+        .unwrap();
         assert_eq!(rx.recv().unwrap(), 2);
-        assert_eq!(command(parser!(b"lrange key2 0 -1"),
-                           &mut db2.lock().unwrap(),
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Array(vec![
-                    Response::Data("value".to_owned().into_bytes()),
-                    ]));
+        assert_eq!(
+            command(
+                parser!(b"lrange key2 0 -1"),
+                &mut db2.lock().unwrap(),
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Array(vec![Response::Data("value".to_owned().into_bytes()),])
+        );
     }
 
     #[test]
     fn brpoplpush_timeout() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        let receiver = match command(parser!(b"brpoplpush key key2 1"),
-                                     &mut db,
-                                     &mut Client::mock())
-            .unwrap_err() {
+        let receiver = match command(
+            parser!(b"brpoplpush key key2 1"),
+            &mut db,
+            &mut Client::mock(),
+        )
+        .unwrap_err()
+        {
             ResponseError::Wait(receiver) => receiver,
             _ => panic!("Unexpected response"),
         };
         assert!(receiver.try_recv().is_err());
-        thread::sleep_ms(1400);
+        thread::sleep(Duration::from_millis(1400));
         assert_eq!(receiver.try_recv().unwrap().is_some(), false);
     }
-
 
     #[test]
     fn brpop_nowait() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
         command(parser!(b"rpush key1 value"), &mut db, &mut Client::mock()).unwrap();
-        assert_eq!(command(parser!(b"brpop key1 key2 0"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Array(vec![
-                    Response::Data("key1".to_owned().into_bytes()),
-                    Response::Data("value".to_owned().into_bytes()),
-                    ]));
+        assert_eq!(
+            command(parser!(b"brpop key1 key2 0"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Array(vec![
+                Response::Data("key1".to_owned().into_bytes()),
+                Response::Data("value".to_owned().into_bytes()),
+            ])
+        );
     }
 
     #[test]
     fn brpop_waiting() {
-        let db = Arc::new(Mutex::new(Database::new(Config::new(Logger::new(Level::Warning)))));
+        let db = Arc::new(Mutex::new(Database::new(Config::new(Logger::new(
+            Level::Warning,
+        )))));
         let (tx, rx) = channel();
         let db2 = db.clone();
         thread::spawn(move || {
-            let r = match command(parser!(b"brpop key1 key2 0"),
-                                  &mut db.lock().unwrap(),
-                                  &mut Client::mock())
-                .unwrap_err() {
+            let r = match command(
+                parser!(b"brpop key1 key2 0"),
+                &mut db.lock().unwrap(),
+                &mut Client::mock(),
+            )
+            .unwrap_err()
+            {
                 ResponseError::Wait(receiver) => {
                     tx.send(1).unwrap();
                     receiver
@@ -3569,32 +4005,42 @@ mod test_command {
                 _ => panic!("Unexpected error"),
             };
             r.recv().unwrap();
-            assert_eq!(command(parser!(b"brpop key1 key2 0"),
-                               &mut db.lock().unwrap(),
-                               &mut Client::mock())
-                           .unwrap(),
-                       Response::Array(vec![
+            assert_eq!(
+                command(
+                    parser!(b"brpop key1 key2 0"),
+                    &mut db.lock().unwrap(),
+                    &mut Client::mock()
+                )
+                .unwrap(),
+                Response::Array(vec![
                     Response::Data("key2".to_owned().into_bytes()),
                     Response::Data("value".to_owned().into_bytes()),
-                    ]));
+                ])
+            );
             tx.send(2).unwrap();
         });
         assert_eq!(rx.recv().unwrap(), 1);
 
         {
-            command(parser!(b"rpush key2 value"),
-                    &mut db2.lock().unwrap(),
-                    &mut Client::mock())
-                .unwrap();
+            command(
+                parser!(b"rpush key2 value"),
+                &mut db2.lock().unwrap(),
+                &mut Client::mock(),
+            )
+            .unwrap();
             assert_eq!(rx.recv().unwrap(), 2);
         }
 
         {
-            assert_eq!(command(parser!(b"llen key2"),
-                               &mut db2.lock().unwrap(),
-                               &mut Client::mock())
-                           .unwrap(),
-                       Response::Integer(0));
+            assert_eq!(
+                command(
+                    parser!(b"llen key2"),
+                    &mut db2.lock().unwrap(),
+                    &mut Client::mock()
+                )
+                .unwrap(),
+                Response::Integer(0)
+            );
         }
     }
 
@@ -3602,12 +4048,13 @@ mod test_command {
     fn brpop_timeout() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
         let receiver = match command(parser!(b"brpop key1 key2 1"), &mut db, &mut Client::mock())
-            .unwrap_err() {
+            .unwrap_err()
+        {
             ResponseError::Wait(receiver) => receiver,
             _ => panic!("Unexpected response"),
         };
         assert!(receiver.try_recv().is_err());
-        thread::sleep_ms(1400);
+        thread::sleep(Duration::from_millis(1400));
         assert_eq!(receiver.try_recv().unwrap().is_some(), false);
     }
 
@@ -3618,54 +4065,77 @@ mod test_command {
         command(parser!(b"rpush key value"), &mut db, &mut Client::mock()).unwrap();
         command(parser!(b"rpush key valuf"), &mut db, &mut Client::mock()).unwrap();
         command(parser!(b"rpush key valuf"), &mut db, &mut Client::mock()).unwrap();
-        assert_eq!(command(parser!(b"ltrim key 1 -2"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Status("OK".to_owned()));
-        assert_eq!(command(parser!(b"lrange key 0 -1"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Array(vec![
-                    Response::Data("value".to_owned().into_bytes()),
-                    Response::Data("valuf".to_owned().into_bytes()),
-                    ]));
+        assert_eq!(
+            command(parser!(b"ltrim key 1 -2"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Status("OK".to_owned())
+        );
+        assert_eq!(
+            command(parser!(b"lrange key 0 -1"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Array(vec![
+                Response::Data("value".to_owned().into_bytes()),
+                Response::Data("valuf".to_owned().into_bytes()),
+            ])
+        );
     }
 
     #[test]
     fn sadd_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"sadd key 1 1 1 2 3"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(3));
-        assert_eq!(command(parser!(b"sadd key 1 1 1 2 3"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(0));
+        assert_eq!(
+            command(parser!(b"sadd key 1 1 1 2 3"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(3)
+        );
+        assert_eq!(
+            command(parser!(b"sadd key 1 1 1 2 3"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(0)
+        );
     }
 
     #[test]
     fn srem_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"sadd key 1 1 1 2 3"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(3));
-        assert_eq!(command(parser!(b"srem key 2 3 4"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(2));
-        assert_eq!(command(parser!(b"srem key 2 3 4"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(0));
+        assert_eq!(
+            command(parser!(b"sadd key 1 1 1 2 3"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(3)
+        );
+        assert_eq!(
+            command(parser!(b"srem key 2 3 4"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(2)
+        );
+        assert_eq!(
+            command(parser!(b"srem key 2 3 4"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(0)
+        );
     }
 
     #[test]
     fn sismember_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"sadd key 1 2 3"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(3));
-        assert_eq!(command(parser!(b"sismember key 2"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(1));
-        assert_eq!(command(parser!(b"sismember key 4"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(0));
+        assert_eq!(
+            command(parser!(b"sadd key 1 2 3"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(3)
+        );
+        assert_eq!(
+            command(parser!(b"sismember key 2"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(1)
+        );
+        assert_eq!(
+            command(parser!(b"sismember key 4"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(0)
+        );
     }
 
     #[test]
     fn smembers_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"sadd key 1 2 3"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(3));
+        assert_eq!(
+            command(parser!(b"sadd key 1 2 3"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(3)
+        );
         match command(parser!(b"smembers key"), &mut db, &mut Client::mock()).unwrap() {
             Response::Array(ref arr) => {
-                let mut array = arr.iter()
+                let mut array = arr
+                    .iter()
                     .map(|x| match x {
                         &Response::Data(ref d) => d.clone(),
                         _ => panic!("Expected data"),
@@ -3681,86 +4151,132 @@ mod test_command {
     #[test]
     fn srandmember_command1() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"sadd key 1 2 3"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(3));
+        assert_eq!(
+            command(parser!(b"sadd key 1 2 3"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(3)
+        );
         let r = command(parser!(b"srandmember key"), &mut db, &mut Client::mock()).unwrap();
-        assert!(r == Response::Data(b"1".to_vec()) || r == Response::Data(b"2".to_vec()) ||
-                r == Response::Data(b"3".to_vec()));
-        assert_eq!(command(parser!(b"scard key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(3));
+        assert!(
+            r == Response::Data(b"1".to_vec())
+                || r == Response::Data(b"2".to_vec())
+                || r == Response::Data(b"3".to_vec())
+        );
+        assert_eq!(
+            command(parser!(b"scard key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(3)
+        );
     }
 
     #[test]
     fn srandmember_command2() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"sadd key 1 2 3"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(3));
+        assert_eq!(
+            command(parser!(b"sadd key 1 2 3"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(3)
+        );
         let r = command(parser!(b"srandmember key 1"), &mut db, &mut Client::mock()).unwrap();
-        assert!(r == Response::Array(vec![Response::Data(b"1".to_vec())]) ||
-                r == Response::Array(vec![Response::Data(b"2".to_vec())]) ||
-                r == Response::Array(vec![Response::Data(b"3".to_vec())]));
-        assert_eq!(command(parser!(b"scard key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(3));
+        assert!(
+            r == Response::Array(vec![Response::Data(b"1".to_vec())])
+                || r == Response::Array(vec![Response::Data(b"2".to_vec())])
+                || r == Response::Array(vec![Response::Data(b"3".to_vec())])
+        );
+        assert_eq!(
+            command(parser!(b"scard key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(3)
+        );
     }
 
     #[test]
     fn spop_command1() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"sadd key 1 2 3"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(3));
+        assert_eq!(
+            command(parser!(b"sadd key 1 2 3"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(3)
+        );
         let r = command(parser!(b"spop key"), &mut db, &mut Client::mock()).unwrap();
-        assert!(r == Response::Data(b"1".to_vec()) || r == Response::Data(b"2".to_vec()) ||
-                r == Response::Data(b"3".to_vec()));
-        assert_eq!(command(parser!(b"scard key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(2));
+        assert!(
+            r == Response::Data(b"1".to_vec())
+                || r == Response::Data(b"2".to_vec())
+                || r == Response::Data(b"3".to_vec())
+        );
+        assert_eq!(
+            command(parser!(b"scard key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(2)
+        );
     }
 
     #[test]
     fn spop_command2() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"sadd key 1 2 3"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(3));
+        assert_eq!(
+            command(parser!(b"sadd key 1 2 3"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(3)
+        );
         let r = command(parser!(b"spop key 1"), &mut db, &mut Client::mock()).unwrap();
-        assert!(r == Response::Array(vec![Response::Data(b"1".to_vec())]) ||
-                r == Response::Array(vec![Response::Data(b"2".to_vec())]) ||
-                r == Response::Array(vec![Response::Data(b"3".to_vec())]));
-        assert_eq!(command(parser!(b"scard key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(2));
+        assert!(
+            r == Response::Array(vec![Response::Data(b"1".to_vec())])
+                || r == Response::Array(vec![Response::Data(b"2".to_vec())])
+                || r == Response::Array(vec![Response::Data(b"3".to_vec())])
+        );
+        assert_eq!(
+            command(parser!(b"scard key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(2)
+        );
     }
 
     #[test]
     fn smove_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"sadd k1 1 2 3"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(3));
+        assert_eq!(
+            command(parser!(b"sadd k1 1 2 3"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(3)
+        );
 
-        assert_eq!(command(parser!(b"smove k1 k2 1"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(1));
-        assert_eq!(command(parser!(b"smove k1 k2 1"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(0));
+        assert_eq!(
+            command(parser!(b"smove k1 k2 1"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(1)
+        );
+        assert_eq!(
+            command(parser!(b"smove k1 k2 1"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(0)
+        );
 
-        assert_eq!(command(parser!(b"smove k1 k2 2"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(1));
-        assert_eq!(command(parser!(b"smove k1 k2 2"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(0));
+        assert_eq!(
+            command(parser!(b"smove k1 k2 2"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(1)
+        );
+        assert_eq!(
+            command(parser!(b"smove k1 k2 2"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(0)
+        );
 
-        assert_eq!(command(parser!(b"smove k1 k2 5"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(0));
+        assert_eq!(
+            command(parser!(b"smove k1 k2 5"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(0)
+        );
 
-        assert_eq!(command(parser!(b"set k3 value"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Status("OK".to_owned()));
-        assert_eq!(command(parser!(b"smove k1 k3 3"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Error("WRONGTYPE Operation against a key holding the wrong kind of \
-                                    value"
-                       .to_owned()));
+        assert_eq!(
+            command(parser!(b"set k3 value"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Status("OK".to_owned())
+        );
+        assert_eq!(
+            command(parser!(b"smove k1 k3 3"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Error(
+                "WRONGTYPE Operation against a key holding the wrong kind of \
+                 value"
+                    .to_owned()
+            )
+        );
     }
 
     #[test]
     fn scard_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
         command(parser!(b"sadd key 1 2 3"), &mut db, &mut Client::mock()).unwrap();
-        assert_eq!(command(parser!(b"scard key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(3));
+        assert_eq!(
+            command(parser!(b"scard key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(3)
+        );
     }
 
     #[test]
@@ -3772,7 +4288,8 @@ mod test_command {
             Response::Array(arr) => arr,
             _ => panic!("Expected array"),
         };
-        let mut r = arr.iter()
+        let mut r = arr
+            .iter()
             .map(|el| match el {
                 &Response::Data(ref el) => el.clone(),
                 _ => panic!("Expected data"),
@@ -3787,13 +4304,20 @@ mod test_command {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
         command(parser!(b"sadd key1 1 2 3"), &mut db, &mut Client::mock()).unwrap();
         command(parser!(b"sadd key2 3 4 5"), &mut db, &mut Client::mock()).unwrap();
-        assert_eq!(command(parser!(b"sdiffstore target key1 key2"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(2));
+        assert_eq!(
+            command(
+                parser!(b"sdiffstore target key1 key2"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(2)
+        );
 
-        let set = vec![b"1".to_vec(), b"2".to_vec()].iter().cloned().collect::<HashSet<_>>();
+        let set = vec![b"1".to_vec(), b"2".to_vec()]
+            .iter()
+            .cloned()
+            .collect::<HashSet<_>>();
         let mut set2 = Value::Nil;
         set2.create_set(set);
         assert_eq!(db.get(0, &b"target".to_vec()).unwrap(), &set2);
@@ -3804,8 +4328,10 @@ mod test_command {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
         command(parser!(b"sadd key1 1 2 3"), &mut db, &mut Client::mock()).unwrap();
         command(parser!(b"sadd key2 2 3"), &mut db, &mut Client::mock()).unwrap();
-        assert_eq!(command(parser!(b"sdiff key1 key2"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Array(vec![Response::Data(b"1".to_vec()),]));
+        assert_eq!(
+            command(parser!(b"sdiff key1 key2"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Array(vec![Response::Data(b"1".to_vec()),])
+        );
     }
 
     #[test]
@@ -3817,7 +4343,8 @@ mod test_command {
             Response::Array(arr) => arr,
             _ => panic!("Expected array"),
         };
-        let mut r = arr.iter()
+        let mut r = arr
+            .iter()
             .map(|el| match el {
                 &Response::Data(ref el) => el.clone(),
                 _ => panic!("Expected data"),
@@ -3833,12 +4360,13 @@ mod test_command {
         command(parser!(b"sadd key1 1 2 3"), &mut db, &mut Client::mock()).unwrap();
         command(parser!(b"sadd key2 2 3 4 5"), &mut db, &mut Client::mock()).unwrap();
 
-        let arr = match command(parser!(b"sinter key1 key2"), &mut db, &mut Client::mock())
-            .unwrap() {
+        let arr = match command(parser!(b"sinter key1 key2"), &mut db, &mut Client::mock()).unwrap()
+        {
             Response::Array(arr) => arr,
             _ => panic!("Expected array"),
         };
-        let mut r = arr.iter()
+        let mut r = arr
+            .iter()
             .map(|el| match el {
                 &Response::Data(ref el) => el.clone(),
                 _ => panic!("Expected data"),
@@ -3854,10 +4382,13 @@ mod test_command {
         command(parser!(b"sadd key1 1 2 3"), &mut db, &mut Client::mock()).unwrap();
         command(parser!(b"sadd key2 2 3 4"), &mut db, &mut Client::mock()).unwrap();
 
-        let arr = match command(parser!(b"sinter key1 key2 nokey"),
-                                &mut db,
-                                &mut Client::mock())
-            .unwrap() {
+        let arr = match command(
+            parser!(b"sinter key1 key2 nokey"),
+            &mut db,
+            &mut Client::mock(),
+        )
+        .unwrap()
+        {
             Response::Array(arr) => arr,
             _ => panic!("Expected array"),
         };
@@ -3869,13 +4400,20 @@ mod test_command {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
         command(parser!(b"sadd key1 1 2 3"), &mut db, &mut Client::mock()).unwrap();
         command(parser!(b"sadd key2 2 3 5"), &mut db, &mut Client::mock()).unwrap();
-        assert_eq!(command(parser!(b"sinterstore target key1 key2"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(2));
+        assert_eq!(
+            command(
+                parser!(b"sinterstore target key1 key2"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(2)
+        );
 
-        let set = vec![b"3".to_vec(), b"2".to_vec()].iter().cloned().collect::<HashSet<_>>();
+        let set = vec![b"3".to_vec(), b"2".to_vec()]
+            .iter()
+            .cloned()
+            .collect::<HashSet<_>>();
         let mut set2 = Value::Nil;
         set2.create_set(set);
         assert_eq!(db.get(0, &b"target".to_vec()).unwrap(), &set2);
@@ -3890,7 +4428,8 @@ mod test_command {
             Response::Array(arr) => arr,
             _ => panic!("Expected array"),
         };
-        let mut r = arr.iter()
+        let mut r = arr
+            .iter()
             .map(|el| match el {
                 &Response::Data(ref el) => el.clone(),
                 _ => panic!("Expected data"),
@@ -3906,20 +4445,23 @@ mod test_command {
         command(parser!(b"sadd key1 1 2 3"), &mut db, &mut Client::mock()).unwrap();
         command(parser!(b"sadd key2 2 3 4"), &mut db, &mut Client::mock()).unwrap();
 
-        let arr = match command(parser!(b"sunion key1 key2"), &mut db, &mut Client::mock())
-            .unwrap() {
+        let arr = match command(parser!(b"sunion key1 key2"), &mut db, &mut Client::mock()).unwrap()
+        {
             Response::Array(arr) => arr,
             _ => panic!("Expected array"),
         };
-        let mut r = arr.iter()
+        let mut r = arr
+            .iter()
             .map(|el| match el {
                 &Response::Data(ref el) => el.clone(),
                 _ => panic!("Expected data"),
             })
             .collect::<Vec<_>>();
         r.sort();
-        assert_eq!(r,
-                   vec![b"1".to_vec(), b"2".to_vec(), b"3".to_vec(), b"4".to_vec()]);
+        assert_eq!(
+            r,
+            vec![b"1".to_vec(), b"2".to_vec(), b"3".to_vec(), b"4".to_vec()]
+        );
     }
 
     #[test]
@@ -3927,11 +4469,15 @@ mod test_command {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
         command(parser!(b"sadd key1 1 2 3"), &mut db, &mut Client::mock()).unwrap();
         command(parser!(b"sadd key2 2 3 4"), &mut db, &mut Client::mock()).unwrap();
-        assert_eq!(command(parser!(b"sunionstore target key1 key2"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(4));
+        assert_eq!(
+            command(
+                parser!(b"sunionstore target key1 key2"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(4)
+        );
 
         let set = vec![b"1".to_vec(), b"2".to_vec(), b"3".to_vec(), b"4".to_vec()]
             .iter()
@@ -3945,659 +4491,1032 @@ mod test_command {
     #[test]
     fn zadd_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"zadd key 1 a 2 b"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(2));
-        assert_eq!(command(parser!(b"zadd key 1 a 2 b"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(0));
-        assert_eq!(command(parser!(b"zadd key XX 2 a 3 b"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(0));
-        assert_eq!(command(parser!(b"zadd key CH 2 a 2 b 2 c"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(2));
-        assert_eq!(command(parser!(b"zadd key NX 1 a 2 b 3 c 4 d"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(1));
-        assert_eq!(command(parser!(b"zadd key XX CH 2 b 2 d 2 e"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(1));
+        assert_eq!(
+            command(parser!(b"zadd key 1 a 2 b"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(2)
+        );
+        assert_eq!(
+            command(parser!(b"zadd key 1 a 2 b"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(0)
+        );
+        assert_eq!(
+            command(
+                parser!(b"zadd key XX 2 a 3 b"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(0)
+        );
+        assert_eq!(
+            command(
+                parser!(b"zadd key CH 2 a 2 b 2 c"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(2)
+        );
+        assert_eq!(
+            command(
+                parser!(b"zadd key NX 1 a 2 b 3 c 4 d"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(1)
+        );
+        assert_eq!(
+            command(
+                parser!(b"zadd key XX CH 2 b 2 d 2 e"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(1)
+        );
     }
 
     #[test]
     fn zcard_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"zadd key 1 a 2 b"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(2));
-        assert_eq!(command(parser!(b"zcard key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(2));
+        assert_eq!(
+            command(parser!(b"zadd key 1 a 2 b"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(2)
+        );
+        assert_eq!(
+            command(parser!(b"zcard key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(2)
+        );
     }
 
     #[test]
     fn zscore_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"zadd key 1 a 2 b"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(2));
-        assert_eq!(command(parser!(b"zscore key a"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Data(b"1".to_vec()));
-        assert_eq!(command(parser!(b"zscore key c"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Nil);
-        assert_eq!(command(parser!(b"zscore key2 a"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Nil);
+        assert_eq!(
+            command(parser!(b"zadd key 1 a 2 b"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(2)
+        );
+        assert_eq!(
+            command(parser!(b"zscore key a"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Data(b"1".to_vec())
+        );
+        assert_eq!(
+            command(parser!(b"zscore key c"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Nil
+        );
+        assert_eq!(
+            command(parser!(b"zscore key2 a"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Nil
+        );
     }
 
     #[test]
     fn zincrby_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"zincrby key 3 a"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Data(b"3".to_vec()));
-        assert_eq!(command(parser!(b"zincrby key 4 a"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Data(b"7".to_vec()));
+        assert_eq!(
+            command(parser!(b"zincrby key 3 a"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Data(b"3".to_vec())
+        );
+        assert_eq!(
+            command(parser!(b"zincrby key 4 a"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Data(b"7".to_vec())
+        );
     }
 
     #[test]
     fn zcount_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"zadd key 1 a 2 b 3 c 4 d"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(4));
-        assert_eq!(command(parser!(b"zcount key 2 3"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(2));
-        assert_eq!(command(parser!(b"zcount key 2 3"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(2));
-        assert_eq!(command(parser!(b"zcount key (2 3"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(1));
-        assert_eq!(command(parser!(b"zcount key -inf inf"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(4));
+        assert_eq!(
+            command(
+                parser!(b"zadd key 1 a 2 b 3 c 4 d"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(4)
+        );
+        assert_eq!(
+            command(parser!(b"zcount key 2 3"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(2)
+        );
+        assert_eq!(
+            command(parser!(b"zcount key 2 3"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(2)
+        );
+        assert_eq!(
+            command(parser!(b"zcount key (2 3"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(1)
+        );
+        assert_eq!(
+            command(
+                parser!(b"zcount key -inf inf"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(4)
+        );
     }
 
     #[test]
     fn zlexcount_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"zadd key 0 a 0 b 0 c 0 d"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(4));
-        assert_eq!(command(parser!(b"zlexcount key [a [b"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(2));
-        assert_eq!(command(parser!(b"zlexcount key [a [b"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(2));
-        assert_eq!(command(parser!(b"zlexcount key (b [c"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(1));
-        assert_eq!(command(parser!(b"zlexcount key - +"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(4));
+        assert_eq!(
+            command(
+                parser!(b"zadd key 0 a 0 b 0 c 0 d"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(4)
+        );
+        assert_eq!(
+            command(
+                parser!(b"zlexcount key [a [b"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(2)
+        );
+        assert_eq!(
+            command(
+                parser!(b"zlexcount key [a [b"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(2)
+        );
+        assert_eq!(
+            command(
+                parser!(b"zlexcount key (b [c"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(1)
+        );
+        assert_eq!(
+            command(parser!(b"zlexcount key - +"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(4)
+        );
     }
 
     #[test]
     fn zremrangebyscore_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"zadd key 1 a 2 b 3 c 4 d"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(4));
-        assert_eq!(command(parser!(b"zremrangebyscore key 2 3"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(2));
-        assert_eq!(command(parser!(b"zremrangebyscore key 2 3"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(0));
-        assert_eq!(command(parser!(b"zremrangebyscore key (2 4"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(1));
-        assert_eq!(command(parser!(b"zremrangebyscore key -inf inf"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(1));
+        assert_eq!(
+            command(
+                parser!(b"zadd key 1 a 2 b 3 c 4 d"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(4)
+        );
+        assert_eq!(
+            command(
+                parser!(b"zremrangebyscore key 2 3"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(2)
+        );
+        assert_eq!(
+            command(
+                parser!(b"zremrangebyscore key 2 3"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(0)
+        );
+        assert_eq!(
+            command(
+                parser!(b"zremrangebyscore key (2 4"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(1)
+        );
+        assert_eq!(
+            command(
+                parser!(b"zremrangebyscore key -inf inf"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(1)
+        );
     }
 
     #[test]
     fn zremrangebylex_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"zadd key 0 a 0 b 0 c 0 d"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(4));
-        assert_eq!(command(parser!(b"zremrangebylex key [b (d"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(2));
-        assert_eq!(command(parser!(b"zremrangebylex key [b (d"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(0));
-        assert_eq!(command(parser!(b"zremrangebylex key (b [d"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(1));
-        assert_eq!(command(parser!(b"zremrangebylex key - +"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(1));
+        assert_eq!(
+            command(
+                parser!(b"zadd key 0 a 0 b 0 c 0 d"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(4)
+        );
+        assert_eq!(
+            command(
+                parser!(b"zremrangebylex key [b (d"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(2)
+        );
+        assert_eq!(
+            command(
+                parser!(b"zremrangebylex key [b (d"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(0)
+        );
+        assert_eq!(
+            command(
+                parser!(b"zremrangebylex key (b [d"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(1)
+        );
+        assert_eq!(
+            command(
+                parser!(b"zremrangebylex key - +"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(1)
+        );
     }
 
     #[test]
     fn zremrangebyrank_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"zadd key 1 a 2 b 3 c 4 d"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(4));
-        assert_eq!(command(parser!(b"zremrangebyrank key 1 2"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(2));
-        assert_eq!(command(parser!(b"zremrangebyrank key 5 10"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(0));
-        assert_eq!(command(parser!(b"zremrangebyrank key 1 -1"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(1));
-        assert_eq!(command(parser!(b"zremrangebyrank key 0 -1"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(1));
+        assert_eq!(
+            command(
+                parser!(b"zadd key 1 a 2 b 3 c 4 d"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(4)
+        );
+        assert_eq!(
+            command(
+                parser!(b"zremrangebyrank key 1 2"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(2)
+        );
+        assert_eq!(
+            command(
+                parser!(b"zremrangebyrank key 5 10"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(0)
+        );
+        assert_eq!(
+            command(
+                parser!(b"zremrangebyrank key 1 -1"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(1)
+        );
+        assert_eq!(
+            command(
+                parser!(b"zremrangebyrank key 0 -1"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(1)
+        );
     }
 
     #[test]
     fn zrange_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"zadd key 1 a 2 b 3 c 4 d"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(4));
-        assert_eq!(command(parser!(b"zrange key 0 0"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Array(vec![
-                    Response::Data(b"a".to_vec()),
-                    ]));
-        assert_eq!(command(parser!(b"zrange key 0 0 withscoreS"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Array(vec![
-                    Response::Data(b"a".to_vec()),
-                    Response::Data(b"1".to_vec()),
-                    ]));
-        assert_eq!(command(parser!(b"zrange key -2 -1 WITHSCORES"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Array(vec![
-                    Response::Data(b"c".to_vec()),
-                    Response::Data(b"3".to_vec()),
-                    Response::Data(b"d".to_vec()),
-                    Response::Data(b"4".to_vec()),
-                    ]));
+        assert_eq!(
+            command(
+                parser!(b"zadd key 1 a 2 b 3 c 4 d"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(4)
+        );
+        assert_eq!(
+            command(parser!(b"zrange key 0 0"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Array(vec![Response::Data(b"a".to_vec()),])
+        );
+        assert_eq!(
+            command(
+                parser!(b"zrange key 0 0 withscoreS"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Array(vec![
+                Response::Data(b"a".to_vec()),
+                Response::Data(b"1".to_vec()),
+            ])
+        );
+        assert_eq!(
+            command(
+                parser!(b"zrange key -2 -1 WITHSCORES"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Array(vec![
+                Response::Data(b"c".to_vec()),
+                Response::Data(b"3".to_vec()),
+                Response::Data(b"d".to_vec()),
+                Response::Data(b"4".to_vec()),
+            ])
+        );
     }
 
     #[test]
     fn zrevrange_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"zadd key 1 a 2 b 3 c 4 d"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(4));
-        assert_eq!(command(parser!(b"zrevrange key 0 0"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Array(vec![
-                    Response::Data(b"d".to_vec()),
-                    ]));
-        assert_eq!(command(parser!(b"zrevrange key 0 0 withscoreS"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Array(vec![
-                    Response::Data(b"d".to_vec()),
-                    Response::Data(b"4".to_vec()),
-                    ]));
-        assert_eq!(command(parser!(b"zrevrange key -2 -1 WITHSCORES"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Array(vec![
-                    Response::Data(b"b".to_vec()),
-                    Response::Data(b"2".to_vec()),
-                    Response::Data(b"a".to_vec()),
-                    Response::Data(b"1".to_vec()),
-                    ]));
+        assert_eq!(
+            command(
+                parser!(b"zadd key 1 a 2 b 3 c 4 d"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(4)
+        );
+        assert_eq!(
+            command(parser!(b"zrevrange key 0 0"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Array(vec![Response::Data(b"d".to_vec()),])
+        );
+        assert_eq!(
+            command(
+                parser!(b"zrevrange key 0 0 withscoreS"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Array(vec![
+                Response::Data(b"d".to_vec()),
+                Response::Data(b"4".to_vec()),
+            ])
+        );
+        assert_eq!(
+            command(
+                parser!(b"zrevrange key -2 -1 WITHSCORES"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Array(vec![
+                Response::Data(b"b".to_vec()),
+                Response::Data(b"2".to_vec()),
+                Response::Data(b"a".to_vec()),
+                Response::Data(b"1".to_vec()),
+            ])
+        );
     }
 
     #[test]
     fn zrangebyscore_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"zadd key 1 a 2 b 3 c 4 d"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(4));
-        assert_eq!(command(parser!(b"zrangebyscore key 1 (2"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Array(vec![
-                    Response::Data(b"a".to_vec()),
-                    ]));
-        assert_eq!(command(parser!(b"zrangebyscore key 1 1 withscoreS"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Array(vec![
-                    Response::Data(b"a".to_vec()),
-                    Response::Data(b"1".to_vec()),
-                    ]));
-        assert_eq!(command(parser!(b"zrangebyscore key (2 inf WITHSCORES"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Array(vec![
-                    Response::Data(b"c".to_vec()),
-                    Response::Data(b"3".to_vec()),
-                    Response::Data(b"d".to_vec()),
-                    Response::Data(b"4".to_vec()),
-                    ]));
-        assert_eq!(command(parser!(b"zrangebyscore key -inf inf withscores LIMIT 2 10"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Array(vec![
-                    Response::Data(b"c".to_vec()),
-                    Response::Data(b"3".to_vec()),
-                    Response::Data(b"d".to_vec()),
-                    Response::Data(b"4".to_vec()),
-                    ]));
+        assert_eq!(
+            command(
+                parser!(b"zadd key 1 a 2 b 3 c 4 d"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(4)
+        );
+        assert_eq!(
+            command(
+                parser!(b"zrangebyscore key 1 (2"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Array(vec![Response::Data(b"a".to_vec()),])
+        );
+        assert_eq!(
+            command(
+                parser!(b"zrangebyscore key 1 1 withscoreS"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Array(vec![
+                Response::Data(b"a".to_vec()),
+                Response::Data(b"1".to_vec()),
+            ])
+        );
+        assert_eq!(
+            command(
+                parser!(b"zrangebyscore key (2 inf WITHSCORES"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Array(vec![
+                Response::Data(b"c".to_vec()),
+                Response::Data(b"3".to_vec()),
+                Response::Data(b"d".to_vec()),
+                Response::Data(b"4".to_vec()),
+            ])
+        );
+        assert_eq!(
+            command(
+                parser!(b"zrangebyscore key -inf inf withscores LIMIT 2 10"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Array(vec![
+                Response::Data(b"c".to_vec()),
+                Response::Data(b"3".to_vec()),
+                Response::Data(b"d".to_vec()),
+                Response::Data(b"4".to_vec()),
+            ])
+        );
     }
 
     #[test]
     fn zrevrangebyscore_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"zadd key 1 a 2 b 3 c 4 d"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(4));
-        assert_eq!(command(parser!(b"zrevrangebyscore key (2 1"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Array(vec![
-                    Response::Data(b"a".to_vec()),
-                    ]));
-        assert_eq!(command(parser!(b"zrevrangebyscore key 1 1 withscoreS"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Array(vec![
-                    Response::Data(b"a".to_vec()),
-                    Response::Data(b"1".to_vec()),
-                    ]));
-        assert_eq!(command(parser!(b"zrevrangebyscore key inf (2 WITHSCORES"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Array(vec![
-                    Response::Data(b"d".to_vec()),
-                    Response::Data(b"4".to_vec()),
-                    Response::Data(b"c".to_vec()),
-                    Response::Data(b"3".to_vec()),
-                    ]));
-        assert_eq!(command(parser!(b"zrevrangebyscore key inf -inf withscores LIMIT 2 10"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Array(vec![
-                    Response::Data(b"b".to_vec()),
-                    Response::Data(b"2".to_vec()),
-                    Response::Data(b"a".to_vec()),
-                    Response::Data(b"1".to_vec()),
-                    ]));
+        assert_eq!(
+            command(
+                parser!(b"zadd key 1 a 2 b 3 c 4 d"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(4)
+        );
+        assert_eq!(
+            command(
+                parser!(b"zrevrangebyscore key (2 1"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Array(vec![Response::Data(b"a".to_vec()),])
+        );
+        assert_eq!(
+            command(
+                parser!(b"zrevrangebyscore key 1 1 withscoreS"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Array(vec![
+                Response::Data(b"a".to_vec()),
+                Response::Data(b"1".to_vec()),
+            ])
+        );
+        assert_eq!(
+            command(
+                parser!(b"zrevrangebyscore key inf (2 WITHSCORES"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Array(vec![
+                Response::Data(b"d".to_vec()),
+                Response::Data(b"4".to_vec()),
+                Response::Data(b"c".to_vec()),
+                Response::Data(b"3".to_vec()),
+            ])
+        );
+        assert_eq!(
+            command(
+                parser!(b"zrevrangebyscore key inf -inf withscores LIMIT 2 10"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Array(vec![
+                Response::Data(b"b".to_vec()),
+                Response::Data(b"2".to_vec()),
+                Response::Data(b"a".to_vec()),
+                Response::Data(b"1".to_vec()),
+            ])
+        );
     }
 
     #[test]
     fn zrangebylex_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"zadd key 0 a 0 b 0 c 0 d"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(4));
-        assert_eq!(command(parser!(b"zrangebylex key [a (b"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Array(vec![
-                    Response::Data(b"a".to_vec()),
-                    ]));
-        assert_eq!(command(parser!(b"zrangebylex key (b +"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Array(vec![
-                    Response::Data(b"c".to_vec()),
-                    Response::Data(b"d".to_vec()),
-                    ]));
-        assert_eq!(command(parser!(b"zrangebylex key - + LIMIT 2 10"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Array(vec![
-                    Response::Data(b"c".to_vec()),
-                    Response::Data(b"d".to_vec()),
-                    ]));
+        assert_eq!(
+            command(
+                parser!(b"zadd key 0 a 0 b 0 c 0 d"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(4)
+        );
+        assert_eq!(
+            command(
+                parser!(b"zrangebylex key [a (b"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Array(vec![Response::Data(b"a".to_vec()),])
+        );
+        assert_eq!(
+            command(
+                parser!(b"zrangebylex key (b +"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Array(vec![
+                Response::Data(b"c".to_vec()),
+                Response::Data(b"d".to_vec()),
+            ])
+        );
+        assert_eq!(
+            command(
+                parser!(b"zrangebylex key - + LIMIT 2 10"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Array(vec![
+                Response::Data(b"c".to_vec()),
+                Response::Data(b"d".to_vec()),
+            ])
+        );
     }
 
     #[test]
     fn zrevrangebylex_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"zadd key 0 a 0 b 0 c 0 d"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(4));
-        assert_eq!(command(parser!(b"zrevrangebylex key (b [a"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Array(vec![
-                    Response::Data(b"a".to_vec()),
-                    ]));
-        assert_eq!(command(parser!(b"zrevrangebylex key + (b"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Array(vec![
-                    Response::Data(b"d".to_vec()),
-                    Response::Data(b"c".to_vec()),
-                    ]));
-        assert_eq!(command(parser!(b"zrevrangebylex key + - LIMIT 2 10"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Array(vec![
-                    Response::Data(b"b".to_vec()),
-                    Response::Data(b"a".to_vec()),
-                    ]));
+        assert_eq!(
+            command(
+                parser!(b"zadd key 0 a 0 b 0 c 0 d"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(4)
+        );
+        assert_eq!(
+            command(
+                parser!(b"zrevrangebylex key (b [a"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Array(vec![Response::Data(b"a".to_vec()),])
+        );
+        assert_eq!(
+            command(
+                parser!(b"zrevrangebylex key + (b"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Array(vec![
+                Response::Data(b"d".to_vec()),
+                Response::Data(b"c".to_vec()),
+            ])
+        );
+        assert_eq!(
+            command(
+                parser!(b"zrevrangebylex key + - LIMIT 2 10"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Array(vec![
+                Response::Data(b"b".to_vec()),
+                Response::Data(b"a".to_vec()),
+            ])
+        );
     }
 
     #[test]
     fn zrank_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"zadd key 1 a 2 b 3 c 4 d"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(4));
-        assert_eq!(command(parser!(b"zrank key a"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(0));
-        assert_eq!(command(parser!(b"zrank key b"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(1));
-        assert_eq!(command(parser!(b"zrank key e"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Nil);
+        assert_eq!(
+            command(
+                parser!(b"zadd key 1 a 2 b 3 c 4 d"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(4)
+        );
+        assert_eq!(
+            command(parser!(b"zrank key a"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(0)
+        );
+        assert_eq!(
+            command(parser!(b"zrank key b"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(1)
+        );
+        assert_eq!(
+            command(parser!(b"zrank key e"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Nil
+        );
     }
 
     #[test]
     fn zrevrank_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"zadd key 1 a 2 b 3 c 4 d"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(4));
-        assert_eq!(command(parser!(b"zrevrank key a"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(3));
-        assert_eq!(command(parser!(b"zrevrank key b"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(2));
-        assert_eq!(command(parser!(b"zrevrank key e"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Nil);
+        assert_eq!(
+            command(
+                parser!(b"zadd key 1 a 2 b 3 c 4 d"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(4)
+        );
+        assert_eq!(
+            command(parser!(b"zrevrank key a"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(3)
+        );
+        assert_eq!(
+            command(parser!(b"zrevrank key b"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(2)
+        );
+        assert_eq!(
+            command(parser!(b"zrevrank key e"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Nil
+        );
     }
 
     #[test]
     fn zrem_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"zadd key 1 a 2 b 3 c"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(3));
-        assert_eq!(command(parser!(b"zrem key a b d e"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(2));
-        assert_eq!(command(parser!(b"zrem key c"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(1));
+        assert_eq!(
+            command(
+                parser!(b"zadd key 1 a 2 b 3 c"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(3)
+        );
+        assert_eq!(
+            command(parser!(b"zrem key a b d e"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(2)
+        );
+        assert_eq!(
+            command(parser!(b"zrem key c"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(1)
+        );
     }
 
     #[test]
     fn zunionstore_command_short() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"zadd key1 1 a 2 b 3 c"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(3));
-        assert_eq!(command(parser!(b"zadd key2 4 d 5 e"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(2));
-        assert_eq!(command(parser!(b"zunionstore key 3 key1 key2 key3"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(5));
+        assert_eq!(
+            command(
+                parser!(b"zadd key1 1 a 2 b 3 c"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(3)
+        );
+        assert_eq!(
+            command(parser!(b"zadd key2 4 d 5 e"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(2)
+        );
+        assert_eq!(
+            command(
+                parser!(b"zunionstore key 3 key1 key2 key3"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(5)
+        );
     }
 
     #[test]
     fn zunionstore_command_short2() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"zadd key1 1 a 2 b 3 c"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(3));
-        assert_eq!(command(parser!(b"zadd key2 4 d 5 e"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(2));
-        assert_eq!(command(parser!(b"zunionstore key 2 key1 key2"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(5));
+        assert_eq!(
+            command(
+                parser!(b"zadd key1 1 a 2 b 3 c"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(3)
+        );
+        assert_eq!(
+            command(parser!(b"zadd key2 4 d 5 e"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(2)
+        );
+        assert_eq!(
+            command(
+                parser!(b"zunionstore key 2 key1 key2"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(5)
+        );
     }
 
     #[test]
     fn zunionstore_command_weights() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"zadd key1 1 a 2 b 3 c"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(3));
-        assert_eq!(command(parser!(b"zadd key2 4 d 5 e"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(2));
-        assert_eq!(command(parser!(b"zunionstore key 3 key1 key2 key3 Weights 1 2 3"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(5));
-        assert_eq!(command(parser!(b"zscore key d"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Data(b"8".to_vec()));
+        assert_eq!(
+            command(
+                parser!(b"zadd key1 1 a 2 b 3 c"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(3)
+        );
+        assert_eq!(
+            command(parser!(b"zadd key2 4 d 5 e"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(2)
+        );
+        assert_eq!(
+            command(
+                parser!(b"zunionstore key 3 key1 key2 key3 Weights 1 2 3"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(5)
+        );
+        assert_eq!(
+            command(parser!(b"zscore key d"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Data(b"8".to_vec())
+        );
     }
 
     #[test]
     fn zunionstore_command_aggregate() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"zadd key1 1 a 2 b 3 c"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(3));
-        assert_eq!(command(parser!(b"zadd key2 9 c 4 d 5 e"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(3));
-        assert_eq!(command(parser!(b"zunionstore key 3 key1 key2 key3 aggregate max"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(5));
-        assert_eq!(command(parser!(b"zscore key c"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Data(b"9".to_vec()));
-        assert_eq!(command(parser!(b"zunionstore key 3 key1 key2 key3 aggregate min"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(5));
-        assert_eq!(command(parser!(b"zscore key c"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Data(b"3".to_vec()));
+        assert_eq!(
+            command(
+                parser!(b"zadd key1 1 a 2 b 3 c"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(3)
+        );
+        assert_eq!(
+            command(
+                parser!(b"zadd key2 9 c 4 d 5 e"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(3)
+        );
+        assert_eq!(
+            command(
+                parser!(b"zunionstore key 3 key1 key2 key3 aggregate max"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(5)
+        );
+        assert_eq!(
+            command(parser!(b"zscore key c"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Data(b"9".to_vec())
+        );
+        assert_eq!(
+            command(
+                parser!(b"zunionstore key 3 key1 key2 key3 aggregate min"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(5)
+        );
+        assert_eq!(
+            command(parser!(b"zscore key c"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Data(b"3".to_vec())
+        );
     }
 
     #[test]
     fn zunionstore_command_weights_aggregate() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"zadd key1 1 a 2 b 3 c"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(3));
-        assert_eq!(command(parser!(b"zadd key2 3 c 4 d 5 e"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(3));
-        assert_eq!(command(parser!(b"zunionstore key 3 key1 key2 key3 weights 1 2 3 aggregate max"), &mut db, &mut Client::mock()).unwrap(), Response::Integer(5));
-        assert_eq!(command(parser!(b"zscore key c"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Data(b"6".to_vec()));
+        assert_eq!(
+            command(
+                parser!(b"zadd key1 1 a 2 b 3 c"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(3)
+        );
+        assert_eq!(
+            command(
+                parser!(b"zadd key2 3 c 4 d 5 e"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(3)
+        );
+        assert_eq!(
+            command(
+                parser!(b"zunionstore key 3 key1 key2 key3 weights 1 2 3 aggregate max"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(5)
+        );
+        assert_eq!(
+            command(parser!(b"zscore key c"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Data(b"6".to_vec())
+        );
     }
 
     #[test]
     fn zinterstore_command_short() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"zadd key1 1 a 2 b 3 c"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(3));
-        assert_eq!(command(parser!(b"zadd key2 3 c 4 d 5 e"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(3));
-        assert_eq!(command(parser!(b"zinterstore key 2 key1 key2"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(1));
+        assert_eq!(
+            command(
+                parser!(b"zadd key1 1 a 2 b 3 c"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(3)
+        );
+        assert_eq!(
+            command(
+                parser!(b"zadd key2 3 c 4 d 5 e"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(3)
+        );
+        assert_eq!(
+            command(
+                parser!(b"zinterstore key 2 key1 key2"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(1)
+        );
     }
 
     #[test]
     fn zinterstore_command_weights() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"zadd key1 1 a 2 b 3 c 4 d"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(4));
-        assert_eq!(command(parser!(b"zadd key2 4 d 5 e"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(2));
-        assert_eq!(command(parser!(b"zadd key3 0 d"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Integer(1));
-        assert_eq!(command(parser!(b"zinterstore key 3 key1 key2 key3 Weights 1 2 3"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(1));
-        assert_eq!(command(parser!(b"zscore key d"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Data(b"12".to_vec()));
+        assert_eq!(
+            command(
+                parser!(b"zadd key1 1 a 2 b 3 c 4 d"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(4)
+        );
+        assert_eq!(
+            command(parser!(b"zadd key2 4 d 5 e"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(2)
+        );
+        assert_eq!(
+            command(parser!(b"zadd key3 0 d"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Integer(1)
+        );
+        assert_eq!(
+            command(
+                parser!(b"zinterstore key 3 key1 key2 key3 Weights 1 2 3"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(1)
+        );
+        assert_eq!(
+            command(parser!(b"zscore key d"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Data(b"12".to_vec())
+        );
     }
 
     #[test]
     fn zinterstore_command_aggregate() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"zadd key1 1 a 2 b 3 c"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(3));
-        assert_eq!(command(parser!(b"zadd key2 9 c 4 d 5 e"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(3));
-        assert_eq!(command(parser!(b"zinterstore key 2 key1 key2 aggregate max"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(1));
-        assert_eq!(command(parser!(b"zscore key c"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Data(b"9".to_vec()));
-        assert_eq!(command(parser!(b"zinterstore key 2 key1 key2 aggregate min"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(1));
-        assert_eq!(command(parser!(b"zscore key c"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Data(b"3".to_vec()));
+        assert_eq!(
+            command(
+                parser!(b"zadd key1 1 a 2 b 3 c"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(3)
+        );
+        assert_eq!(
+            command(
+                parser!(b"zadd key2 9 c 4 d 5 e"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(3)
+        );
+        assert_eq!(
+            command(
+                parser!(b"zinterstore key 2 key1 key2 aggregate max"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(1)
+        );
+        assert_eq!(
+            command(parser!(b"zscore key c"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Data(b"9".to_vec())
+        );
+        assert_eq!(
+            command(
+                parser!(b"zinterstore key 2 key1 key2 aggregate min"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(1)
+        );
+        assert_eq!(
+            command(parser!(b"zscore key c"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Data(b"3".to_vec())
+        );
     }
 
     #[test]
     fn zinterstore_command_weights_aggregate() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert_eq!(command(parser!(b"zadd key1 1 a 2 b 3 c"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(3));
-        assert_eq!(command(parser!(b"zadd key2 3 c 4 d 5 e"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(3));
-        assert_eq!(command(parser!(b"zinterstore key 2 key1 key2 weights 1 2 aggregate max"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(1));
-        assert_eq!(command(parser!(b"zscore key c"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Data(b"6".to_vec()));
+        assert_eq!(
+            command(
+                parser!(b"zadd key1 1 a 2 b 3 c"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(3)
+        );
+        assert_eq!(
+            command(
+                parser!(b"zadd key2 3 c 4 d 5 e"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(3)
+        );
+        assert_eq!(
+            command(
+                parser!(b"zinterstore key 2 key1 key2 weights 1 2 aggregate max"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(1)
+        );
+        assert_eq!(
+            command(parser!(b"zscore key c"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Data(b"6".to_vec())
+        );
     }
-
 
     #[test]
     fn select_command() {
@@ -4612,19 +5531,29 @@ mod test_command {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
         let mut client = Client::mock();
         command(parser!(b"select 0"), &mut db, &mut client).unwrap();
-        assert_eq!(command(parser!(b"set key value"), &mut db, &mut client).unwrap(),
-                   Response::Status("OK".to_owned()));
+        assert_eq!(
+            command(parser!(b"set key value"), &mut db, &mut client).unwrap(),
+            Response::Status("OK".to_owned())
+        );
         command(parser!(b"select 1"), &mut db, &mut client).unwrap();
-        assert_eq!(command(parser!(b"set key valuf"), &mut db, &mut client).unwrap(),
-                   Response::Status("OK".to_owned()));
-        assert_eq!(command(parser!(b"flushdb"), &mut db, &mut client).unwrap(),
-                   Response::Status("OK".to_owned()));
+        assert_eq!(
+            command(parser!(b"set key valuf"), &mut db, &mut client).unwrap(),
+            Response::Status("OK".to_owned())
+        );
+        assert_eq!(
+            command(parser!(b"flushdb"), &mut db, &mut client).unwrap(),
+            Response::Status("OK".to_owned())
+        );
         command(parser!(b"select 0"), &mut db, &mut client).unwrap();
-        assert_eq!(command(parser!(b"get key"), &mut db, &mut client).unwrap(),
-                   Response::Data("value".to_owned().into_bytes()));
+        assert_eq!(
+            command(parser!(b"get key"), &mut db, &mut client).unwrap(),
+            Response::Data("value".to_owned().into_bytes())
+        );
         command(parser!(b"select 1"), &mut db, &mut client).unwrap();
-        assert_eq!(command(parser!(b"get key"), &mut db, &mut client).unwrap(),
-                   Response::Nil);
+        assert_eq!(
+            command(parser!(b"get key"), &mut db, &mut client).unwrap(),
+            Response::Nil
+        );
     }
 
     #[test]
@@ -4632,19 +5561,29 @@ mod test_command {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
         let mut client = Client::mock();
         command(parser!(b"select 0"), &mut db, &mut client).unwrap();
-        assert_eq!(command(parser!(b"set key value"), &mut db, &mut client).unwrap(),
-                   Response::Status("OK".to_owned()));
+        assert_eq!(
+            command(parser!(b"set key value"), &mut db, &mut client).unwrap(),
+            Response::Status("OK".to_owned())
+        );
         command(parser!(b"select 1"), &mut db, &mut client).unwrap();
-        assert_eq!(command(parser!(b"set key valuf"), &mut db, &mut client).unwrap(),
-                   Response::Status("OK".to_owned()));
-        assert_eq!(command(parser!(b"flushall"), &mut db, &mut client).unwrap(),
-                   Response::Status("OK".to_owned()));
+        assert_eq!(
+            command(parser!(b"set key valuf"), &mut db, &mut client).unwrap(),
+            Response::Status("OK".to_owned())
+        );
+        assert_eq!(
+            command(parser!(b"flushall"), &mut db, &mut client).unwrap(),
+            Response::Status("OK".to_owned())
+        );
         command(parser!(b"select 0"), &mut db, &mut client).unwrap();
-        assert_eq!(command(parser!(b"get key"), &mut db, &mut client).unwrap(),
-                   Response::Nil);
+        assert_eq!(
+            command(parser!(b"get key"), &mut db, &mut client).unwrap(),
+            Response::Nil
+        );
         command(parser!(b"select 1"), &mut db, &mut client).unwrap();
-        assert_eq!(command(parser!(b"get key"), &mut db, &mut client).unwrap(),
-                   Response::Nil);
+        assert_eq!(
+            command(parser!(b"get key"), &mut db, &mut client).unwrap(),
+            Response::Nil
+        );
     }
 
     #[test]
@@ -4653,31 +5592,41 @@ mod test_command {
         let (tx, rx) = channel();
         let mut client = Client::new(tx, 0);
         assert!(command(parser!(b"subscribe channel"), &mut db, &mut client).is_err());
-        assert_eq!(command(parser!(b"publish channel hello-world"),
-                           &mut db,
-                           &mut Client::mock())
-                       .unwrap(),
-                   Response::Integer(1));
+        assert_eq!(
+            command(
+                parser!(b"publish channel hello-world"),
+                &mut db,
+                &mut Client::mock()
+            )
+            .unwrap(),
+            Response::Integer(1)
+        );
         assert!(command(parser!(b"unsubscribe channel"), &mut db, &mut client).is_err());
 
-        assert_eq!(rx.try_recv().unwrap().unwrap(),
-                   Response::Array(vec![
-                    Response::Data(b"subscribe".to_vec()),
-                    Response::Data(b"channel".to_vec()),
-                    Response::Integer(1),
-                    ]));
-        assert_eq!(rx.try_recv().unwrap().unwrap(),
-                   Response::Array(vec![
-                    Response::Data(b"message".to_vec()),
-                    Response::Data(b"channel".to_vec()),
-                    Response::Data(b"hello-world".to_vec()),
-                    ]));
-        assert_eq!(rx.try_recv().unwrap().unwrap(),
-                   Response::Array(vec![
-                    Response::Data(b"unsubscribe".to_vec()),
-                    Response::Data(b"channel".to_vec()),
-                    Response::Integer(0),
-                    ]));
+        assert_eq!(
+            rx.try_recv().unwrap().unwrap(),
+            Response::Array(vec![
+                Response::Data(b"subscribe".to_vec()),
+                Response::Data(b"channel".to_vec()),
+                Response::Integer(1),
+            ])
+        );
+        assert_eq!(
+            rx.try_recv().unwrap().unwrap(),
+            Response::Array(vec![
+                Response::Data(b"message".to_vec()),
+                Response::Data(b"channel".to_vec()),
+                Response::Data(b"hello-world".to_vec()),
+            ])
+        );
+        assert_eq!(
+            rx.try_recv().unwrap().unwrap(),
+            Response::Array(vec![
+                Response::Data(b"unsubscribe".to_vec()),
+                Response::Data(b"channel".to_vec()),
+                Response::Integer(0),
+            ])
+        );
     }
 
     #[test]
@@ -4686,102 +5635,162 @@ mod test_command {
         config.requirepass = Some("helloworld".to_owned());
         let mut db = Database::new(config);
         let mut client = Client::mock();
-        assert!(command(parser!(b"get key"), &mut db, &mut client).unwrap().is_error());
+        assert!(command(parser!(b"get key"), &mut db, &mut client)
+            .unwrap()
+            .is_error());
         assert_eq!(client.auth, false);
-        assert!(command(parser!(b"auth channel"), &mut db, &mut client).unwrap().is_error());
+        assert!(command(parser!(b"auth channel"), &mut db, &mut client)
+            .unwrap()
+            .is_error());
         assert_eq!(client.auth, false);
-        assert!(!command(parser!(b"auth helloworld"), &mut db, &mut client).unwrap().is_error());
+        assert!(!command(parser!(b"auth helloworld"), &mut db, &mut client)
+            .unwrap()
+            .is_error());
         assert_eq!(client.auth, true);
     }
 
     #[test]
     fn dump_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
-        assert!(db.get_or_create(0, &b"key".to_vec()).set(b"1".to_vec()).is_ok());
-        assert_eq!(command(parser!(b"dump key"), &mut db, &mut Client::mock()).unwrap(),
-                   Response::Data(b"\x00\xc0\x01\x07\x00\xd9J2E\xd9\xcb\xc4\xe6".to_vec()));
+        assert!(db
+            .get_or_create(0, &b"key".to_vec())
+            .set(b"1".to_vec())
+            .is_ok());
+        assert_eq!(
+            command(parser!(b"dump key"), &mut db, &mut Client::mock()).unwrap(),
+            Response::Data(b"\x00\xc0\x01\x07\x00\xd9J2E\xd9\xcb\xc4\xe6".to_vec())
+        );
     }
 
     #[test]
     fn keys_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
         let mut client = Client::mock();
-        assert!(db.get_or_create(0, &b"key1".to_vec()).set(b"value".to_vec()).is_ok());
-        assert!(db.get_or_create(0, &b"key2".to_vec()).set(b"value".to_vec()).is_ok());
-        assert!(db.get_or_create(0, &b"key3".to_vec()).set(b"value".to_vec()).is_ok());
+        assert!(db
+            .get_or_create(0, &b"key1".to_vec())
+            .set(b"value".to_vec())
+            .is_ok());
+        assert!(db
+            .get_or_create(0, &b"key2".to_vec())
+            .set(b"value".to_vec())
+            .is_ok());
+        assert!(db
+            .get_or_create(0, &b"key3".to_vec())
+            .set(b"value".to_vec())
+            .is_ok());
 
         match command(parser!(b"KEYS *"), &mut db, &mut client).unwrap() {
             Response::Array(resp) => assert_eq!(3, resp.len()),
             _ => panic!("Keys failed"),
         };
 
-        assert_eq!(command(parser!(b"KEYS key1"), &mut db, &mut client).unwrap(),
-                   Response::Array(vec![Response::Data(b"key1".to_vec())]));
-        assert_eq!(command(parser!(b"KEYS key[^23]"), &mut db, &mut client).unwrap(),
-                   Response::Array(vec![Response::Data(b"key1".to_vec())]));
-        assert_eq!(command(parser!(b"KEYS key[1]"), &mut db, &mut client).unwrap(),
-                   Response::Array(vec![Response::Data(b"key1".to_vec())]));
+        assert_eq!(
+            command(parser!(b"KEYS key1"), &mut db, &mut client).unwrap(),
+            Response::Array(vec![Response::Data(b"key1".to_vec())])
+        );
+        assert_eq!(
+            command(parser!(b"KEYS key[^23]"), &mut db, &mut client).unwrap(),
+            Response::Array(vec![Response::Data(b"key1".to_vec())])
+        );
+        assert_eq!(
+            command(parser!(b"KEYS key[1]"), &mut db, &mut client).unwrap(),
+            Response::Array(vec![Response::Data(b"key1".to_vec())])
+        );
     }
 
     #[test]
     fn multi_exec_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
         let mut client = Client::mock();
-        assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
+        assert!(db
+            .get_or_create(0, &b"key".to_vec())
+            .set(b"value".to_vec())
+            .is_ok());
 
-        assert_eq!(command(parser!(b"multi"), &mut db, &mut client).unwrap(),
-                   Response::Status("OK".to_owned()));
-        assert_eq!(command(parser!(b"append key 1"), &mut db, &mut client).unwrap(),
-                   Response::Status("QUEUED".to_owned()));
-        assert_eq!(command(parser!(b"get key"), &mut db, &mut client).unwrap(),
-                   Response::Status("QUEUED".to_owned()));
+        assert_eq!(
+            command(parser!(b"multi"), &mut db, &mut client).unwrap(),
+            Response::Status("OK".to_owned())
+        );
+        assert_eq!(
+            command(parser!(b"append key 1"), &mut db, &mut client).unwrap(),
+            Response::Status("QUEUED".to_owned())
+        );
+        assert_eq!(
+            command(parser!(b"get key"), &mut db, &mut client).unwrap(),
+            Response::Status("QUEUED".to_owned())
+        );
 
         // still has the old value
-        assert_eq!(db.get_or_create(0, &b"key".to_vec()).get().unwrap(),
-                   b"value".to_vec());
+        assert_eq!(
+            db.get_or_create(0, &b"key".to_vec()).get().unwrap(),
+            b"value".to_vec()
+        );
 
-        assert_eq!(command(parser!(b"EXEC"), &mut db, &mut client).unwrap(),
-                   Response::Array(vec![
-                    Response::Integer(6),
-                    Response::Data(b"value1".to_vec()),
-                    ]));
+        assert_eq!(
+            command(parser!(b"EXEC"), &mut db, &mut client).unwrap(),
+            Response::Array(vec![
+                Response::Integer(6),
+                Response::Data(b"value1".to_vec()),
+            ])
+        );
 
         // value is updated
-        assert_eq!(db.get_or_create(0, &b"key".to_vec()).get().unwrap(),
-                   b"value1".to_vec());
+        assert_eq!(
+            db.get_or_create(0, &b"key".to_vec()).get().unwrap(),
+            b"value1".to_vec()
+        );
 
         // multi status back to normal
-        assert_eq!(command(parser!(b"get key"), &mut db, &mut client).unwrap(),
-                   Response::Data(b"value1".to_vec()));
+        assert_eq!(
+            command(parser!(b"get key"), &mut db, &mut client).unwrap(),
+            Response::Data(b"value1".to_vec())
+        );
     }
 
     #[test]
     fn multi_discard_command() {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
         let mut client = Client::mock();
-        assert!(db.get_or_create(0, &b"key".to_vec()).set(b"value".to_vec()).is_ok());
+        assert!(db
+            .get_or_create(0, &b"key".to_vec())
+            .set(b"value".to_vec())
+            .is_ok());
 
-        assert_eq!(command(parser!(b"multi"), &mut db, &mut client).unwrap(),
-                   Response::Status("OK".to_owned()));
-        assert_eq!(command(parser!(b"append key 1"), &mut db, &mut client).unwrap(),
-                   Response::Status("QUEUED".to_owned()));
-        assert_eq!(command(parser!(b"get key"), &mut db, &mut client).unwrap(),
-                   Response::Status("QUEUED".to_owned()));
+        assert_eq!(
+            command(parser!(b"multi"), &mut db, &mut client).unwrap(),
+            Response::Status("OK".to_owned())
+        );
+        assert_eq!(
+            command(parser!(b"append key 1"), &mut db, &mut client).unwrap(),
+            Response::Status("QUEUED".to_owned())
+        );
+        assert_eq!(
+            command(parser!(b"get key"), &mut db, &mut client).unwrap(),
+            Response::Status("QUEUED".to_owned())
+        );
 
         // still has the old value
-        assert_eq!(db.get_or_create(0, &b"key".to_vec()).get().unwrap(),
-                   b"value".to_vec());
+        assert_eq!(
+            db.get_or_create(0, &b"key".to_vec()).get().unwrap(),
+            b"value".to_vec()
+        );
 
-        assert_eq!(command(parser!(b"DISCARD"), &mut db, &mut client).unwrap(),
-                   Response::Status("OK".to_owned()));
+        assert_eq!(
+            command(parser!(b"DISCARD"), &mut db, &mut client).unwrap(),
+            Response::Status("OK".to_owned())
+        );
 
         // still has the old value
-        assert_eq!(db.get_or_create(0, &b"key".to_vec()).get().unwrap(),
-                   b"value".to_vec());
+        assert_eq!(
+            db.get_or_create(0, &b"key".to_vec()).get().unwrap(),
+            b"value".to_vec()
+        );
 
         // multi status back to normal
-        assert_eq!(command(parser!(b"get key"), &mut db, &mut client).unwrap(),
-                   Response::Data(b"value".to_vec()));
+        assert_eq!(
+            command(parser!(b"get key"), &mut db, &mut client).unwrap(),
+            Response::Data(b"value".to_vec())
+        );
     }
 
     #[test]
@@ -4789,16 +5798,26 @@ mod test_command {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
         let mut client = Client::mock();
 
-        assert_eq!(command(parser!(b"watch key"), &mut db, &mut client).unwrap(),
-                   Response::Status("OK".to_owned()));
-        assert_eq!(command(parser!(b"set key 1"), &mut db, &mut client).unwrap(),
-                   Response::Status("OK".to_owned()));
-        assert_eq!(command(parser!(b"multi"), &mut db, &mut client).unwrap(),
-                   Response::Status("OK".to_owned()));
-        assert_eq!(command(parser!(b"get key"), &mut db, &mut client).unwrap(),
-                   Response::Status("QUEUED".to_owned()));
-        assert_eq!(command(parser!(b"exec"), &mut db, &mut client).unwrap(),
-                   Response::Nil);
+        assert_eq!(
+            command(parser!(b"watch key"), &mut db, &mut client).unwrap(),
+            Response::Status("OK".to_owned())
+        );
+        assert_eq!(
+            command(parser!(b"set key 1"), &mut db, &mut client).unwrap(),
+            Response::Status("OK".to_owned())
+        );
+        assert_eq!(
+            command(parser!(b"multi"), &mut db, &mut client).unwrap(),
+            Response::Status("OK".to_owned())
+        );
+        assert_eq!(
+            command(parser!(b"get key"), &mut db, &mut client).unwrap(),
+            Response::Status("QUEUED".to_owned())
+        );
+        assert_eq!(
+            command(parser!(b"exec"), &mut db, &mut client).unwrap(),
+            Response::Nil
+        );
     }
 
     #[test]
@@ -4806,18 +5825,26 @@ mod test_command {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
         let mut client = Client::mock();
 
-        assert_eq!(command(parser!(b"watch key"), &mut db, &mut client).unwrap(),
-                   Response::Status("OK".to_owned()));
-        assert_eq!(command(parser!(b"get key"), &mut db, &mut client).unwrap(),
-                   Response::Nil);
-        assert_eq!(command(parser!(b"multi"), &mut db, &mut client).unwrap(),
-                   Response::Status("OK".to_owned()));
-        assert_eq!(command(parser!(b"set key 1"), &mut db, &mut client).unwrap(),
-                   Response::Status("QUEUED".to_owned()));
-        assert_eq!(command(parser!(b"EXEC"), &mut db, &mut client).unwrap(),
-                   Response::Array(vec![
-                    Response::Status("OK".to_owned()),
-                    ]));
+        assert_eq!(
+            command(parser!(b"watch key"), &mut db, &mut client).unwrap(),
+            Response::Status("OK".to_owned())
+        );
+        assert_eq!(
+            command(parser!(b"get key"), &mut db, &mut client).unwrap(),
+            Response::Nil
+        );
+        assert_eq!(
+            command(parser!(b"multi"), &mut db, &mut client).unwrap(),
+            Response::Status("OK".to_owned())
+        );
+        assert_eq!(
+            command(parser!(b"set key 1"), &mut db, &mut client).unwrap(),
+            Response::Status("QUEUED".to_owned())
+        );
+        assert_eq!(
+            command(parser!(b"EXEC"), &mut db, &mut client).unwrap(),
+            Response::Array(vec![Response::Status("OK".to_owned()),])
+        );
     }
 
     #[test]
@@ -4825,20 +5852,30 @@ mod test_command {
         let mut db = Database::new(Config::new(Logger::new(Level::Warning)));
         let mut client = Client::mock();
 
-        assert_eq!(command(parser!(b"watch key"), &mut db, &mut client).unwrap(),
-                   Response::Status("OK".to_owned()));
-        assert_eq!(command(parser!(b"set key 1"), &mut db, &mut client).unwrap(),
-                   Response::Status("OK".to_owned()));
-        assert_eq!(command(parser!(b"unwatch"), &mut db, &mut client).unwrap(),
-                   Response::Status("OK".to_owned()));
-        assert_eq!(command(parser!(b"multi"), &mut db, &mut client).unwrap(),
-                   Response::Status("OK".to_owned()));
-        assert_eq!(command(parser!(b"get key"), &mut db, &mut client).unwrap(),
-                   Response::Status("QUEUED".to_owned()));
-        assert_eq!(command(parser!(b"EXEC"), &mut db, &mut client).unwrap(),
-                   Response::Array(vec![
-                    Response::Data(b"1".to_vec()),
-                    ]));
+        assert_eq!(
+            command(parser!(b"watch key"), &mut db, &mut client).unwrap(),
+            Response::Status("OK".to_owned())
+        );
+        assert_eq!(
+            command(parser!(b"set key 1"), &mut db, &mut client).unwrap(),
+            Response::Status("OK".to_owned())
+        );
+        assert_eq!(
+            command(parser!(b"unwatch"), &mut db, &mut client).unwrap(),
+            Response::Status("OK".to_owned())
+        );
+        assert_eq!(
+            command(parser!(b"multi"), &mut db, &mut client).unwrap(),
+            Response::Status("OK".to_owned())
+        );
+        assert_eq!(
+            command(parser!(b"get key"), &mut db, &mut client).unwrap(),
+            Response::Status("QUEUED".to_owned())
+        );
+        assert_eq!(
+            command(parser!(b"EXEC"), &mut db, &mut client).unwrap(),
+            Response::Array(vec![Response::Data(b"1".to_vec()),])
+        );
     }
 
     #[test]
@@ -4847,12 +5884,18 @@ mod test_command {
         let (tx, rx) = channel();
         let mut client1 = Client::new(tx, 0);
         let mut client2 = Client::mock();
-        assert_eq!(command(parser!(b"monitor"), &mut db, &mut client1).unwrap(),
-                   Response::Status("OK".to_owned()));
-        assert_eq!(command(parser!(b"get key"), &mut db, &mut client2).unwrap(),
-                   Response::Nil);
-        assert_eq!(rx.recv().unwrap(),
-                   Some(Response::Status("\"get\" \"key\" ".to_owned())));
+        assert_eq!(
+            command(parser!(b"monitor"), &mut db, &mut client1).unwrap(),
+            Response::Status("OK".to_owned())
+        );
+        assert_eq!(
+            command(parser!(b"get key"), &mut db, &mut client2).unwrap(),
+            Response::Nil
+        );
+        assert_eq!(
+            rx.recv().unwrap(),
+            Some(Response::Status("\"get\" \"key\" ".to_owned()))
+        );
         assert!(rx.try_recv().is_err());
     }
 

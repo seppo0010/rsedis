@@ -6,7 +6,7 @@ use basichll::HLL;
 use dbutil::normalize_position;
 use error::OperationError;
 use rdbutil::constants::*;
-use rdbutil::{EncodeError, encode_i64, encode_slice_u8};
+use rdbutil::{encode_i64, encode_slice_u8, EncodeError};
 
 const HLL_ERROR: f64 = 0.0019;
 
@@ -79,15 +79,14 @@ impl ValueString {
     pub fn incr(&mut self, incr: i64) -> Result<i64, OperationError> {
         let val = match *self {
             ValueString::Integer(i) => i,
-            ValueString::Data(ref data) => {
-                match to_i64(data) {
-                    Some(i) => i,
-                    None => {
-                        return Err(OperationError::ValueError("ERR value is not a valid integer"
-                            .to_owned()))
-                    }
+            ValueString::Data(ref data) => match to_i64(data) {
+                Some(i) => i,
+                None => {
+                    return Err(OperationError::ValueError(
+                        "ERR value is not a valid integer".to_owned(),
+                    ))
                 }
-            }
+            },
         };
         let newval = try!(val.checked_add(incr).ok_or(OperationError::OverflowError));
         *self = ValueString::Integer(newval.clone());
@@ -97,15 +96,14 @@ impl ValueString {
     pub fn incrbyfloat(&mut self, incr: f64) -> Result<f64, OperationError> {
         let val = match *self {
             ValueString::Integer(i) => i as f64,
-            ValueString::Data(ref data) => {
-                match to_f64(data) {
-                    Some(f) => f,
-                    None => {
-                        return Err(OperationError::ValueError("ERR value is not a valid float"
-                            .to_owned()))
-                    }
+            ValueString::Data(ref data) => match to_f64(data) {
+                Some(f) => f,
+                None => {
+                    return Err(OperationError::ValueError(
+                        "ERR value is not a valid float".to_owned(),
+                    ))
                 }
-            }
+            },
         };
         let newval = val + incr;
         *self = ValueString::Data(format!("{}", newval).into_bytes());
@@ -154,7 +152,7 @@ impl ValueString {
             ValueString::Integer(i) => *self = ValueString::Data(format!("{}", i).into_bytes()),
             ValueString::Data(_) => (),
         };
-        let mut d = match *self {
+        let d = match *self {
             ValueString::Data(ref mut d) => d,
             _ => panic!("Value should be data"),
         };
@@ -207,7 +205,7 @@ impl ValueString {
             ValueString::Data(_) => (),
         }
 
-        let mut d = match self {
+        let d = match self {
             &mut ValueString::Data(ref mut s) => s,
             _ => panic!("String must be data"),
         };
@@ -269,26 +267,24 @@ impl ValueString {
     pub fn dump<T: Write>(&self, writer: &mut T) -> io::Result<usize> {
         let mut v = vec![];
         match *self {
-            ValueString::Integer(ref i) => {
-                match encode_i64(i.clone(), &mut v) {
-                    Ok(s) => s,
-                    Err(e) => {
-                        match e {
-                            EncodeError::IOError(e) => return Err(e),
-                            EncodeError::OverflowError => {
-                                try!(encode_slice_u8(&*self.to_vec(), &mut v, false))
-                            }
-                        }
+            ValueString::Integer(ref i) => match encode_i64(i.clone(), &mut v) {
+                Ok(s) => s,
+                Err(e) => match e {
+                    EncodeError::IOError(e) => return Err(e),
+                    EncodeError::OverflowError => {
+                        try!(encode_slice_u8(&*self.to_vec(), &mut v, false))
                     }
-                }
-            }
+                },
+            },
             ValueString::Data(ref d) => try!(encode_slice_u8(&*d, &mut v, true)),
         };
-        let data = [vec![TYPE_STRING],
-                    v,
-                    vec![(VERSION & 0xff) as u8],
-                    vec![((VERSION >> 8) & 0xff) as u8]]
-            .concat();
+        let data = [
+            vec![TYPE_STRING],
+            v,
+            vec![(VERSION & 0xff) as u8],
+            vec![((VERSION >> 8) & 0xff) as u8],
+        ]
+        .concat();
         writer.write(&*data)
     }
 
@@ -299,11 +295,12 @@ impl ValueString {
             ValueString::Integer(_) => "int",
             ValueString::Data(_) => "raw",
         };
-        format!("Value at:0x0000000000 refcount:1 encoding:{} serializedlength:{} lru:0 \
-                 lru_seconds_idle:0",
-                encoding,
-                serialized)
-            .to_owned()
+        format!(
+            "Value at:0x0000000000 refcount:1 encoding:{} serializedlength:{} lru:0 \
+             lru_seconds_idle:0",
+            encoding, serialized
+        )
+        .to_owned()
     }
 }
 
@@ -330,7 +327,9 @@ mod test_rdb {
     #[test]
     fn dump_string() {
         let mut v = vec![];
-        ValueString::Data(b"hello world".to_vec()).dump(&mut v).unwrap();
+        ValueString::Data(b"hello world".to_vec())
+            .dump(&mut v)
+            .unwrap();
         assert_eq!(&*v, b"\x00\x0bhello world\x07\x00");
     }
 }

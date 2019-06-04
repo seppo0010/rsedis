@@ -1,19 +1,13 @@
-extern crate rsedis;
-extern crate config;
-extern crate logger;
-extern crate networking;
-extern crate compat;
-
-mod release;
+pub mod release;
 
 use std::env::args;
 use std::process::exit;
 
+use crate::release::*;
 use compat::getpid;
 use config::Config;
+use logger::{Level, Logger};
 use networking::Server;
-use logger::{Logger, Level};
-use release::*;
 
 fn main() {
     let mut config = Config::new(Logger::new(Level::Notice));
@@ -22,7 +16,7 @@ fn main() {
             Ok(_) => (),
             Err(_) => {
                 exit(1);
-            },
+            }
         },
         None => (),
     }

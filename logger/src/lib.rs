@@ -1,16 +1,14 @@
 #[cfg(unix)]
 extern crate syslog;
 
-#[cfg(unix)]
-use std::ascii::AsciiExt;
-use std::io;
-use std::io::{Write, stderr, stdout};
-use std::iter::FromIterator;
-use std::fs::{File, OpenOptions};
 use std::fmt::{Debug, Error, Formatter};
+use std::fs::{File, OpenOptions};
+use std::io;
+use std::io::{stderr, stdout, Write};
+use std::iter::FromIterator;
 use std::path::Path;
 use std::process;
-use std::sync::mpsc::{Sender, channel};
+use std::sync::mpsc::{channel, Sender};
 use std::thread;
 
 /// Macro to log a message. Uses the `format!` syntax.
@@ -120,10 +118,14 @@ impl Clone for Output {
             Output::Channel(ref v) => Output::Channel(v.clone()),
             Output::Stderr => Output::Stderr,
             Output::Stdout => Output::Stdout,
-            Output::File(_, ref path) => {
-                Output::File(OpenOptions::new().write(true).create(true).open(path).unwrap(),
-                             path.clone())
-            }
+            Output::File(_, ref path) => Output::File(
+                OpenOptions::new()
+                    .write(true)
+                    .create(true)
+                    .open(path)
+                    .unwrap(),
+                path.clone(),
+            ),
         }
     }
 }
@@ -171,11 +173,13 @@ pub struct Logger {
     /// To log a message send `(None, Some(Level), Some(String), None)` where the
     /// level is the message level
     /// If the last parameter is not none, it will exit the process with that exit code
-    tx: Sender<(Option<Output>,
-                    Option<Level>,
-                    Option<String>,
-                    Option<Option<Box<syslog::Logger>>>,
-                    Option<i32>)>,
+    tx: Sender<(
+        Option<Output>,
+        Option<Level>,
+        Option<String>,
+        Option<Option<Box<syslog::Logger>>>,
+        Option<i32>,
+    )>,
 }
 
 #[derive(Clone)]
@@ -186,18 +190,26 @@ pub struct Logger {
     /// To change the Level target, send `(None, Some(Level), None, None)`
     /// To log a message send `(None, Some(Level), Some(String), None)` where the
     /// level is the message level
-    tx: Sender<(Option<Output>, Option<Level>, Option<String>, Option<()>, Option<i32>)>,
+    tx: Sender<(
+        Option<Output>,
+        Option<Level>,
+        Option<String>,
+        Option<()>,
+        Option<i32>,
+    )>,
 }
 
 impl Logger {
     /// Creates a new `Logger` for a given `Output` and severity `Level`.
     #[cfg(unix)]
     fn create(level: Level, output: Output) -> Logger {
-        let (tx, rx) = channel::<(Option<Output>,
-                                  Option<Level>,
-                                  Option<String>,
-                                  Option<Option<Box<syslog::Logger>>>,
-                                  Option<i32>)>();
+        let (tx, rx) = channel::<(
+            Option<Output>,
+            Option<Level>,
+            Option<String>,
+            Option<Option<Box<syslog::Logger>>>,
+            Option<i32>,
+        )>();
         {
             let mut level = level;
             let mut output = output;
@@ -221,15 +233,15 @@ impl Logger {
                                 }
                             };
                             if let Some(ref mut w) = syslog_writer {
-                                match w.send_3164(match lvl {
-                                                      Level::Debug => syslog::Severity::LOG_DEBUG,
-                                                      Level::Verbose => syslog::Severity::LOG_INFO,
-                                                      Level::Notice => syslog::Severity::LOG_NOTICE,
-                                                      Level::Warning => {
-                                                          syslog::Severity::LOG_WARNING
-                                                      }
-                                                  },
-                                                  msg.clone()) {
+                                match w.send_3164(
+                                    match lvl {
+                                        Level::Debug => syslog::Severity::LOG_DEBUG,
+                                        Level::Verbose => syslog::Severity::LOG_INFO,
+                                        Level::Notice => syslog::Severity::LOG_NOTICE,
+                                        Level::Warning => syslog::Severity::LOG_WARNING,
+                                    },
+                                    msg.clone(),
+                                ) {
                                     Ok(_) => (),
                                     Err(e) => {
                                         // failing to log a message... will write straight to stderr
@@ -246,8 +258,10 @@ impl Logger {
                     } else if _syslog_writer.is_some() {
                         syslog_writer = _syslog_writer.unwrap();
                     } else {
-                        panic!("Unknown message {:?}",
-                               (_output, _level, _msg, _syslog_writer.is_some()));
+                        panic!(
+                            "Unknown message {:?}",
+                            (_output, _level, _msg, _syslog_writer.is_some())
+                        );
                     }
                     if let Some(code) = _code {
                         process::exit(code);
@@ -261,8 +275,13 @@ impl Logger {
 
     #[cfg(not(unix))]
     fn create(level: Level, output: Output) -> Logger {
-        let (tx, rx) =
-            channel::<(Option<Output>, Option<Level>, Option<String>, Option<()>, Option<i32>)>();
+        let (tx, rx) = channel::<(
+            Option<Output>,
+            Option<Level>,
+            Option<String>,
+            Option<()>,
+            Option<i32>,
+        )>();
         {
             let mut level = level;
             let mut output = output;
@@ -346,8 +365,10 @@ impl Logger {
 
     /// Creates a new logger that writes in a file.
     pub fn file(level: Level, path: &str) -> io::Result<Self> {
-        Ok(Self::create(level,
-                        Output::File(try!(File::create(Path::new(path))), path.to_owned())))
+        Ok(Self::create(
+            level,
+            Output::File(try!(File::create(Path::new(path))), path.to_owned()),
+        ))
     }
 
     /// Disables syslog
@@ -363,19 +384,21 @@ impl Logger {
     #[cfg(unix)]
     pub fn set_syslog(&mut self, ident: &String, facility: &String) {
         let mut w = syslog::unix(match &*(&*facility.clone()).to_ascii_lowercase() {
-                "local0" => syslog::Facility::LOG_LOCAL0,
-                "local1" => syslog::Facility::LOG_LOCAL1,
-                "local2" => syslog::Facility::LOG_LOCAL2,
-                "local3" => syslog::Facility::LOG_LOCAL3,
-                "local4" => syslog::Facility::LOG_LOCAL4,
-                "local5" => syslog::Facility::LOG_LOCAL5,
-                "local6" => syslog::Facility::LOG_LOCAL6,
-                "local7" => syslog::Facility::LOG_LOCAL7,
-                _ => syslog::Facility::LOG_USER,
-            })
-            .unwrap();
+            "local0" => syslog::Facility::LOG_LOCAL0,
+            "local1" => syslog::Facility::LOG_LOCAL1,
+            "local2" => syslog::Facility::LOG_LOCAL2,
+            "local3" => syslog::Facility::LOG_LOCAL3,
+            "local4" => syslog::Facility::LOG_LOCAL4,
+            "local5" => syslog::Facility::LOG_LOCAL5,
+            "local6" => syslog::Facility::LOG_LOCAL6,
+            "local7" => syslog::Facility::LOG_LOCAL7,
+            _ => syslog::Facility::LOG_USER,
+        })
+        .unwrap();
         w.set_process_name(ident.clone());
-        self.tx.send((None, None, None, Some(Some(w)), None)).unwrap();
+        self.tx
+            .send((None, None, None, Some(Some(w)), None))
+            .unwrap();
     }
 
     #[cfg(not(unix))]
@@ -397,24 +420,24 @@ impl Logger {
     pub fn sender(&self) -> Sender<(Level, String)> {
         let (tx, rx) = channel();
         let tx2 = self.tx.clone();
-        thread::spawn(move || {
-            loop {
-                let (level, message) = match rx.recv() {
-                    Ok(msg) => msg,
-                    Err(_) => break,
-                };
-                match tx2.send((None, Some(level), Some(message), None, None)) {
-                    Ok(_) => (),
-                    Err(_) => break,
-                };
-            }
+        thread::spawn(move || loop {
+            let (level, message) = match rx.recv() {
+                Ok(msg) => msg,
+                Err(_) => break,
+            };
+            match tx2.send((None, Some(level), Some(message), None, None)) {
+                Ok(_) => (),
+                Err(_) => break,
+            };
         });
         tx
     }
 
     /// Logs a message with a log level.
     pub fn log(&self, level: Level, msg: String, code: Option<i32>) {
-        self.tx.send((None, Some(level), Some(msg), None, code)).unwrap();
+        self.tx
+            .send((None, Some(level), Some(msg), None, code))
+            .unwrap();
     }
 }
 
@@ -422,8 +445,8 @@ unsafe impl Sync for Logger {}
 
 #[cfg(test)]
 mod test_log {
-    use super::{Logger, Level};
-    use std::sync::mpsc::{TryRecvError, channel};
+    use super::{Level, Logger};
+    use std::sync::mpsc::{channel, TryRecvError};
 
     #[test]
     fn log_levels() {
@@ -477,7 +500,9 @@ mod test_log {
         let (tx, rx) = channel();
         let logger = Logger::channel(Level::Debug, tx);
         let sender = logger.sender();
-        sender.send((Level::Debug, "hello world".to_owned())).unwrap();
+        sender
+            .send((Level::Debug, "hello world".to_owned()))
+            .unwrap();
         assert_eq!(rx.recv().unwrap(), b"hello world\n");
     }
 }

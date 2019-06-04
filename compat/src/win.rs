@@ -5,5 +5,9 @@ pub fn getpid() -> u32 {
 }
 
 pub fn getos() -> (String, String, String) {
-    ("Windows".to_owned(), "Unknown".to_owned(), "Unknown".to_owned())
+    (
+        "Windows".to_owned(),
+        "Unknown".to_owned(),
+        "Unknown".to_owned(),
+    )
 }

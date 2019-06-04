@@ -1,4 +1,3 @@
-#![feature(collections_bound)]
 extern crate util;
 
 use std::collections::Bound;
@@ -6,7 +5,7 @@ use std::error::Error;
 use std::f64::{INFINITY, NEG_INFINITY};
 use std::fmt;
 use std::iter;
-use std::num::{ParseIntError, ParseFloatError};
+use std::num::{ParseFloatError, ParseIntError};
 use std::str::{from_utf8, Utf8Error};
 
 use util::format_repr;
@@ -127,7 +126,6 @@ impl<'a> ParsedCommand<'a> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(collections_bound)]
     /// # use std::collections::Bound;
     /// # use parser::{ParsedCommand, Argument};
     /// let parser = ParsedCommand::new(b"+inf", vec![Argument { pos: 0, len: 4 }]);
@@ -135,7 +133,6 @@ impl<'a> ParsedCommand<'a> {
     /// ```
     ///
     /// ```
-    /// # #![feature(collections_bound)]
     /// # use std::collections::Bound;
     /// # use parser::{ParsedCommand, Argument};
     /// let parser = ParsedCommand::new(b"1.23", vec![Argument { pos: 0, len: 4 }]);
@@ -143,7 +140,6 @@ impl<'a> ParsedCommand<'a> {
     /// ```
     ///
     /// ```
-    /// # #![feature(collections_bound)]
     /// # use std::collections::Bound;
     /// # use parser::{ParsedCommand, Argument};
     /// let parser = ParsedCommand::new(b"(1.23", vec![Argument { pos: 0, len: 5 }]);
@@ -310,8 +306,10 @@ fn parse_int(input: &[u8], len: usize, name: &str) -> Result<(Option<usize>, usi
         return Err(ParseError::Incomplete);
     }
     if input[i] as char != '\n' {
-        return Err(ParseError::BadProtocol(format!("expected \\r\\n separator, got \\r{}",
-                                                   input[i] as char)));
+        return Err(ParseError::BadProtocol(format!(
+            "expected \\r\\n separator, got \\r{}",
+            input[i] as char
+        )));
     }
     return Ok((argco, i + 1));
 }
@@ -334,9 +332,11 @@ pub fn parse(input: &[u8]) -> Result<(ParsedCommand, usize), ParseError> {
     while input.len() > pos && input[pos] as char == '\r' {
         if pos + 1 < input.len() {
             if input[pos + 1] as char != '\n' {
-                return Err(ParseError::BadProtocol(format!("expected \\r\\n separator, got \
-                                                            \\r{}",
-                                                           input[pos + 1] as char)));
+                return Err(ParseError::BadProtocol(format!(
+                    "expected \\r\\n separator, got \
+                     \\r{}",
+                    input[pos + 1] as char
+                )));
             }
             pos += 2;
         } else {
@@ -347,7 +347,10 @@ pub fn parse(input: &[u8]) -> Result<(ParsedCommand, usize), ParseError> {
         return Err(ParseError::Incomplete);
     }
     if input[pos] as char != '*' {
-        return Err(ParseError::BadProtocol(format!("expected '*', got '{}'", input[pos] as char)));
+        return Err(ParseError::BadProtocol(format!(
+            "expected '*', got '{}'",
+            input[pos] as char
+        )));
     }
     pos += 1;
     let len = input.len();
@@ -358,7 +361,9 @@ pub fn parse(input: &[u8]) -> Result<(ParsedCommand, usize), ParseError> {
     };
     pos += intlen;
     if argc > 1024 * 1024 {
-        return Err(ParseError::BadProtocol("invalid multibulk length".to_owned()));
+        return Err(ParseError::BadProtocol(
+            "invalid multibulk length".to_owned(),
+        ));
     }
     let mut argv = Vec::new();
     for i in 0..argc {
@@ -366,8 +371,10 @@ pub fn parse(input: &[u8]) -> Result<(ParsedCommand, usize), ParseError> {
             return Err(ParseError::Incomplete);
         }
         if input[pos] as char != '$' {
-            return Err(ParseError::BadProtocol(format!("expected '$', got '{}'",
-                                                       input[pos] as char)));
+            return Err(ParseError::BadProtocol(format!(
+                "expected '$', got '{}'",
+                input[pos] as char
+            )));
         }
         pos += 1;
         let (argleno, arglenlen) = try!(parse_int(&input[pos..len], len - pos, "bulk"));
@@ -391,7 +398,6 @@ pub fn parse(input: &[u8]) -> Result<(ParsedCommand, usize), ParseError> {
     }
     Ok((ParsedCommand::new(input, argv), pos))
 }
-
 
 /// A stream parser
 pub struct Parser {
@@ -586,7 +592,9 @@ mod test_parser {
             let mut v = parser.get_mut();
             v.extend(&*message.to_vec());
         }
-        assert_eq!(format!("{:?}", parser),
-                   "Parser: \"*2\\r\\n$3\\r\\n\\x01\\x00\\b\\r\\n$4\\r\\n\\xffarz\\r\\n\"");
+        assert_eq!(
+            format!("{:?}", parser),
+            "Parser: \"*2\\r\\n$3\\r\\n\\x01\\x00\\b\\r\\n$4\\r\\n\\xffarz\\r\\n\""
+        );
     }
 }

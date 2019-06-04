@@ -1,19 +1,18 @@
 // Taken from nix
 
-use std::mem;
 use libc::c_char;
 use std::ffi::CStr;
+use std::mem;
 use std::str::from_utf8_unchecked;
 
 mod ffi {
-    use libc::c_int;
     use super::UtsName;
+    use libc::c_int;
 
     extern "C" {
         pub fn uname(buf: *mut UtsName) -> c_int;
     }
 }
-
 
 #[cfg(target_os = "linux")]
 const UTSNAME_LEN: usize = 65;

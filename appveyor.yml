@@ -3,7 +3,7 @@ install:
 
 environment:
   matrix:
-    - RUST_VERSION: nightly
+    - RUST_VERSION: stable
 
 build: false
 
