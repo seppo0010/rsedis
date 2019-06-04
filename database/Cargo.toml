@@ -9,7 +9,7 @@ rand = "0.3"
 rehashinghashmap = "0.1.0"
 
 [dependencies.skiplist]
-path = "../skiplist"
+git = "https://github.com/rust-redis/rust-skiplist.git"
 features = ["unstable"]
 
 [dependencies.basichll]
