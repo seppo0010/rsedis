@@ -8,7 +8,7 @@ pub mod utsname;
 pub use unix::*;
 
 #[cfg(windows)]
-extern crate kernel32;
+extern crate winapi;
 #[cfg(windows)]
 pub mod win;
 #[cfg(windows)]

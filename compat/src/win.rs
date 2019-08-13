@@ -1,4 +1,4 @@
-use kernel32::GetCurrentProcessId;
+use winapi::um::processthreadsapi::GetCurrentProcessId;
 
 pub fn getpid() -> u32 {
     unsafe { GetCurrentProcessId() as u32 }
