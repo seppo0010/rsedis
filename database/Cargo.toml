@@ -9,12 +9,9 @@ rand = "0.3"
 rehashinghashmap = "0.1.0"
 
 [dependencies.skiplist]
-git = "https://github.com/rust-redis/rust-skiplist.git"
-
+skiplist = "0.3.0"
 [dependencies.basichll]
-branch = "new-features"
-git = "https://github.com/seppo0010/hll.rs.git"
-
+basichll = "0.3.1"
 [dependencies.config]
 path = "../config"
 

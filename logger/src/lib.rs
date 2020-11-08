@@ -367,7 +367,7 @@ impl Logger {
     pub fn file(level: Level, path: &str) -> io::Result<Self> {
         Ok(Self::create(
             level,
-            Output::File(try!(File::create(Path::new(path))), path.to_owned()),
+            Output::File(File::create(Path::new(path))?, path.to_owned()),
         ))
     }
 
@@ -406,7 +406,7 @@ impl Logger {
 
     /// Changes the output to be a file in `path`.
     pub fn set_logfile(&mut self, path: &str) -> io::Result<()> {
-        let file = Output::File(try!(File::create(Path::new(path))), path.to_owned());
+        let file = Output::File(File::create(Path::new(path))?, path.to_owned());
         self.tx.send((Some(file), None, None, None, None)).unwrap();
         Ok(())
     }

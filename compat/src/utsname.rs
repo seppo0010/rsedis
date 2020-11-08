@@ -63,7 +63,7 @@ impl UtsName {
 
 pub fn uname() -> UtsName {
     unsafe {
-        let mut ret: UtsName = mem::uninitialized();
+        let mut ret: UtsName = mem::MaybeUninit::uninit().assume_init();
         ffi::uname(&mut ret as *mut UtsName);
         ret
     }

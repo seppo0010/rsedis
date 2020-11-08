@@ -17,7 +17,7 @@ pub enum OperationError {
 
 impl fmt::Display for OperationError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.description().fmt(f)
+        self.to_string().fmt(f)
     }
 }
 

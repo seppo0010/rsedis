@@ -23,9 +23,9 @@ use time::get_time;
 pub fn match_char(e1: &u8, e2: &u8, ignore_case: bool) -> bool {
     if ignore_case {
         // FIXME: redis uses tolower() which is locale aware
-        return e1.to_ascii_lowercase() == e2.to_ascii_lowercase();
+        e1.to_ascii_lowercase() == e2.to_ascii_lowercase()
     } else {
-        return e1 == e2;
+        e1 == e2
     }
 }
 
@@ -127,11 +127,10 @@ pub fn glob_match(pattern: &Vec<u8>, element: &Vec<u8>, ignore_case: bool) -> bo
                         if c >= start && c <= end {
                             matched = true;
                         }
-                    } else {
-                        if match_char(&pattern[patternpos], &element[elementpos], ignore_case) {
+                    } else if match_char(&pattern[patternpos], &element[elementpos], ignore_case) {
                             matched = true;
-                        }
                     }
+                    
                     patternpos += 1;
                 }
                 if not {
@@ -163,10 +162,7 @@ pub fn glob_match(pattern: &Vec<u8>, element: &Vec<u8>, ignore_case: bool) -> bo
         }
     }
 
-    if patternpos == pattern.len() && elementpos == element.len() {
-        return true;
-    }
-    return false;
+    patternpos == pattern.len() && elementpos == element.len()
 }
 
 /// Current timestamp in microseconds
@@ -298,20 +294,20 @@ fn is_print(c: char) -> bool {
     unsafe { libc::funcs::c95::ctype::isprint(c as c_int) != 0 }
 }
 pub fn format_repr(f: &mut fmt::Formatter, s: &[u8]) -> Result<(), fmt::Error> {
-    try!(f.write_str("\""));
+    f.write_str("\"")?;
     for c in s {
         match *c {
             0x07 => {
-                try!(f.write_str("\\a"));
+                f.write_str("\\a")?;
                 continue;
             }
             0x08 => {
-                try!(f.write_str("\\b"));
+                f.write_str("\\b")?;
                 continue;
             }
             _ => (),
         };
-        try!(match *c as char {
+        match *c as char {
             '\\' => f.write_str("\\\\"),
             '\"' => f.write_str("\\\""),
             '\n' => f.write_str("\\n"),
@@ -324,7 +320,7 @@ pub fn format_repr(f: &mut fmt::Formatter, s: &[u8]) -> Result<(), fmt::Error> {
                     write!(f, "\\x{:02x}", x as u8)
                 }
             }
-        })
+        }?
     }
     f.write_str("\"")
 }

@@ -30,7 +30,7 @@ impl From<io::Error> for EncodeError {
 // numbers.
 // For now, the caller will have to explicitely cast or implement a wrapper function
 pub fn encode_i64<W: io::Write>(value: i64, enc: &mut W) -> Result<usize, EncodeError> {
-    Ok(try!(if value >= -(1 << 7) && value <= (1 << 7) - 1 {
+    Ok(if value >= -(1 << 7) && value <= (1 << 7) - 1 {
         enc.write(&[(ENCVAL << 6) | ENC_INT8, (value & 0xFF) as u8])
     } else if value >= -(1 << 15) && value <= (1 << 15) - 1 {
         enc.write(&[
@@ -48,7 +48,7 @@ pub fn encode_i64<W: io::Write>(value: i64, enc: &mut W) -> Result<usize, Encode
         ])
     } else {
         return Err(EncodeError::OverflowError);
-    }))
+    }?)
 }
 
 pub fn encode_u8<W: io::Write>(value: u8, enc: &mut W) -> Result<usize, EncodeError> {
@@ -79,27 +79,27 @@ pub fn encode_usize<W: io::Write>(value: usize, enc: &mut W) -> Result<usize, En
     if value > i64::MAX as usize {
         return Err(EncodeError::OverflowError);
     }
-    Ok(try!(encode_i64(value as i64, enc)))
+    Ok(encode_i64(value as i64, enc)?)
 }
 
 pub fn encode_u16_to_slice_u8<W: io::Write>(value: u16, enc: &mut W) -> Result<usize, EncodeError> {
-    Ok(try!(enc.write(&[
+    Ok(enc.write(&[
         (value & 0xFF) as u8,
         ((value >> 8) & 0xFF) as u8,
-    ])))
+    ])?)
 }
 
 pub fn encode_u32_to_slice_u8<W: io::Write>(value: u32, enc: &mut W) -> Result<usize, EncodeError> {
-    Ok(try!(enc.write(&[
+    Ok(enc.write(&[
         (value & 0xFF) as u8,
         ((value >> 8) & 0xFF) as u8,
         ((value >> 16) & 0xFF) as u8,
         ((value >> 24) & 0xFF) as u8,
-    ])))
+    ])?)
 }
 
 pub fn encode_u64_to_slice_u8<W: io::Write>(value: u64, enc: &mut W) -> Result<usize, EncodeError> {
-    Ok(try!(enc.write(&[
+    Ok(enc.write(&[
         (value & 0xFF) as u8,
         ((value >> 8) & 0xFF) as u8,
         ((value >> 16) & 0xFF) as u8,
@@ -108,7 +108,7 @@ pub fn encode_u64_to_slice_u8<W: io::Write>(value: u64, enc: &mut W) -> Result<u
         ((value >> 40) & 0xFF) as u8,
         ((value >> 48) & 0xFF) as u8,
         ((value >> 56) & 0xFF) as u8,
-    ])))
+    ])?)
 }
 
 pub fn encode_len<W: io::Write>(len: usize, enc: &mut W) -> Result<usize, EncodeError> {
@@ -117,15 +117,15 @@ pub fn encode_len<W: io::Write>(len: usize, enc: &mut W) -> Result<usize, Encode
     }
 
     if len < (1 << 6) {
-        Ok(try!(enc.write(&[((len & 0xFF) as u8) | (BITLEN6 << 6)])))
+        Ok(enc.write(&[((len & 0xFF) as u8) | (BITLEN6 << 6)])?)
     } else if len < (1 << 14) {
-        Ok(try!(enc.write(&[
+        Ok(enc.write(&[
             (((len >> 8) as u8) & 0xFF) | (BITLEN14 << 6),
             (len & 0xFF) as u8,
-        ])))
+        ])?)
     } else {
-        let mut s = try!(enc.write(&[BITLEN32 << 6]));
-        s += try!(enc.write(&htonl(len as u32)));
+        let mut s = enc.write(&[BITLEN32 << 6])?;
+        s += enc.write(&htonl(len as u32))?;
         Ok(s)
     }
 }
@@ -148,7 +148,7 @@ pub fn encode_slice_u8<W: io::Write>(
     // TODO: lzf compression
 
     let mut len = encode_len(data.len(), enc).unwrap();
-    len += try!(enc.write(data));
+    len += enc.write(data)?;
     Ok(len)
 }
 

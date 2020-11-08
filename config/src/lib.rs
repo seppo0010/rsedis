@@ -57,7 +57,7 @@ fn read_string(args: Vec<Vec<u8>>) -> Result<String, ConfigError> {
     if args.len() != 2 {
         Err(ConfigError::InvalidFormat)
     } else {
-        Ok(try!(from_utf8(&*args[1])).to_owned())
+        Ok(from_utf8(&*args[1])?.to_owned())
     }
 }
 
@@ -65,7 +65,7 @@ fn read_parse<T>(args: Vec<Vec<u8>>) -> Result<T, ConfigError>
 where
     T: FromStr,
 {
-    let s = try!(read_string(args));
+    let s = read_string(args)?;
     match s.parse() {
         Ok(f) => Ok(f),
         Err(_) => Err(ConfigError::InvalidParameter),
@@ -73,7 +73,7 @@ where
 }
 
 fn read_bool(args: Vec<Vec<u8>>) -> Result<bool, ConfigError> {
-    Ok(match &*try!(read_string(args)) {
+    Ok(match &*read_string(args)? {
         "yes" => true,
         "no" => false,
         _ => return Err(ConfigError::InvalidFormat),
@@ -129,9 +129,9 @@ impl Config {
             }
         });
         for line_iter in file.lines() {
-            let lline = try!(line_iter);
+            let lline = line_iter?;
             let line = lline.trim();
-            if line.starts_with("#") {
+            if line.starts_with('#') {
                 continue;
             }
 
@@ -140,40 +140,40 @@ impl Config {
                 Err(_) => return Err(ConfigError::InvalidFormat),
             };
 
-            if args.len() == 0 {
+            if args.is_empty() {
                 continue;
             }
 
             match &*args[0] {
                 b"bind" => {
                     self.bind
-                        .extend(args[1..].iter().filter(|x| x.len() > 0).map(|x| {
+                        .extend(args[1..].iter().filter(|x| !x.is_empty()).map(|x| {
                             match from_utf8(x) {
                                 Ok(s) => s.to_owned(),
                                 Err(_) => "".to_owned(), // TODO: return ConfigError
                             }
                         }))
                 }
-                b"port" => self.port = try!(read_parse(args)),
-                b"activerehashing" => self.active_rehashing = try!(read_bool(args)),
-                b"daemonize" => self.daemonize = try!(read_bool(args)),
-                b"databases" => self.databases = try!(read_parse(args)),
-                b"tcp-keepalive" => self.tcp_keepalive = try!(read_parse(args)),
-                b"set-max-intset-entries" => self.set_max_intset_entries = try!(read_parse(args)),
-                b"timeout" => self.timeout = try!(read_parse(args)),
-                b"unixsocket" => self.unixsocket = Some(try!(read_string(args)).to_owned()),
+                b"port" => self.port = read_parse(args)?,
+                b"activerehashing" => self.active_rehashing = read_bool(args)?,
+                b"daemonize" => self.daemonize = read_bool(args)?,
+                b"databases" => self.databases = read_parse(args)?,
+                b"tcp-keepalive" => self.tcp_keepalive = read_parse(args)?,
+                b"set-max-intset-entries" => self.set_max_intset_entries = read_parse(args)?,
+                b"timeout" => self.timeout = read_parse(args)?,
+                b"unixsocket" => self.unixsocket = Some(read_string(args)?.to_owned()),
                 b"unixsocketperm" => {
-                    self.unixsocketperm = try!(u32::from_str_radix(&*try!(read_string(args)), 8))
+                    self.unixsocketperm = u32::from_str_radix(&*read_string(args)?, 8)?
                 }
-                b"pidfile" => self.pidfile = try!(read_string(args)).to_owned(),
-                b"dir" => self.dir = try!(read_string(args)).to_owned(),
+                b"pidfile" => self.pidfile = read_string(args)?.to_owned(),
+                b"dir" => self.dir = read_string(args)?.to_owned(),
                 b"logfile" => {
-                    let logfile = try!(read_string(args));
-                    if logfile.len() > 0 {
-                        try!(self.logger.set_logfile(&*logfile))
+                    let logfile = read_string(args)?;
+                    if !logfile.is_empty() {
+                        self.logger.set_logfile(&*logfile)?
                     }
                 }
-                b"loglevel" => self.logger.set_loglevel(match &*try!(read_string(args)) {
+                b"loglevel" => self.logger.set_loglevel(match &*read_string(args)? {
                     "debug" => Level::Debug,
                     "verbose" => Level::Verbose,
                     "notice" => Level::Notice,
@@ -184,9 +184,9 @@ impl Config {
                     if args.len() != 3 {
                         return Err(ConfigError::InvalidFormat);
                     } else {
-                        let command = try!(from_utf8(&*args[1])).to_owned();
-                        let newname = try!(from_utf8(&*args[2])).to_owned();
-                        if newname.len() > 0 {
+                        let command = from_utf8(&*args[1])?.to_owned();
+                        let newname = from_utf8(&*args[2])?.to_owned();
+                        if !newname.is_empty() {
                             self.rename_commands.insert(
                                 newname.to_lowercase(),
                                 Some(command.clone().to_lowercase()),
@@ -195,20 +195,20 @@ impl Config {
                         self.rename_commands.insert(command.to_lowercase(), None);
                     }
                 }
-                b"requirepass" => self.requirepass = Some(try!(read_string(args)).to_owned()),
-                b"tcp-backlog" => self.tcp_backlog = try!(read_parse(args)),
-                b"syslog-enabled" => self.syslog_enabled = try!(read_bool(args)),
-                b"syslog-ident" => self.syslog_ident = try!(read_string(args)).to_owned(),
-                b"syslog-facility" => self.syslog_facility = try!(read_string(args)).to_owned(),
-                b"hz" => self.hz = try!(read_parse(args)),
-                b"appendonly" => self.appendonly = try!(read_bool(args)),
-                b"appendfilename" => self.appendfilename = try!(read_string(args)).to_owned(),
-                b"aof-load-truncated" => self.aof_load_truncated = try!(read_bool(args)),
+                b"requirepass" => self.requirepass = Some(read_string(args)?.to_owned()),
+                b"tcp-backlog" => self.tcp_backlog = read_parse(args)?,
+                b"syslog-enabled" => self.syslog_enabled = read_bool(args)?,
+                b"syslog-ident" => self.syslog_ident = read_string(args)?.to_owned(),
+                b"syslog-facility" => self.syslog_facility = read_string(args)?.to_owned(),
+                b"hz" => self.hz = read_parse(args)?,
+                b"appendonly" => self.appendonly = read_bool(args)?,
+                b"appendfilename" => self.appendfilename = read_string(args)?.to_owned(),
+                b"aof-load-truncated" => self.aof_load_truncated = read_bool(args)?,
                 b"include" => {
                     if args.len() != 2 {
                         return Err(ConfigError::InvalidFormat);
                     } else {
-                        try!(self.parsefile(try!(from_utf8(&*args[1])).to_owned()));
+                        self.parsefile(from_utf8(&*args[1])?.to_owned())?;
                     }
                 }
                 _ => writeln!(&mut std::io::stderr(), "Unknown configuration {:?}", line).unwrap(),
@@ -223,7 +223,7 @@ impl Config {
     }
 
     pub fn addresses(&self) -> Vec<(String, u16)> {
-        if self.bind.len() == 0 {
+        if self.bind.is_empty() {
             vec![("127.0.0.1".to_owned(), self.port)]
         } else {
             self.bind

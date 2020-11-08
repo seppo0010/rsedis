@@ -971,7 +971,7 @@ impl Value {
             Value::Nil => Ok(HashSet::new()),
             Value::Set(ref value) => {
                 let emptyset = ValueSet::new();
-                let sets = try!(get_set_list(set_values, &emptyset));
+                let sets = get_set_list(set_values, &emptyset)?;
                 Ok(value.sdiff(sets))
             }
             _ => Err(OperationError::WrongTypeError),
@@ -1003,7 +1003,7 @@ impl Value {
             Value::Nil => Ok(HashSet::new()),
             Value::Set(ref value) => {
                 let emptyset = ValueSet::new();
-                let sets = try!(get_set_list(set_values, &emptyset));
+                let sets = get_set_list(set_values, &emptyset)?;
                 Ok(value.sinter(sets))
             }
             _ => Err(OperationError::WrongTypeError),
@@ -1030,7 +1030,7 @@ impl Value {
     /// ```
     pub fn sunion(&self, set_values: &Vec<&Value>) -> Result<HashSet<Vec<u8>>, OperationError> {
         let emptyset = ValueSet::new();
-        let sets = try!(get_set_list(set_values, &emptyset));
+        let sets = get_set_list(set_values, &emptyset)?;
 
         match *self {
             Value::Nil => Ok(emptyset.sunion(sets)),
@@ -1147,7 +1147,7 @@ impl Value {
                     return Ok(false);
                 }
                 let mut value = ValueSortedSet::new();
-                let r = try!(value.zadd(s, el, nx, xx, ch, incr, false));
+                let r = value.zadd(s, el, nx, xx, ch, incr, false)?;
                 *self = Value::SortedSet(value);
                 Ok(r)
             }
@@ -1551,7 +1551,7 @@ impl Value {
         aggregate: zset::Aggregate,
     ) -> Result<Value, OperationError> {
         let emptyzset = ValueSortedSet::new();
-        let zsets = try!(get_zset_list(zset_values, &emptyzset));
+        let zsets = get_zset_list(zset_values, &emptyzset)?;
 
         let mut value = ValueSortedSet::new();
         value.zunion(zsets, weights, aggregate);
@@ -1604,7 +1604,7 @@ impl Value {
         aggregate: zset::Aggregate,
     ) -> Result<Value, OperationError> {
         let emptyzset = ValueSortedSet::new();
-        let zsets = try!(get_zset_list(zset_values, &emptyzset));
+        let zsets = get_zset_list(zset_values, &emptyzset)?;
 
         let mut value = ValueSortedSet::new();
         value.zinter(zsets, weights, aggregate);
@@ -1628,14 +1628,14 @@ impl Value {
         let mut data = vec![];
         match *self {
             Value::Nil => return Ok(0), // maybe panic instead?
-            Value::String(ref s) => try!(s.dump(&mut data)),
-            Value::List(ref l) => try!(l.dump(&mut data)),
-            Value::Set(ref s) => try!(s.dump(&mut data)),
-            Value::SortedSet(ref s) => try!(s.dump(&mut data)),
+            Value::String(ref s) => s.dump(&mut data)?,
+            Value::List(ref l) => l.dump(&mut data)?,
+            Value::Set(ref s) => s.dump(&mut data)?,
+            Value::SortedSet(ref s) => s.dump(&mut data)?,
         };
         let crc = crc64(0, &*data);
         encode_u64_to_slice_u8(crc, &mut data).unwrap();
-        Ok(try!(writer.write(&*data)))
+        Ok(writer.write(&*data)?)
     }
 
     pub fn debug_object(&self) -> String {

@@ -17,11 +17,11 @@ pub struct Aof {
 impl Aof {
     pub fn new<P: AsRef<Path>>(path: P) -> io::Result<Aof> {
         Ok(Aof {
-            fp: try!(OpenOptions::new()
+            fp: OpenOptions::new()
                 .read(true)
                 .write(true)
                 .create(true)
-                .open(path)),
+                .open(path)?,
             dbindex: usize::MAX,
         })
     }
@@ -30,7 +30,7 @@ impl Aof {
         if self.dbindex != dbindex {
             // TODO: use logarithms to know the length?
             let n = format!("{}", dbindex);
-            try!(write!(self.fp, "*2\r\n$6\r\nSELECT\r\n${}\r\n{}\r\n", n.len(), n));
+            write!(self.fp, "*2\r\n$6\r\nSELECT\r\n${}\r\n{}\r\n", n.len(), n)?;
             self.dbindex = dbindex;
         }
         Ok(())
@@ -44,8 +44,8 @@ impl Aof {
     }
 
     pub fn write(&mut self, dbindex: usize, command: &ParsedCommand) -> io::Result<()> {
-        try!(self.select(dbindex));
-        try!(self.fp.write(command.get_data()));
+        self.select(dbindex)?;
+        self.fp.write(command.get_data())?;
         Ok(())
     }
 }

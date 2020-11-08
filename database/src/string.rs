@@ -88,7 +88,7 @@ impl ValueString {
                 }
             },
         };
-        let newval = try!(val.checked_add(incr).ok_or(OperationError::OverflowError));
+        let newval = val.checked_add(incr).ok_or(OperationError::OverflowError)?;
         *self = ValueString::Integer(newval.clone());
         Ok(newval)
     }
@@ -189,7 +189,7 @@ impl ValueString {
             return false;
         }
 
-        let bit = 7 - (bitoffset & 0x7);;
+        let bit = 7 - (bitoffset & 0x7);
         let bitval = d[byte] & (1 << bit);
 
         bitval != 0
@@ -229,13 +229,13 @@ impl ValueString {
         let mut hll = if self.strlen() == 0 {
             HLL::new(HLL_ERROR)
         } else {
-            try!(HLL::from_vec(self.to_vec()))
+            HLL::from_vec(self.to_vec())
         };
         for el in data {
             changed = hll.insert(&el) || changed;
         }
         if changed {
-            *self = ValueString::new(try!(hll.into_vec()));
+            *self = ValueString::new(hll.into_vec());
         }
         Ok(changed)
     }
@@ -244,7 +244,7 @@ impl ValueString {
         let hll = if self.strlen() == 0 {
             return Ok(0);
         } else {
-            try!(HLL::from_vec(self.to_vec()))
+            HLL::from_vec(self.to_vec())
         };
         Ok(hll.count().round() as usize)
     }
@@ -253,14 +253,14 @@ impl ValueString {
         let mut hll = if self.strlen() == 0 {
             HLL::new(HLL_ERROR)
         } else {
-            try!(HLL::from_vec(self.to_vec()))
+            HLL::from_vec(self.to_vec())
         };
 
         for s in data {
-            hll = &hll + &try!(HLL::from_vec(s.to_vec()));
+            hll = &hll + &HLL::from_vec(s.to_vec());
         }
 
-        *self = ValueString::new(try!(hll.into_vec()));
+        *self = ValueString::new(hll.into_vec());
         Ok(())
     }
 
@@ -272,11 +272,11 @@ impl ValueString {
                 Err(e) => match e {
                     EncodeError::IOError(e) => return Err(e),
                     EncodeError::OverflowError => {
-                        try!(encode_slice_u8(&*self.to_vec(), &mut v, false))
+                        encode_slice_u8(&*self.to_vec(), &mut v, false)?
                     }
                 },
             },
-            ValueString::Data(ref d) => try!(encode_slice_u8(&*d, &mut v, true)),
+            ValueString::Data(ref d) => encode_slice_u8(&*d, &mut v, true)?,
         };
         let data = [
             vec![TYPE_STRING],
