@@ -388,7 +388,7 @@ impl ValueSet {
                 settype = TYPE_SET;
                 encode_len(set.len(), &mut v).unwrap();
                 for ref item in set {
-                    try!(encode_slice_u8(&*item, &mut v, true));
+                    encode_slice_u8(&*item, &mut v, true)?;
                 }
             }
         };

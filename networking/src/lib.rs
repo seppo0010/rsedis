@@ -58,8 +58,8 @@ impl Stream {
     /// Creates a new independently owned handle to the underlying socket.
     fn try_clone(&self) -> io::Result<Stream> {
         match *self {
-            Stream::Tcp(ref s) => Ok(Stream::Tcp(try!(s.try_clone()))),
-            Stream::Unix(ref s) => Ok(Stream::Unix(try!(s.try_clone()))),
+            Stream::Tcp(ref s) => Ok(Stream::Tcp(s.try_clone()?)),
+            Stream::Unix(ref s) => Ok(Stream::Unix(s.try_clone()?)),
         }
     }
 
@@ -250,7 +250,7 @@ impl Client {
                 parser.allocate();
                 let len = {
                     let pos = parser.written;
-                    let mut buffer = parser.get_mut();
+                    let buffer = parser.get_mut();
 
                     // read socket
                     match self.stream.read(&mut buffer[pos..]) {
@@ -499,7 +499,7 @@ impl Server {
 
     #[cfg(not(windows))]
     fn reuse_address(&self, builder: &TcpBuilder) -> io::Result<()> {
-        try!(builder.reuse_address(true));
+        builder.reuse_address(true)?;
         Ok(())
     }
 
@@ -519,15 +519,15 @@ impl Server {
         timeout: u64,
         tcp_backlog: i32,
     ) -> io::Result<()> {
-        for addr in try!(t.to_socket_addrs()) {
+        for addr in t.to_socket_addrs()? {
             let (tx, rx) = channel();
-            let builder = try!(match addr {
+            let builder = match addr {
                 SocketAddr::V4(_) => TcpBuilder::new_v4(),
                 SocketAddr::V6(_) => TcpBuilder::new_v6(),
-            });
+            }?;
 
-            try!(self.reuse_address(&builder));
-            let listener = try!(try!(builder.bind(addr)).listen(tcp_backlog));
+            self.reuse_address(&builder)?;
+            let listener = builder.bind(addr)?.listen(tcp_backlog)?;
             self.listener_channels.push(tx);
             {
                 let db = self.db.lock().unwrap();

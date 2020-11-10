@@ -22,7 +22,7 @@ pub fn load(db: &mut Database) {
             parser.allocate();
             let len = {
                 let pos = parser.written;
-                let mut buffer = parser.get_mut();
+                let buffer = parser.get_mut();
 
                 match aof.read(&mut buffer[pos..]) {
                     Ok(r) => r,

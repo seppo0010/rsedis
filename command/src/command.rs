@@ -712,7 +712,7 @@ fn generic_pop(
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let r = {
         match db.get_mut(dbindex, &key) {
-            Some(mut list) => match list.pop(right) {
+            Some(list) => match list.pop(right) {
                 Ok(el) => match el {
                     Some(val) => Response::Data(val),
                     None => Response::Nil,
@@ -870,7 +870,7 @@ fn generic_bpop(
     for i in 1..parser.argv.len() - 1 {
         let key = try_opt_validate!(parser.get_vec(i), "Invalid key");
         let val = match db.get_mut(dbindex, &key) {
-            Some(mut list) => match list.pop(right) {
+            Some(list) => match list.pop(right) {
                 Ok(el) => el,
                 Err(err) => return Ok(Response::Error(err.to_string())),
             },
@@ -988,7 +988,7 @@ fn linsert(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Res
         _ => return Response::Error("ERR syntax error".to_owned()),
     };
     let r = match db.get_mut(dbindex, &key) {
-        Some(mut el) => match el.linsert(before, pivot, value) {
+        Some(el) => match el.linsert(before, pivot, value) {
             Ok(r) => match r {
                 Some(listsize) => Response::Integer(listsize as i64),
                 None => Response::Integer(-1),
@@ -1209,7 +1209,7 @@ fn spop(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Respon
     validate_arguments_lte!(parser, 3);
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let r = {
-        let mut value = match db.get_mut(dbindex, &key) {
+        let value = match db.get_mut(dbindex, &key) {
             Some(el) => el,
             None => {
                 return if parser.argv.len() == 2 {
@@ -2885,21 +2885,6 @@ pub fn command(
         db.log_command(client.dbindex, &parser, write);
     }
     r
-}
-
-macro_rules! parser {
-    ($str: expr) => {{
-        let mut _args = Vec::new();
-        let mut pos = 0;
-        for segment in $str.split(|x| *x == b' ') {
-            _args.push(Argument {
-                pos: pos,
-                len: segment.len(),
-            });
-            pos += segment.len() + 1;
-        }
-        ParsedCommand::new($str, _args)
-    }};
 }
 
 #[cfg(test)]

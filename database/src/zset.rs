@@ -309,7 +309,7 @@ impl ValueSortedSet {
         };
 
         for _ in 0..count {
-            let el = skiplist.remove_index(&pos);
+            let el = skiplist.remove_index(pos);
             hmap.remove(&el.s);
         }
         count
@@ -327,7 +327,7 @@ impl ValueSortedSet {
         };
 
         for _ in 0..count {
-            let el = skiplist.remove_index(&pos);
+            let el = skiplist.remove_index(pos);
             hmap.remove(&el.s);
         }
         count
@@ -399,7 +399,7 @@ impl ValueSortedSet {
         };
 
         for _ in 0..(stop - start + 1) {
-            let el = skiplist.remove_index(&start);
+            let el = skiplist.remove_index(start);
             hmap.remove(&el.s);
         }
         stop - start + 1
@@ -415,7 +415,7 @@ impl ValueSortedSet {
             return vec![];
         }
 
-        let first = skiplist.get(&start).unwrap();
+        let first = skiplist.get(start).unwrap();
         let mut r = vec![];
         if rev {
             for member in skiplist
@@ -723,16 +723,16 @@ impl ValueSortedSet {
                 settype = TYPE_ZSET;
                 encode_len(hash.len(), &mut v).unwrap();
                 for (value, score) in hash {
-                    try!(encode_slice_u8(&*value, &mut v, true));
+                    encode_slice_u8(&*value, &mut v, true)?;
                     if score == &NAN {
-                        try!(v.write(&[253]));
+                        v.write(&[253])?;
                     } else if score == &INFINITY {
-                        try!(v.write(&[254]));
+                        v.write(&[254])?;
                     } else if score == &NEG_INFINITY {
-                        try!(v.write(&[255]));
+                        v.write(&[255])?;
                     } else {
                         let scorestr = format!("{}", score.abs()).to_owned();
-                        try!(encode_slice_u8(scorestr.as_bytes(), &mut v, false));
+                        encode_slice_u8(scorestr.as_bytes(), &mut v, false)?;
                     }
                 }
             }

@@ -66,6 +66,6 @@ pub fn vec_to_usize(data: &Vec<u8>) -> Result<usize, OperationError> {
             "ERR value is not an integer".to_owned(),
         ));
     }
-    let res = try!(from_utf8(&data));
-    Ok(try!(res.parse::<usize>()))
+    let res = from_utf8(&data)?;
+    Ok(res.parse::<usize>()?)
 }

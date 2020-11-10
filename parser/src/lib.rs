@@ -63,7 +63,7 @@ impl ParseError {
 
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        return self.response_string().fmt(f);
+        self.response_string().fmt(f)
     }
 }
 
@@ -76,7 +76,7 @@ impl Error for ParseError {
         }
     }
 
-    fn cause(&self) -> Option<&Error> {
+    fn cause(&self) -> Option<&dyn Error> {
         None
     }
 }
@@ -102,8 +102,8 @@ impl From<ParseFloatError> for ParseError {
 impl OwnedParsedCommand {
     pub fn new(data: Vec<u8>, argv: Vec<Argument>) -> Self {
         OwnedParsedCommand {
-            data: data,
-            argv: argv,
+            data,
+            argv,
         }
     }
 
@@ -116,8 +116,8 @@ impl<'a> ParsedCommand<'a> {
     /// Creates a new parser with the data and arguments provided
     pub fn new(data: &[u8], argv: Vec<Argument>) -> ParsedCommand {
         return ParsedCommand {
-            data: data,
-            argv: argv,
+            data,
+            argv,
         };
     }
 
@@ -146,22 +146,22 @@ impl<'a> ParsedCommand<'a> {
     /// assert_eq!(parser.get_f64_bound(0).unwrap(), Bound::Excluded(1.23));
     /// ```
     pub fn get_f64_bound(&self, pos: usize) -> Result<Bound<f64>, ParseError> {
-        let s = try!(self.get_str(pos));
+        let s = self.get_str(pos)?;
         if s == "inf" || s == "+inf" || s == "-inf" {
             return Ok(Bound::Unbounded);
         }
-        if s.starts_with("(") {
-            let f = try!(s[1..].parse::<f64>());
+        if s.starts_with('(') {
+            let f = s[1..].parse::<f64>()?;
             if f.is_nan() {
                 return Err(ParseError::InvalidArgument);
             }
             return Ok(Bound::Excluded(f));
         }
-        let f = try!(s.parse::<f64>());
+        let f = s.parse::<f64>()?;
         if f.is_nan() {
             return Err(ParseError::InvalidArgument);
         }
-        return Ok(Bound::Included(f));
+        Ok(Bound::Included(f))
     }
 
     // TODO: get<T>
@@ -176,18 +176,18 @@ impl<'a> ParsedCommand<'a> {
     /// assert_eq!(parser.get_f64(0).unwrap(), 1.23);
     /// ```
     pub fn get_f64(&self, pos: usize) -> Result<f64, ParseError> {
-        let s = try!(self.get_str(pos));
+        let s = self.get_str(pos)?;
         if s == "+inf" || s == "inf" {
             return Ok(INFINITY);
         }
         if s == "-inf" {
             return Ok(NEG_INFINITY);
         }
-        let f = try!(s.parse::<f64>());
+        let f = s.parse::<f64>()?;
         if f.is_nan() {
             return Err(ParseError::InvalidArgument);
         }
-        return Ok(f);
+        Ok(f)
     }
 
     /// Gets an i64 from a parameter
@@ -200,8 +200,8 @@ impl<'a> ParsedCommand<'a> {
     /// assert_eq!(parser.get_i64(0).unwrap(), -123);
     /// ```
     pub fn get_i64(&self, pos: usize) -> Result<i64, ParseError> {
-        let s = try!(self.get_str(pos));
-        return Ok(try!(s.parse::<i64>()));
+        let s = self.get_str(pos)?;
+        Ok(s.parse::<i64>()?)
     }
 
     /// Gets an str from a parameter
@@ -214,8 +214,8 @@ impl<'a> ParsedCommand<'a> {
     /// assert_eq!(parser.get_str(0).unwrap(), "foo");
     /// ```
     pub fn get_str(&self, pos: usize) -> Result<&str, ParseError> {
-        let data = try!(self.get_slice(pos));
-        Ok(try!(from_utf8(&data)))
+        let data = self.get_slice(pos)?;
+        Ok(from_utf8(&data)?)
     }
 
     /// Gets a Vec<u8> from a parameter
@@ -228,8 +228,8 @@ impl<'a> ParsedCommand<'a> {
     /// assert_eq!(parser.get_vec(0).unwrap(), b"foo".to_vec());
     /// ```
     pub fn get_vec(&self, pos: usize) -> Result<Vec<u8>, ParseError> {
-        let data = try!(self.get_slice(pos));
-        return Ok(data.to_vec());
+        let data = self.get_slice(pos)?;
+        Ok(data.to_vec())
     }
 
     /// Gets a &[u8] from a parameter
@@ -246,7 +246,7 @@ impl<'a> ParsedCommand<'a> {
             return Err(ParseError::InvalidArgument);
         }
         let arg = &self.argv[pos];
-        return Ok(&self.data[arg.pos..arg.pos + arg.len]);
+        Ok(&self.data[arg.pos..arg.pos + arg.len])
     }
 
     pub fn get_data(&self) -> &'a [u8] {
@@ -265,8 +265,8 @@ impl<'a> ParsedCommand<'a> {
 impl<'a> fmt::Debug for ParsedCommand<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         for a in self.argv.iter() {
-            try!(format_repr(f, &self.data[a.pos..(a.pos + a.len)]));
-            try!(f.write_str(" "));
+            format_repr(f, &self.data[a.pos..(a.pos + a.len)])?;
+            f.write_str(" ")?;
         }
         Ok(())
     }
@@ -276,7 +276,7 @@ impl<'a> fmt::Debug for ParsedCommand<'a> {
 /// Upon success, it returns a tuple with the length of the argument and the
 /// length of the parsed length.
 fn parse_int(input: &[u8], len: usize, name: &str) -> Result<(Option<usize>, usize), ParseError> {
-    if input.len() == 0 {
+    if input.is_empty() {
         return Err(ParseError::Incomplete);
     }
     let mut i = 0;
@@ -311,7 +311,7 @@ fn parse_int(input: &[u8], len: usize, name: &str) -> Result<(Option<usize>, usi
             input[i] as char
         )));
     }
-    return Ok((argco, i + 1));
+    Ok((argco, i + 1))
 }
 
 /// Creates a parser from a buffer.
@@ -354,7 +354,7 @@ pub fn parse(input: &[u8]) -> Result<(ParsedCommand, usize), ParseError> {
     }
     pos += 1;
     let len = input.len();
-    let (argco, intlen) = try!(parse_int(&input[pos..len], len - pos, "multibulk"));
+    let (argco, intlen) = parse_int(&input[pos..len], len - pos, "multibulk")?;
     let argc = match argco {
         Some(i) => i,
         None => 0,
@@ -377,7 +377,7 @@ pub fn parse(input: &[u8]) -> Result<(ParsedCommand, usize), ParseError> {
             )));
         }
         pos += 1;
-        let (argleno, arglenlen) = try!(parse_int(&input[pos..len], len - pos, "bulk"));
+        let (argleno, arglenlen) = parse_int(&input[pos..len], len - pos, "bulk")?;
         let arglen = match argleno {
             Some(i) => i,
             None => return Err(ParseError::BadProtocol("invalid bulk length".to_owned())),
@@ -449,7 +449,7 @@ impl Parser {
 
     pub fn next(&mut self) -> Result<ParsedCommand, ParseError> {
         let data = &(&*self.data)[self.position..self.written];
-        let (r, len) = try!(parse(data));
+        let (r, len) = parse(data)?;
         self.position += len;
         Ok(r)
     }
@@ -457,7 +457,7 @@ impl Parser {
 
 impl fmt::Debug for Parser {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        try!(f.write_str("Parser: "));
+        f.write_str("Parser: ")?;
         format_repr(f, &(&*self.data)[self.position..self.written])
     }
 }
