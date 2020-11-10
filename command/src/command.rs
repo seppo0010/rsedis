@@ -1,11 +1,15 @@
-use std::collections::{Bound, HashMap, HashSet};
-use std::io::Write;
-use std::mem::replace;
-use std::sync::mpsc::channel;
-use std::sync::mpsc::Sender;
-use std::thread;
-use std::time::Duration;
-use std::usize;
+use std::{
+    collections::{Bound, HashMap, HashSet},
+    io::Write,
+    mem::replace,
+    sync::mpsc::channel,
+    sync::mpsc::Sender,
+    thread,
+    time::Duration,
+    usize,
+};
+
+use bitflags::bitflags;
 
 use compat::{getos, getpid};
 use database::{zset, Database, PubsubEvent, Value};
@@ -116,10 +120,11 @@ fn generic_set(
     match db.get_or_create(dbindex, &key).set(val) {
         Ok(_) => {
             db.key_updated(dbindex, &key);
-            match expiration {
-                Some(msexp) => db.set_msexpiration(dbindex, key, msexp + mstime()),
-                None => (),
+
+            if let Some(msexp) = expiration {
+                db.set_msexpiration(dbindex, key, msexp + mstime());
             }
+
             Ok(true)
         }
         Err(err) => Err(Response::Error(err.to_string())),
@@ -217,15 +222,13 @@ fn del(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Respons
     let mut c = 0;
     for i in 1..parser.argv.len() {
         let key = try_validate!(parser.get_vec(i), "Invalid key");
-        match db.remove(dbindex, &key) {
-            Some(_) => {
-                c += 1;
-                db.key_updated(dbindex, &key);
-            }
-            None => {}
+        if db.remove(dbindex, &key).is_some() {
+            c += 1;
+            db.key_updated(dbindex, &key);
         }
     }
-    return Response::Integer(c);
+
+    Response::Integer(c)
 }
 
 fn debug_object(db: &mut Database, dbindex: usize, key: Vec<u8>) -> Option<String> {
@@ -310,10 +313,11 @@ fn pexpireat(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> R
 fn flushdb(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate_arguments_exact!(parser, 1);
     db.clear(dbindex);
-    return Response::Status("OK".to_owned());
+
+    Response::Status("OK".to_owned())
 }
 
-fn generic_ttl(db: &mut Database, dbindex: usize, key: &Vec<u8>, divisor: i64) -> Response {
+fn generic_ttl(db: &mut Database, dbindex: usize, key: &[u8], divisor: i64) -> Response {
     Response::Integer(match db.get(dbindex, key) {
         Some(_) => match db.get_msexpiration(dbindex, key) {
             Some(exp) => (exp - mstime()) / divisor,
@@ -349,14 +353,13 @@ fn persist(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Res
 fn dbtype(parser: &mut ParsedCommand, db: &Database, dbindex: usize) -> Response {
     validate_arguments_exact!(parser, 2);
     let key = try_validate!(parser.get_vec(1), "Invalid key");
+
     match db.get(dbindex, &key) {
-        Some(value) => match value {
-            &Value::Nil => Response::Data("none".to_owned().into_bytes()),
-            &Value::String(_) => Response::Data("string".to_owned().into_bytes()),
-            &Value::List(_) => Response::Data("list".to_owned().into_bytes()),
-            &Value::Set(_) => Response::Data("set".to_owned().into_bytes()),
-            &Value::SortedSet(_) => Response::Data("zset".to_owned().into_bytes()),
-        },
+        Some(Value::Nil) => Response::Data("none".to_owned().into_bytes()),
+        Some(Value::String(_)) => Response::Data("string".to_owned().into_bytes()),
+        Some(Value::List(_)) => Response::Data("list".to_owned().into_bytes()),
+        Some(Value::Set(_)) => Response::Data("set".to_owned().into_bytes()),
+        Some(Value::SortedSet(_)) => Response::Data("zset".to_owned().into_bytes()),
         None => Response::Data("none".to_owned().into_bytes()),
     }
 }
@@ -364,7 +367,8 @@ fn dbtype(parser: &mut ParsedCommand, db: &Database, dbindex: usize) -> Response
 fn flushall(parser: &mut ParsedCommand, db: &mut Database, _: usize) -> Response {
     validate_arguments_exact!(parser, 1);
     db.clearall();
-    return Response::Status("OK".to_owned());
+
+    Response::Status("OK".to_owned())
 }
 
 fn append(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
@@ -429,12 +433,13 @@ fn getrange(parser: &mut ParsedCommand, db: &Database, dbindex: usize) -> Respon
     let start = try_validate!(parser.get_i64(2), "Invalid range");
     let stop = try_validate!(parser.get_i64(3), "Invalid range");
     let obj = db.get(dbindex, &key);
+
     match obj {
         Some(value) => match value.getrange(start, stop) {
             Ok(r) => Response::Data(r),
             Err(e) => Response::Error(e.to_string()),
         },
-        None => return Response::Nil,
+        None => Response::Nil,
     }
 }
 
@@ -450,7 +455,7 @@ fn setrange(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Re
     };
     let value = try_validate!(parser.get_vec(3), "Invalid value");
     let r = {
-        if db.get(dbindex, &key).is_none() && value.len() == 0 {
+        if db.get(dbindex, &key).is_none() && value.is_empty() {
             return Response::Integer(0);
         }
         let oldval = db.get_or_create(dbindex, &key);
@@ -515,12 +520,13 @@ fn strlen(parser: &mut ParsedCommand, db: &Database, dbindex: usize) -> Response
     validate_arguments_exact!(parser, 2);
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let obj = db.get(dbindex, &key);
+
     match obj {
         Some(value) => match value.strlen() {
             Ok(r) => Response::Integer(r as i64),
             Err(err) => Response::Error(err.to_string()),
         },
-        None => return Response::Integer(0),
+        None => Response::Integer(0),
     }
 }
 
@@ -541,12 +547,12 @@ fn generic_incr(
 
 fn incr(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate_arguments_exact!(parser, 2);
-    return generic_incr(parser, db, dbindex, 1);
+    generic_incr(parser, db, dbindex, 1)
 }
 
 fn decr(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
     validate_arguments_exact!(parser, 2);
-    return generic_incr(parser, db, dbindex, -1);
+    generic_incr(parser, db, dbindex, -1)
 }
 
 fn incrby(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
@@ -607,9 +613,8 @@ fn pfcount(parser: &ParsedCommand, db: &Database, dbindex: usize) -> Response {
         let mut values = Vec::with_capacity(parser.argv.len() - 1);
         for i in 1..parser.argv.len() {
             let key = try_validate!(parser.get_vec(i), "Invalid key");
-            match db.get(dbindex, &key) {
-                Some(v) => values.push(v),
-                None => (),
+            if let Some(v) = db.get(dbindex, &key) {
+                values.push(v);
             }
         }
         let mut val = Value::Nil;
@@ -635,9 +640,8 @@ fn pfmerge(parser: &ParsedCommand, db: &mut Database, dbindex: usize) -> Respons
         let mut values = Vec::with_capacity(parser.argv.len() - 2);
         for i in 2..parser.argv.len() {
             let key = try_validate!(parser.get_vec(i), "Invalid key");
-            match db.get(dbindex, &key) {
-                Some(v) => values.push(v),
-                None => (),
+            if let Some(v) = db.get(dbindex, &key) {
+                values.push(v);
             }
         }
 
@@ -687,19 +691,19 @@ fn generic_push(
 }
 
 fn lpush(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
-    return generic_push(parser, db, dbindex, false, true);
+    generic_push(parser, db, dbindex, false, true)
 }
 
 fn rpush(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
-    return generic_push(parser, db, dbindex, true, true);
+    generic_push(parser, db, dbindex, true, true)
 }
 
 fn lpushx(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
-    return generic_push(parser, db, dbindex, false, false);
+    generic_push(parser, db, dbindex, false, false)
 }
 
 fn rpushx(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
-    return generic_push(parser, db, dbindex, true, false);
+    generic_push(parser, db, dbindex, true, false)
 }
 
 fn generic_pop(
@@ -727,27 +731,21 @@ fn generic_pop(
 }
 
 fn lpop(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
-    return generic_pop(parser, db, dbindex, false);
+    generic_pop(parser, db, dbindex, false)
 }
 
 fn rpop(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
-    return generic_pop(parser, db, dbindex, true);
+    generic_pop(parser, db, dbindex, true)
 }
 
 fn generic_rpoplpush(
     db: &mut Database,
     dbindex: usize,
-    source: &Vec<u8>,
-    destination: &Vec<u8>,
+    source: &[u8],
+    destination: &[u8],
 ) -> Response {
-    #![allow(unused_must_use)]
-
-    match db.get(dbindex, destination) {
-        Some(el) => match el.llen() {
-            Ok(_) => (),
-            Err(_) => return Response::Error("WRONGTYPE Destination is not a list".to_owned()),
-        },
-        None => (),
+    if let Some(Err(_)) = db.get(dbindex, destination).map(|el| el.llen()) {
+        return Response::Error("WRONGTYPE Destination is not a list".to_owned());
     }
 
     let el = {
@@ -771,7 +769,10 @@ fn generic_rpoplpush(
 
     let resp = {
         let destinationlist = db.get_or_create(dbindex, destination);
-        destinationlist.push(el.clone(), false);
+        if let Err(e) = destinationlist.push(el.clone(), false) {
+            return Response::Error(e.to_string());
+        }
+
         Response::Data(el)
     };
     db.key_updated(dbindex, source);
@@ -791,7 +792,6 @@ fn brpoplpush(
     db: &mut Database,
     dbindex: usize,
 ) -> Result<Response, ResponseError> {
-    #![allow(unused_must_use)]
     opt_validate!(parser.argv.len() == 4, "Wrong number of parameters");
 
     let source = try_opt_validate!(parser.get_vec(1), "Invalid source");
@@ -810,7 +810,7 @@ fn brpoplpush(
         let tx = txcommand.clone();
         thread::spawn(move || {
             thread::sleep(Duration::from_secs(timeout as u64));
-            tx.send(None);
+            let _ = tx.send(None);
         });
     }
     let command_name = try_opt_validate!(parser.get_vec(0), "Invalid command");
@@ -850,10 +850,11 @@ fn brpoplpush(
             pos: data.len(),
             len: timeout_formatted.len(),
         });
-        data.extend(timeout_formatted.to_owned().into_bytes());
-        txcommand.send(Some(OwnedParsedCommand::new(data, arguments)));
+        data.extend(timeout_formatted.into_bytes());
+        let _ = txcommand.send(Some(OwnedParsedCommand::new(data, arguments)));
     });
-    return Err(ResponseError::Wait(rxcommand));
+
+    Err(ResponseError::Wait(rxcommand))
 }
 
 fn generic_bpop(
@@ -862,7 +863,6 @@ fn generic_bpop(
     dbindex: usize,
     right: bool,
 ) -> Result<Response, ResponseError> {
-    #![allow(unused_must_use)]
     opt_validate!(parser.argv.len() >= 3, "Wrong number of parameters");
     let time = mstime();
 
@@ -898,7 +898,7 @@ fn generic_bpop(
         let tx = txcommand.clone();
         thread::spawn(move || {
             thread::sleep(Duration::from_secs(timeout as u64));
-            tx.send(None);
+            let _ = tx.send(None);
         });
     }
     let command_name = try_opt_validate!(parser.get_vec(0), "Invalid command");
@@ -937,10 +937,11 @@ fn generic_bpop(
             pos: data.len(),
             len: timeout_formatted.len(),
         });
-        data.extend(timeout_formatted.to_owned().into_bytes());
-        txcommand.send(Some(OwnedParsedCommand::new(data, arguments)));
+        data.extend(timeout_formatted.into_bytes());
+        let _ = txcommand.send(Some(OwnedParsedCommand::new(data, arguments)));
     });
-    return Err(ResponseError::Wait(rxcommand));
+
+    Err(ResponseError::Wait(rxcommand))
 }
 
 fn brpop(
@@ -963,16 +964,17 @@ fn lindex(parser: &mut ParsedCommand, db: &Database, dbindex: usize) -> Response
     validate_arguments_exact!(parser, 3);
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let index = try_validate!(parser.get_i64(2), "Invalid index");
-    return match db.get(dbindex, &key) {
+
+    match db.get(dbindex, &key) {
         Some(el) => match el.lindex(index) {
             Ok(el) => match el {
-                Some(val) => Response::Data(val.clone()),
+                Some(val) => Response::Data(val.to_vec()),
                 None => Response::Nil,
             },
             Err(err) => Response::Error(err.to_string()),
         },
         None => Response::Nil,
-    };
+    }
 }
 
 fn linsert(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
@@ -1004,13 +1006,14 @@ fn linsert(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Res
 fn llen(parser: &mut ParsedCommand, db: &Database, dbindex: usize) -> Response {
     validate_arguments_exact!(parser, 2);
     let key = try_validate!(parser.get_vec(1), "Invalid key");
-    return match db.get(dbindex, &key) {
+
+    match db.get(dbindex, &key) {
         Some(el) => match el.llen() {
             Ok(listsize) => Response::Integer(listsize as i64),
             Err(err) => Response::Error(err.to_string()),
         },
         None => Response::Integer(0),
-    };
+    }
 }
 
 fn lrange(parser: &mut ParsedCommand, db: &Database, dbindex: usize) -> Response {
@@ -1018,7 +1021,8 @@ fn lrange(parser: &mut ParsedCommand, db: &Database, dbindex: usize) -> Response
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let start = try_validate!(parser.get_i64(2), "Invalid range");
     let stop = try_validate!(parser.get_i64(3), "Invalid range");
-    return match db.get(dbindex, &key) {
+
+    match db.get(dbindex, &key) {
         Some(el) => match el.lrange(start, stop) {
             Ok(items) => {
                 Response::Array(items.iter().map(|i| Response::Data(i.to_vec())).collect())
@@ -1026,7 +1030,7 @@ fn lrange(parser: &mut ParsedCommand, db: &Database, dbindex: usize) -> Response
             Err(err) => Response::Error(err.to_string()),
         },
         None => Response::Array(Vec::new()),
-    };
+    }
 }
 
 fn lrem(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
@@ -1035,7 +1039,7 @@ fn lrem(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Respon
     let count = try_validate!(parser.get_i64(2), "Invalid count");
     let value = try_validate!(parser.get_vec(3), "Invalid value");
     let r = match db.get_mut(dbindex, &key) {
-        Some(ref mut el) => match el.lrem(count < 0, count.abs() as usize, value) {
+        Some(el) => match el.lrem(count < 0, count.abs() as usize, value) {
             Ok(removed) => Response::Integer(removed as i64),
             Err(err) => Response::Error(err.to_string()),
         },
@@ -1051,7 +1055,7 @@ fn lset(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Respon
     let index = try_validate!(parser.get_i64(2), "Invalid index");
     let value = try_validate!(parser.get_vec(3), "Invalid value");
     let r = match db.get_mut(dbindex, &key) {
-        Some(ref mut el) => match el.lset(index, value) {
+        Some(el) => match el.lset(index, value) {
             Ok(()) => Response::Status("OK".to_owned()),
             Err(err) => Response::Error(err.to_string()),
         },
@@ -1067,7 +1071,7 @@ fn ltrim(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Respo
     let start = try_validate!(parser.get_i64(2), "Invalid start");
     let stop = try_validate!(parser.get_i64(3), "Invalid stop");
     let r = match db.get_mut(dbindex, &key) {
-        Some(ref mut el) => match el.ltrim(start, stop) {
+        Some(el) => match el.ltrim(start, stop) {
             Ok(()) => Response::Status("OK".to_owned()),
             Err(err) => Response::Error(err.to_string()),
         },
@@ -1097,7 +1101,8 @@ fn sadd(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Respon
         }
     }
     db.key_updated(dbindex, &key);
-    return Response::Integer(count);
+
+    Response::Integer(count)
 }
 
 fn srem(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
@@ -1119,13 +1124,15 @@ fn srem(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Respon
         }
     }
     db.key_updated(dbindex, &key);
-    return Response::Integer(count);
+
+    Response::Integer(count)
 }
 
 fn sismember(parser: &mut ParsedCommand, db: &Database, dbindex: usize) -> Response {
     validate_arguments_exact!(parser, 3);
     let key = try_validate!(parser.get_vec(1), "Invalid key");
     let member = try_validate!(parser.get_vec(2), "Invalid key");
+
     Response::Integer(match db.get(dbindex, &key) {
         Some(el) => match el.sismember(&member) {
             Ok(e) => {
@@ -1158,7 +1165,7 @@ fn srandmember(parser: &mut ParsedCommand, db: &Database, dbindex: usize) -> Res
     if parser.argv.len() == 2 {
         match value.srandmember(1, false) {
             Ok(els) => {
-                if els.len() > 0 {
+                if !els.is_empty() {
                     Response::Data(els[0].clone())
                 } else {
                     Response::Nil
@@ -1222,7 +1229,7 @@ fn spop(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Respon
         if parser.argv.len() == 2 {
             match value.spop(1) {
                 Ok(els) => {
-                    if els.len() > 0 {
+                    if !els.is_empty() {
                         Response::Data(els[0].clone())
                     } else {
                         Response::Nil
@@ -1253,17 +1260,14 @@ fn smove(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Respo
     let member = try_validate!(parser.get_vec(3), "Invalid member");
 
     {
-        match db.get(dbindex, &destination_key) {
-            Some(e) => {
-                if !e.is_set() {
-                    return Response::Error(
-                        "WRONGTYPE Operation against a key holding the wrong \
+        if let Some(e) = db.get(dbindex, &destination_key) {
+            if !e.is_set() {
+                return Response::Error(
+                    "WRONGTYPE Operation against a key holding the wrong \
                          kind of value"
-                            .to_owned(),
-                    );
-                }
+                        .to_owned(),
+                );
             }
-            None => (),
         }
     }
     {
@@ -1293,7 +1297,8 @@ fn smove(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Respo
 
     db.key_updated(dbindex, &source_key);
     db.key_updated(dbindex, &destination_key);
-    return Response::Integer(1);
+
+    Response::Integer(1)
 }
 
 fn scard(parser: &mut ParsedCommand, db: &Database, dbindex: usize) -> Response {
@@ -1303,10 +1308,11 @@ fn scard(parser: &mut ParsedCommand, db: &Database, dbindex: usize) -> Response 
         Some(e) => e,
         None => return Response::Integer(0),
     };
-    return match el.scard() {
+
+    match el.scard() {
         Ok(count) => Response::Integer(count as i64),
-        Err(err) => return Response::Error(err.to_string()),
-    };
+        Err(err) => Response::Error(err.to_string()),
+    }
 }
 
 fn sdiff(parser: &mut ParsedCommand, db: &Database, dbindex: usize) -> Response {
@@ -1360,14 +1366,14 @@ fn sinter(parser: &mut ParsedCommand, db: &Database, dbindex: usize) -> Response
     };
     let nil = Value::Nil;
     let sets = get_values!(2, parser.argv.len(), parser, db, dbindex, &nil);
-    return match el.sinter(&sets) {
+    match el.sinter(&sets) {
         Ok(set) => Response::Array(
             set.iter()
                 .map(|x| Response::Data(x.clone()))
                 .collect::<Vec<_>>(),
         ),
         Err(err) => Response::Error(err.to_string()),
-    };
+    }
 }
 
 fn sinterstore(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
@@ -1403,14 +1409,15 @@ fn sunion(parser: &mut ParsedCommand, db: &Database, dbindex: usize) -> Response
     };
     let nil = Value::Nil;
     let sets = get_values!(2, parser.argv.len(), parser, db, dbindex, &nil);
-    return match el.sunion(&sets) {
+
+    match el.sunion(&sets) {
         Ok(set) => Response::Array(
             set.iter()
                 .map(|x| Response::Data(x.clone()))
                 .collect::<Vec<_>>(),
         ),
         Err(err) => Response::Error(err.to_string()),
-    };
+    }
 }
 
 fn sunionstore(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
@@ -1505,7 +1512,8 @@ fn zadd(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Respon
     if count > 0 {
         db.key_updated(dbindex, &key);
     }
-    return Response::Integer(count);
+
+    Response::Integer(count)
 }
 
 fn zcard(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
@@ -1515,10 +1523,11 @@ fn zcard(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Respo
         Some(e) => e,
         None => return Response::Integer(0),
     };
-    return match el.zcard() {
+
+    match el.zcard() {
         Ok(count) => Response::Integer(count as i64),
-        Err(err) => return Response::Error(err.to_string()),
-    };
+        Err(err) => Response::Error(err.to_string()),
+    }
 }
 
 fn zscore(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
@@ -1529,13 +1538,14 @@ fn zscore(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Resp
         Some(e) => e,
         None => return Response::Nil,
     };
-    return match el.zscore(element) {
+
+    match el.zscore(element) {
         Ok(s) => match s {
             Some(score) => Response::Data(format!("{}", score).into_bytes()),
             None => Response::Nil,
         },
-        Err(err) => return Response::Error(err.to_string()),
-    };
+        Err(err) => Response::Error(err.to_string()),
+    }
 }
 
 fn zincrby(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
@@ -1551,7 +1561,8 @@ fn zincrby(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Res
         }
     };
     db.key_updated(dbindex, &key);
-    return Response::Data(format!("{}", newscore).into_bytes());
+
+    Response::Data(format!("{}", newscore).into_bytes())
 }
 
 fn zrem(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
@@ -1578,7 +1589,8 @@ fn zrem(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Respon
     if count > 0 {
         db.key_updated(dbindex, &key);
     }
-    return Response::Integer(count);
+
+    Response::Integer(count)
 }
 
 fn zremrangebyscore(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Response {
@@ -1769,9 +1781,8 @@ fn zrevrangebyscore(parser: &mut ParsedCommand, db: &mut Database, dbindex: usiz
     generic_zrangebyscore(parser, db, dbindex, true)
 }
 
-fn get_vec_bound(_m: Vec<u8>) -> Result<Bound<Vec<u8>>, Response> {
-    let mut m = _m;
-    if m.len() == 0 {
+fn get_vec_bound(mut m: Vec<u8>) -> Result<Bound<Vec<u8>>, Response> {
+    if m.is_empty() {
         return Err(Response::Error(
             "ERR min or max not valid string range item".to_string(),
         ));
@@ -1781,7 +1792,7 @@ fn get_vec_bound(_m: Vec<u8>) -> Result<Bound<Vec<u8>>, Response> {
         '(' => Bound::Excluded(m),
         '[' => Bound::Included(m),
         '-' => {
-            if m.len() > 0 {
+            if !m.is_empty() {
                 return Err(Response::Error(
                     "ERR min or max not valid string range item".to_string(),
                 ));
@@ -1789,7 +1800,7 @@ fn get_vec_bound(_m: Vec<u8>) -> Result<Bound<Vec<u8>>, Response> {
             Bound::Unbounded
         }
         '+' => {
-            if m.len() > 0 {
+            if !m.is_empty() {
                 return Err(Response::Error(
                     "ERR min or max not valid string range item".to_string(),
                 ));
@@ -1902,7 +1913,7 @@ fn zlexcount(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> R
 fn generic_zrank(
     db: &mut Database,
     dbindex: usize,
-    key: &Vec<u8>,
+    key: &[u8],
     member: Vec<u8>,
     rev: bool,
 ) -> Response {
@@ -1916,10 +1927,10 @@ fn generic_zrank(
     };
     match el.zrank(member) {
         Ok(r) => match r {
-            Some(v) => return Response::Integer(if rev { card - v - 1 } else { v } as i64),
-            None => return Response::Nil,
+            Some(v) => Response::Integer(if rev { card - v - 1 } else { v } as i64),
+            None => Response::Nil,
         },
-        Err(err) => return Response::Error(err.to_string()),
+        Err(err) => Response::Error(err.to_string()),
     }
 }
 
@@ -2026,7 +2037,6 @@ fn zinterstore(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) ->
 }
 
 fn ping(parser: &mut ParsedCommand, client: &mut Client) -> Response {
-    #![allow(unused_variables)]
     validate!(
         parser.argv.len() <= 2,
         format!(
@@ -2034,7 +2044,8 @@ fn ping(parser: &mut ParsedCommand, client: &mut Client) -> Response {
             parser.get_str(0).unwrap()
         )
     );
-    if client.subscriptions.len() > 0 {
+
+    if !client.subscriptions.is_empty() {
         if parser.argv.len() == 2 {
             match parser.get_vec(1) {
                 Ok(r) => Response::Array(vec![Response::Data(b"pong".to_vec()), Response::Data(r)]),
@@ -2046,15 +2057,13 @@ fn ping(parser: &mut ParsedCommand, client: &mut Client) -> Response {
                 Response::Data(vec![]),
             ])
         }
-    } else {
-        if parser.argv.len() == 2 {
-            match parser.get_vec(1) {
-                Ok(r) => Response::Data(r),
-                Err(err) => Response::Error(err.to_string()),
-            }
-        } else {
-            Response::Status("PONG".to_owned())
+    } else if parser.argv.len() == 2 {
+        match parser.get_vec(1) {
+            Ok(r) => Response::Data(r),
+            Err(err) => Response::Error(err.to_string()),
         }
+    } else {
+        Response::Status("PONG".to_owned())
     }
 }
 
@@ -2094,7 +2103,7 @@ fn unsubscribe(
     sender: &Sender<Option<Response>>,
 ) -> Result<Response, ResponseError> {
     if parser.argv.len() == 1 {
-        if subscriptions.len() == 0 {
+        if subscriptions.is_empty() {
             let _ = sender.send(Some(
                 PubsubEvent::Unsubscription(vec![], pattern_subscriptions_len).as_response(),
             ));
@@ -2110,11 +2119,8 @@ fn unsubscribe(
     } else {
         for i in 1..parser.argv.len() {
             let channel_name = try_opt_validate!(parser.get_vec(i), "Invalid channel");
-            match subscriptions.remove(&channel_name) {
-                Some(subscriber_id) => {
-                    db.unsubscribe(channel_name.clone(), subscriber_id);
-                }
-                None => (),
+            if let Some(subscriber_id) = subscriptions.remove(&channel_name) {
+                db.unsubscribe(channel_name.clone(), subscriber_id);
             }
             let _ = sender.send(Some(
                 PubsubEvent::Unsubscription(
@@ -2162,7 +2168,7 @@ fn punsubscribe(
     sender: &Sender<Option<Response>>,
 ) -> Result<Response, ResponseError> {
     if parser.argv.len() == 1 {
-        if pattern_subscriptions.len() == 0 {
+        if pattern_subscriptions.is_empty() {
             let _ = sender.send(Some(
                 PubsubEvent::PatternUnsubscription(vec![], subscriptions_len).as_response(),
             ));
@@ -2177,11 +2183,8 @@ fn punsubscribe(
     } else {
         for i in 1..parser.argv.len() {
             let pattern = try_opt_validate!(parser.get_vec(i), "Invalid pattern");
-            match pattern_subscriptions.remove(&pattern) {
-                Some(subscriber_id) => {
-                    db.punsubscribe(pattern.clone(), subscriber_id);
-                }
-                None => (),
+            if let Some(subscriber_id) = pattern_subscriptions.remove(&pattern) {
+                db.punsubscribe(pattern.clone(), subscriber_id);
             }
             let _ = sender.send(Some(
                 PubsubEvent::PatternUnsubscription(
@@ -2210,15 +2213,13 @@ fn monitor(
     validate_arguments_exact!(parser, 1);
     let (tx, rx) = channel();
     db.monitor_add(tx);
-    thread::spawn(move || loop {
-        let r = match rx.recv() {
-            Ok(r) => r,
-            Err(_) => break,
-        };
-        match rawsender.send(Some(Response::Status(r))) {
-            Ok(_) => (),
-            Err(_) => break,
-        }
+    thread::spawn(move || {
+        while rx
+            .recv()
+            .ok()
+            .and_then(|r| rawsender.send(Some(Response::Status(r))).ok())
+            .is_some()
+        {}
     });
     Response::Status("OK".to_owned())
 }
@@ -2325,9 +2326,9 @@ impl Client {
             pattern_subscriptions: HashMap::new(),
             multi: false,
             multi_commands: Vec::new(),
-            id: id,
+            id,
             watched_keys: HashSet::new(),
-            rawsender: rawsender,
+            rawsender,
         }
     }
 }
@@ -2339,7 +2340,7 @@ fn keys(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Respon
     // FIXME: This might be a bit suboptimal, as db.keys already allocates a vector.
     // Instead we should collect only once.
     let responses = db.keys(dbindex, &pattern);
-    Response::Array(responses.into_iter().map(|i| Response::Data(i)).collect())
+    Response::Array(responses.into_iter().map(Response::Data).collect())
 }
 
 fn watch(
@@ -2395,6 +2396,7 @@ fn multi(client: &mut Client) -> Response {
         Response::Status("OK".to_owned())
     }
 }
+
 fn exec(db: &mut Database, client: &mut Client) -> Response {
     if !client.multi {
         return Response::Error("ERR EXEC without MULTI".to_owned());
@@ -2422,52 +2424,76 @@ fn discard(db: &mut Database, client: &mut Client) -> Response {
     }
 }
 
-mod flags {
-    /// write command (may modify the key space).
-    pub const WRITE: u64 = 1;
-    /// read command  (will never modify the key space).
-    pub const READONLY: u64 = 2;
-    /// may increase memory usage once called. Don't allow if out of memory.
-    pub const DENYOOM: u64 = 4;
-    /// admin command, like SAVE or SHUTDOWN.
-    pub const ADMIN: u64 = 8;
-    /// Pub/Sub related command.
-    pub const PUBSUB: u64 = 16;
-    /// command not allowed in scripts.
-    pub const NOSCRIPT: u64 = 32;
-    /// random command. Command is not deterministic, that is, the same command
-    /// with the same arguments, with the same key space, may have different
-    /// results. For instance SPOP and RANDOMKEY are two random commands.
-    pub const RANDOM: u64 = 64;
-    /// Sort command output array if called from script, so that the output
-    /// is deterministic.
-    pub const SORT_FOR_SCRIPT: u64 = 128;
-    /// Allow command while loading the database.
-    pub const LOADING: u64 = 256;
-    /// Allow command while a slave has stale data but is not allowed to
-    /// server this data. Normally no command is accepted in this condition
-    /// but just a few.
-    pub const STALE: u64 = 512;
-    /// Do not automatically propagate the command on MONITOR.
-    pub const SKIP_MONITOR: u64 = 1024;
-    /// Perform an implicit ASKING for this command, so the command will be
-    /// accepted in cluster mode if the slot is marked as 'importing'.
-    pub const ASKING: u64 = 2048;
-    /// Fast command: O(1) or O(log(N)) command that should never delay
-    /// its execution as long as the kernel scheduler is giving us time.
-    /// Note that commands that may trigger a DEL as a side effect (like SET)
-    /// are not fast commands.
-    pub const FAST: u64 = 4096;
+bitflags! {
+    struct CommandFlags: u16 {
+        /// write command (may modify the key space).
+        const WRITE = 1;
+        /// read command  (will never modify the key space).
+        const READONLY = 2;
+        /// may increase memory usage once called. Don't allow if out of memory.
+        const DENYOOM = 4;
+        /// admin command, like SAVE or SHUTDOWN.
+        const ADMIN = 8;
+        /// Pub/Sub related command.
+        const PUBSUB = 16;
+        /// command not allowed in scripts.
+        const NOSCRIPT = 32;
+        /// random command. Command is not deterministic, that is, the same command
+        /// with the same arguments, with the same key space, may have different
+        /// results. For instance SPOP and RANDOMKEY are two random commands.
+        const RANDOM = 64;
+        /// Sort command output array if called from script, so that the output
+        /// is deterministic.
+        const SORT_FOR_SCRIPT = 128;
+        /// Allow command while loading the database.
+        const LOADING = 256;
+        /// Allow command while a slave has stale data but is not allowed to
+        /// server this data. Normally no command is accepted in this condition
+        /// but just a few.
+        const STALE = 512;
+        /// Do not automatically propagate the command on MONITOR.
+        const SKIP_MONITOR = 1024;
+        /// Perform an implicit ASKING for this command, so the command will be
+        /// accepted in cluster mode if the slot is marked as 'importing'.
+        const ASKING = 2048;
+        /// Fast command(1) or O(log(N)) command that should never delay
+        /// its execution as long as the kernel scheduler is giving us time.
+        /// Note that commands that may trigger a DEL as a side effect (like SET)
+        /// are not fast commands.
+        const FAST = 4096;
+    }
 }
-// arity
-// flags: flags as bitmask. Computed by Redis using the 'sflags' field.
-// first_key_index: first argument that is a key
-// last_key_index: last argument that is a key
-// key_step: step to get all the keys from first to last argument. For instance
-//           in MSET the step is two since arguments are key,val,key,val,...
-//
-fn command_properties(command_name: &str) -> (i64, u64, i64, i64, i64) {
-    use self::flags::*;
+
+// TODO: Only `flags` is ever used
+#[allow(dead_code)]
+struct CommandProperties {
+    arity: i64,
+    /// Flags as bitmask. Computed by Redis using the 'sflags' field.
+    flags: CommandFlags,
+    /// First argument that is a key
+    first_key_index: i64,
+    /// Last argument that is a key
+    last_key_index: i64,
+    /// Step to get all the keys from first to last argument. For instance
+    ///           in MSET the step is two since arguments are key,val,key,val,...
+    key_step: i64,
+}
+
+fn command_properties(command_name: &str) -> CommandProperties {
+    const ADMIN: CommandFlags = CommandFlags::ADMIN;
+    const ASKING: CommandFlags = CommandFlags::ASKING;
+    const DENYOOM: CommandFlags = CommandFlags::DENYOOM;
+    const FAST: CommandFlags = CommandFlags::FAST;
+    const LOADING: CommandFlags = CommandFlags::LOADING;
+    const NOSCRIPT: CommandFlags = CommandFlags::NOSCRIPT;
+    const PUBSUB: CommandFlags = CommandFlags::PUBSUB;
+    const RANDOM: CommandFlags = CommandFlags::RANDOM;
+    const READONLY: CommandFlags = CommandFlags::READONLY;
+    const SKIP_MONITOR: CommandFlags = CommandFlags::SKIP_MONITOR;
+    const SORT_FOR_SCRIPT: CommandFlags = CommandFlags::SORT_FOR_SCRIPT;
+    const STALE: CommandFlags = CommandFlags::STALE;
+    const WRITE: CommandFlags = CommandFlags::WRITE;
+
     let wm = WRITE | DENYOOM;
     let wf = WRITE | FAST;
     let wmf = WRITE | DENYOOM | FAST;
@@ -2475,7 +2501,7 @@ fn command_properties(command_name: &str) -> (i64, u64, i64, i64, i64) {
     let ls = LOADING | STALE;
     let ars = READONLY | ADMIN | NOSCRIPT;
     let sr = READONLY | SORT_FOR_SCRIPT;
-    match command_name {
+    let (arity, flags, first_key_index, last_key_index, key_step) = match command_name {
         "get" => (2, fr, 1, 1, 1),
         "set" => (3, wm, 1, 1, 1),
         "setnx" => (3, wmf, 1, 1, 1),
@@ -2646,19 +2672,29 @@ fn command_properties(command_name: &str) -> (i64, u64, i64, i64, i64) {
         "pfmerge" => (-2, wm, 1, -1, 1),
         "pfdebug" => (-3, WRITE, 0, 0, 0),
         "latency" => (-2, ars | ls, 0, 0, 0),
-        _ => (0, 0, 0, 0, 0),
-    }
-}
+        _ => (0, CommandFlags::empty(), 0, 0, 0),
+    };
 
-fn command_has_flags(command_name: &str, flags: u64) -> bool {
-    (command_properties(command_name).1 & flags) == flags
+    CommandProperties {
+        arity,
+        flags,
+        first_key_index,
+        last_key_index,
+        key_step,
+    }
 }
 
 #[test]
 fn command_has_flags_test() {
-    assert!(command_has_flags("set", flags::WRITE));
-    assert!(command_has_flags("setnx", flags::WRITE | flags::FAST));
-    assert!(!command_has_flags("append", flags::READONLY));
+    assert!(command_properties("set")
+        .flags
+        .contains(CommandFlags::WRITE));
+    assert!(command_properties("setnx")
+        .flags
+        .contains(CommandFlags::WRITE | CommandFlags::FAST));
+    assert!(!command_properties("append")
+        .flags
+        .contains(CommandFlags::READONLY));
 }
 
 fn execute_command(
@@ -2668,7 +2704,7 @@ fn execute_command(
     log: &mut bool,
     write: &mut bool,
 ) -> Result<Response, ResponseError> {
-    if parser.argv.len() == 0 {
+    if parser.argv.is_empty() {
         return Err(ResponseError::NoReply);
     }
     let command_name = &*match db.mapped_command(
@@ -2678,7 +2714,9 @@ fn execute_command(
         None => return Ok(Response::Error("unknown command".to_owned())),
     };
 
-    *write = !command_has_flags(command_name, flags::READONLY);
+    *write = !command_properties(command_name)
+        .flags
+        .contains(CommandFlags::READONLY);
 
     if db.config.requirepass.is_none() {
         client.auth = true;
@@ -2733,8 +2771,8 @@ fn execute_command(
         client.dbindex = dbindex;
         return Ok(Response::Status("OK".to_owned()));
     }
-    let dbindex = client.dbindex.clone();
-    return Ok(match command_name {
+    let dbindex = client.dbindex;
+    Ok(match command_name {
         "pexpireat" => pexpireat(parser, db, dbindex),
         "pexpire" => pexpire(parser, db, dbindex),
         "expireat" => expireat(parser, db, dbindex),
@@ -2768,7 +2806,7 @@ fn execute_command(
         "pfcount" => pfcount(parser, db, dbindex),
         "pfmerge" => pfmerge(parser, db, dbindex),
         "exists" => exists(parser, db, dbindex),
-        "ping" => return Ok(ping(parser, client)),
+        "ping" => ping(parser, client),
         "flushdb" => flushdb(parser, db, dbindex),
         "flushall" => flushall(parser, db, dbindex),
         "lpush" => lpush(parser, db, dbindex),
@@ -2785,9 +2823,9 @@ fn execute_command(
         "lset" => lset(parser, db, dbindex),
         "ltrim" => ltrim(parser, db, dbindex),
         "rpoplpush" => rpoplpush(parser, db, dbindex),
-        "brpoplpush" => return brpoplpush(parser, db, dbindex),
-        "brpop" => return brpop(parser, db, dbindex),
-        "blpop" => return blpop(parser, db, dbindex),
+        "brpoplpush" => brpoplpush(parser, db, dbindex)?,
+        "brpop" => brpop(parser, db, dbindex)?,
+        "blpop" => blpop(parser, db, dbindex)?,
         "sadd" => sadd(parser, db, dbindex),
         "srem" => srem(parser, db, dbindex),
         "sismember" => sismember(parser, db, dbindex),
@@ -2826,50 +2864,42 @@ fn execute_command(
         "keys" => keys(parser, db, dbindex),
         "watch" => watch(parser, db, dbindex, client.id, &mut client.watched_keys),
         "unwatch" => unwatch(parser, db, client.id, &mut client.watched_keys),
-        "subscribe" => {
-            return subscribe(
-                parser,
-                db,
-                &mut client.subscriptions,
-                client.pattern_subscriptions.len(),
-                &client.rawsender,
-            )
-        }
-        "unsubscribe" => {
-            return unsubscribe(
-                parser,
-                db,
-                &mut client.subscriptions,
-                client.pattern_subscriptions.len(),
-                &client.rawsender,
-            )
-        }
-        "psubscribe" => {
-            return psubscribe(
-                parser,
-                db,
-                client.subscriptions.len(),
-                &mut client.pattern_subscriptions,
-                &client.rawsender,
-            )
-        }
-        "punsubscribe" => {
-            return punsubscribe(
-                parser,
-                db,
-                client.subscriptions.len(),
-                &mut client.pattern_subscriptions,
-                &client.rawsender,
-            )
-        }
+        "subscribe" => subscribe(
+            parser,
+            db,
+            &mut client.subscriptions,
+            client.pattern_subscriptions.len(),
+            &client.rawsender,
+        )?,
+        "unsubscribe" => unsubscribe(
+            parser,
+            db,
+            &mut client.subscriptions,
+            client.pattern_subscriptions.len(),
+            &client.rawsender,
+        )?,
+        "psubscribe" => psubscribe(
+            parser,
+            db,
+            client.subscriptions.len(),
+            &mut client.pattern_subscriptions,
+            &client.rawsender,
+        )?,
+        "punsubscribe" => punsubscribe(
+            parser,
+            db,
+            client.subscriptions.len(),
+            &mut client.pattern_subscriptions,
+            &client.rawsender,
+        )?,
         "publish" => publish(parser, db),
         "monitor" => {
             *log = false;
             monitor(parser, db, client.rawsender.clone())
         }
         "info" => info(parser, db),
-        cmd => Response::Error(format!("ERR unknown command \"{}\"", cmd).to_owned()),
-    });
+        cmd => Response::Error(format!("ERR unknown command \"{}\"", cmd)),
+    })
 }
 
 pub fn command(
@@ -2905,9 +2935,24 @@ mod test_command {
     use super::{command, Client};
     use std::time::Duration;
 
+    macro_rules! parser {
+        ($str: expr) => {{
+            let mut _args = Vec::new();
+            let mut pos = 0;
+            for segment in $str.split(|x| *x == b' ') {
+                _args.push(Argument {
+                    pos: pos,
+                    len: segment.len(),
+                });
+                pos += segment.len() + 1;
+            }
+            ParsedCommand::new($str, _args)
+        }};
+    }
+
     fn getstr(database: &Database, key: &[u8]) -> String {
         match database.get(0, &key.to_vec()).unwrap() {
-            &Value::String(ref value) => from_utf8(&*value.to_vec()).unwrap().to_owned(),
+            &Value::String(value) => from_utf8(&*value.to_vec()).unwrap().to_owned(),
             _ => panic!("Got non-string"),
         }
     }
@@ -3522,7 +3567,7 @@ mod test_command {
         )
         .unwrap()
         {
-            Response::Data(ref v) => {
+            Response::Data(v) => {
                 assert_eq!(v[0], '2' as u8);
                 assert_eq!(v[1], '.' as u8);
                 assert!(v[2] == '1' as u8 || v[2] == '0' as u8);
@@ -3536,7 +3581,7 @@ mod test_command {
         )
         .unwrap()
         {
-            Response::Data(ref v) => {
+            Response::Data(v) => {
                 assert_eq!(v[0], '6' as u8);
                 assert_eq!(v[1], '.' as u8);
                 assert!(v[2] == '1' as u8 || v[2] == '2' as u8);
@@ -4118,11 +4163,11 @@ mod test_command {
             Response::Integer(3)
         );
         match command(parser!(b"smembers key"), &mut db, &mut Client::mock()).unwrap() {
-            Response::Array(ref arr) => {
+            Response::Array(arr) => {
                 let mut array = arr
                     .iter()
                     .map(|x| match x {
-                        &Response::Data(ref d) => d.clone(),
+                        &Response::Data(d) => d.clone(),
                         _ => panic!("Expected data"),
                     })
                     .collect::<Vec<_>>();
@@ -4276,7 +4321,7 @@ mod test_command {
         let mut r = arr
             .iter()
             .map(|el| match el {
-                &Response::Data(ref el) => el.clone(),
+                &Response::Data(el) => el.clone(),
                 _ => panic!("Expected data"),
             })
             .collect::<Vec<_>>();
@@ -4331,7 +4376,7 @@ mod test_command {
         let mut r = arr
             .iter()
             .map(|el| match el {
-                &Response::Data(ref el) => el.clone(),
+                &Response::Data(el) => el.clone(),
                 _ => panic!("Expected data"),
             })
             .collect::<Vec<_>>();
@@ -4353,7 +4398,7 @@ mod test_command {
         let mut r = arr
             .iter()
             .map(|el| match el {
-                &Response::Data(ref el) => el.clone(),
+                &Response::Data(el) => el.clone(),
                 _ => panic!("Expected data"),
             })
             .collect::<Vec<_>>();
@@ -4416,7 +4461,7 @@ mod test_command {
         let mut r = arr
             .iter()
             .map(|el| match el {
-                &Response::Data(ref el) => el.clone(),
+                &Response::Data(el) => el.clone(),
                 _ => panic!("Expected data"),
             })
             .collect::<Vec<_>>();
@@ -4438,7 +4483,7 @@ mod test_command {
         let mut r = arr
             .iter()
             .map(|el| match el {
-                &Response::Data(ref el) => el.clone(),
+                &Response::Data(el) => el.clone(),
                 _ => panic!("Expected data"),
             })
             .collect::<Vec<_>>();

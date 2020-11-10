@@ -45,7 +45,7 @@ impl Aof {
 
     pub fn write(&mut self, dbindex: usize, command: &ParsedCommand) -> io::Result<()> {
         self.select(dbindex)?;
-        self.fp.write(command.get_data())?;
+        self.fp.write_all(command.get_data())?;
         Ok(())
     }
 }
@@ -60,11 +60,11 @@ impl io::Read for Aof {
 mod test_aof {
     use std::env::temp_dir;
     use std::fs::File;
-    use std::io::Write;
     use std::io::Read;
+    use std::io::Write;
 
-    use parser::parse;
     use super::Aof;
+    use parser::parse;
 
     #[test]
     fn test_write() {
@@ -78,10 +78,15 @@ mod test_aof {
             w.write(10, &command).unwrap()
         }
         {
-            let mut data = String::with_capacity(100);;
-            File::open(path.as_path()).unwrap().read_to_string(&mut data).unwrap();
-            assert_eq!(data,
-                       "*2\r\n$6\r\nSELECT\r\n$2\r\n10\r\n*2\r\n$5\r\nhello\r\n$5\r\nworld\r\n");
+            let mut data = String::with_capacity(100);
+            File::open(path.as_path())
+                .unwrap()
+                .read_to_string(&mut data)
+                .unwrap();
+            assert_eq!(
+                data,
+                "*2\r\n$6\r\nSELECT\r\n$2\r\n10\r\n*2\r\n$5\r\nhello\r\n$5\r\nworld\r\n"
+            );
         }
     }
 
@@ -89,7 +94,10 @@ mod test_aof {
     fn test_read() {
         let mut path = temp_dir();
         path.push("aoftest2");
-        File::create(path.as_path()).unwrap().write(b"hello world").unwrap();
+        File::create(path.as_path())
+            .unwrap()
+            .write(b"hello world")
+            .unwrap();
 
         let mut r = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '!' as u8];
         let mut aof = Aof::new(path.as_path()).unwrap();

@@ -2,6 +2,7 @@
 name = "networking"
 version = "0.1.0"
 authors = ["Sebastian Waisbrot <seppo0010@gmail.com>"]
+edition = "2018"
 
 [dependencies.config]
 path = "../config"
@@ -28,9 +29,9 @@ path = "../command"
 net2 = { version = "0.2.2", features = ["nightly"] }
 
 [target.x86_64-unknown-linux-gnu.dependencies]
-libc ="0.1.8"
+fork = "0.1"
 unix_socket = "0.4.3"
 
 [target.x86_64-apple-darwin.dependencies]
-libc ="0.1.8"
+fork = "0.1"
 unix_socket = "0.4.3"

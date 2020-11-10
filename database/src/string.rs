@@ -1,6 +1,6 @@
 use std::io;
 use std::io::Write;
-use std::str::from_utf8;
+use std::str;
 
 use basichll::HLL;
 use dbutil::normalize_position;
@@ -16,87 +16,63 @@ pub enum ValueString {
     Data(Vec<u8>),
 }
 
-fn to_i64(newvalue: &Vec<u8>) -> Option<i64> {
-    if newvalue.len() > 0 && newvalue.len() < 32 {
-        // ought to be enough!
-        if newvalue[0] as char != '0' && newvalue[0] as char != ' ' {
-            if let Ok(utf8) = from_utf8(&*newvalue) {
-                if let Ok(i) = utf8.parse::<i64>() {
-                    return Some(i);
-                }
-            }
-        }
+fn parse_utf8<T: str::FromStr>(newvalue: &[u8]) -> Option<T> {
+    if let Some(b'0') = newvalue.first() {
+        None
+    } else {
+        str::from_utf8(newvalue).ok().and_then(|s| s.parse().ok())
     }
-    return None;
-}
-
-fn to_f64(newvalue: &Vec<u8>) -> Option<f64> {
-    if newvalue.len() > 0 && newvalue.len() < 32 {
-        // ought to be enough!
-        if newvalue[0] as char != '0' && newvalue[0] as char != ' ' {
-            if let Ok(utf8) = from_utf8(&*newvalue) {
-                if let Ok(f) = utf8.parse::<f64>() {
-                    return Some(f);
-                }
-            }
-        }
-    }
-    return None;
 }
 
 impl ValueString {
     pub fn new(newvalue: Vec<u8>) -> Self {
-        match to_i64(&newvalue) {
+        match parse_utf8(&newvalue) {
             Some(i) => ValueString::Integer(i),
             None => ValueString::Data(newvalue),
         }
     }
 
     pub fn to_vec(&self) -> Vec<u8> {
-        match *self {
-            ValueString::Data(ref data) => data.clone(),
-            ValueString::Integer(ref int) => format!("{}", int).into_bytes(),
+        match self {
+            ValueString::Data(data) => data.clone(),
+            ValueString::Integer(int) => int.to_string().into_bytes(),
         }
     }
 
     pub fn strlen(&self) -> usize {
-        match *self {
-            ValueString::Data(ref data) => data.len(),
-            ValueString::Integer(ref int) => format!("{}", int).len(),
+        match self {
+            ValueString::Data(data) => data.len(),
+            ValueString::Integer(int) => int.to_string().len(),
         }
     }
 
     pub fn append(&mut self, newvalue: Vec<u8>) {
-        match *self {
-            ValueString::Data(ref mut data) => data.extend(newvalue),
+        match self {
+            ValueString::Data(data) => data.extend(newvalue),
             ValueString::Integer(i) => {
-                let oldstr = format!("{}", i);
+                let oldstr = i.to_string();
                 *self = ValueString::new([oldstr.into_bytes(), newvalue].concat());
             }
         };
     }
 
     pub fn incr(&mut self, incr: i64) -> Result<i64, OperationError> {
-        let val = match *self {
-            ValueString::Integer(i) => i,
-            ValueString::Data(ref data) => match to_i64(data) {
-                Some(i) => i,
-                None => {
-                    return Err(OperationError::ValueError(
-                        "ERR value is not a valid integer".to_owned(),
-                    ))
-                }
-            },
+        let val = match self {
+            ValueString::Integer(i) => *i,
+            ValueString::Data(data) => parse_utf8(data).ok_or_else(|| {
+                OperationError::ValueError("ERR value is not a valid integer".to_owned())
+            })?,
         };
+
         let newval = val.checked_add(incr).ok_or(OperationError::OverflowError)?;
-        *self = ValueString::Integer(newval.clone());
+        *self = ValueString::Integer(newval);
         Ok(newval)
     }
 
     pub fn incrbyfloat(&mut self, incr: f64) -> Result<f64, OperationError> {
-        let val = match *self {
-            ValueString::Integer(i) => i as f64,
-            ValueString::Data(ref data) => match to_f64(data) {
+        let val = match self {
+            ValueString::Integer(i) => *i as f64,
+            ValueString::Data(data) => match parse_utf8(data) {
                 Some(f) => f,
                 None => {
                     return Err(OperationError::ValueError(
@@ -111,9 +87,9 @@ impl ValueString {
     }
 
     pub fn getrange(&self, _start: i64, _stop: i64) -> Vec<u8> {
-        let s = match *self {
-            ValueString::Integer(ref i) => format!("{}", i).into_bytes(),
-            ValueString::Data(ref s) => s.clone(),
+        let s = match self {
+            ValueString::Integer(i) => format!("{}", i).into_bytes(),
+            ValueString::Data(s) => s.clone(),
         };
 
         let len = s.len();
@@ -148,12 +124,13 @@ impl ValueString {
     }
 
     pub fn setbit(&mut self, bitoffset: usize, on: bool) -> bool {
-        match *self {
+        match self {
             ValueString::Integer(i) => *self = ValueString::Data(format!("{}", i).into_bytes()),
             ValueString::Data(_) => (),
         };
-        let d = match *self {
-            ValueString::Data(ref mut d) => d,
+
+        let d = match self {
+            ValueString::Data(d) => d,
             _ => panic!("Value should be data"),
         };
 
@@ -176,12 +153,12 @@ impl ValueString {
 
     pub fn getbit(&self, bitoffset: usize) -> bool {
         let tmp;
-        let d = match *self {
+        let d = match self {
             ValueString::Integer(i) => {
                 tmp = format!("{}", i).into_bytes();
                 &tmp
             }
-            ValueString::Data(ref d) => d,
+            ValueString::Data(d) => d,
         };
 
         let byte = bitoffset >> 3;
@@ -196,17 +173,17 @@ impl ValueString {
     }
 
     pub fn setrange(&mut self, _index: usize, data: Vec<u8>) -> usize {
-        if data.len() == 0 {
+        if data.is_empty() {
             return self.strlen();
         }
 
-        match *self {
+        match self {
             ValueString::Integer(i) => *self = ValueString::Data(format!("{}", i).into_bytes()),
             ValueString::Data(_) => (),
         }
 
         let d = match self {
-            &mut ValueString::Data(ref mut s) => s,
+            ValueString::Data(s) => s,
             _ => panic!("String must be data"),
         };
 
@@ -241,12 +218,11 @@ impl ValueString {
     }
 
     pub fn pfcount(&self) -> Result<usize, OperationError> {
-        let hll = if self.strlen() == 0 {
-            return Ok(0);
+        Ok(if self.strlen() == 0 {
+            0
         } else {
-            HLL::from_vec(self.to_vec())
-        };
-        Ok(hll.count().round() as usize)
+            HLL::from_vec(self.to_vec()).count().round() as usize
+        })
     }
 
     pub fn pfmerge(&mut self, data: Vec<&ValueString>) -> Result<(), OperationError> {
@@ -266,17 +242,15 @@ impl ValueString {
 
     pub fn dump<T: Write>(&self, writer: &mut T) -> io::Result<usize> {
         let mut v = vec![];
-        match *self {
-            ValueString::Integer(ref i) => match encode_i64(i.clone(), &mut v) {
+        match self {
+            ValueString::Integer(i) => match encode_i64(*i, &mut v) {
                 Ok(s) => s,
                 Err(e) => match e {
                     EncodeError::IOError(e) => return Err(e),
-                    EncodeError::OverflowError => {
-                        encode_slice_u8(&*self.to_vec(), &mut v, false)?
-                    }
+                    EncodeError::OverflowError => encode_slice_u8(&*self.to_vec(), &mut v, false)?,
                 },
             },
-            ValueString::Data(ref d) => encode_slice_u8(&*d, &mut v, true)?,
+            ValueString::Data(d) => encode_slice_u8(&*d, &mut v, true)?,
         };
         let data = [
             vec![TYPE_STRING],
@@ -291,16 +265,16 @@ impl ValueString {
     pub fn debug_object(&self) -> String {
         let mut serialized_data = vec![];
         let serialized = self.dump(&mut serialized_data).unwrap();
-        let encoding = match *self {
+        let encoding = match self {
             ValueString::Integer(_) => "int",
             ValueString::Data(_) => "raw",
         };
+
         format!(
             "Value at:0x0000000000 refcount:1 encoding:{} serializedlength:{} lru:0 \
              lru_seconds_idle:0",
             encoding, serialized
         )
-        .to_owned()
     }
 }
 

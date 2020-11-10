@@ -11,15 +11,12 @@ use networking::Server;
 
 fn main() {
     let mut config = Config::new(Logger::new(Level::Notice));
-    match args().nth(1) {
-        Some(f) => match config.parsefile(f) {
-            Ok(_) => (),
-            Err(_) => {
-                exit(1);
-            }
-        },
-        None => (),
+    if let Some(f) = args().nth(1) {
+        if config.parsefile(f).is_err() {
+            exit(1);
+        }
     }
+
     let (port, daemonize) = (config.port, config.daemonize);
     let mut server = Server::new(config);
     {

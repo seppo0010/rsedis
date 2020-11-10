@@ -26,13 +26,14 @@ pub fn normalize_position(position: i64, _len: usize) -> Result<usize, bool> {
     if pos < 0 {
         pos += len;
     }
+
     if pos < 0 {
-        return Err(false);
+        Err(false)
+    } else if pos >= len {
+        Err(true)
+    } else {
+        Ok(pos as usize)
     }
-    if pos >= len {
-        return Err(true);
-    }
-    return Ok(pos as usize);
 }
 
 /// Creates an ASCII representation of a number
@@ -59,13 +60,14 @@ pub fn usize_to_vec(i: usize) -> Vec<u8> {
 /// assert!(vec_to_usize(&b"0".to_vec()).is_ok());
 /// assert!(vec_to_usize(&b"".to_vec()).is_err());
 /// ```
-pub fn vec_to_usize(data: &Vec<u8>) -> Result<usize, OperationError> {
+pub fn vec_to_usize(data: &[u8]) -> Result<usize, OperationError> {
     // "01" should not be transformed into 1
-    if data.len() == 0 || (data.len() > 1 && data[0] as char == '0') {
+    if data.is_empty() || (data.len() > 1 && data[0] as char == '0') {
         return Err(OperationError::ValueError(
             "ERR value is not an integer".to_owned(),
         ));
     }
+
     let res = from_utf8(&data)?;
     Ok(res.parse::<usize>()?)
 }

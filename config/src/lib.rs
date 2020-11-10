@@ -83,19 +83,19 @@ fn read_bool(args: Vec<Vec<u8>>) -> Result<bool, ConfigError> {
 impl Config {
     pub fn default(port: u16, logger: Logger) -> Config {
         Config {
-            logger: logger,
+            logger,
             active_rehashing: true,
             daemonize: false,
             databases: 16,
             pidfile: "/var/run/rsedis.pid".to_owned(),
             dir: "./".to_owned(),
             bind: vec![],
-            port: port,
+            port,
             tcp_keepalive: 0,
             set_max_intset_entries: 512,
             timeout: 0,
             unixsocket: None,
-            unixsocketperm: 0700,
+            unixsocketperm: 0o700,
             rename_commands: HashMap::new(),
             requirepass: None,
             tcp_backlog: 511,

@@ -12,6 +12,12 @@ pub enum ValueList {
     Data(LinkedList<Vec<u8>>),
 }
 
+impl Default for ValueList {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ValueList {
     pub fn new() -> Self {
         ValueList::Data(LinkedList::new())
@@ -41,14 +47,14 @@ impl ValueList {
         }
     }
 
-    pub fn lindex(&self, _index: i64) -> Option<&Vec<u8>> {
+    pub fn lindex(&self, _index: i64) -> Option<&[u8]> {
         match *self {
             ValueList::Data(ref list) => {
                 let index = match normalize_position(_index, list.len()) {
                     Ok(i) => i,
                     Err(_) => return None,
                 };
-                list.iter().nth(index as usize)
+                list.iter().nth(index as usize).map(|a| &a[..])
             }
         }
     }
@@ -63,7 +69,7 @@ impl ValueList {
                     list.append(&mut right);
                     Some(list.len())
                 }
-                None => return None,
+                None => None,
             },
         }
     }
@@ -74,7 +80,7 @@ impl ValueList {
         }
     }
 
-    pub fn lrange(&self, _start: i64, _stop: i64) -> Vec<&Vec<u8>> {
+    pub fn lrange(&self, _start: i64, _stop: i64) -> Vec<&[u8]> {
         match *self {
             ValueList::Data(ref list) => {
                 let len = list.len();
@@ -101,6 +107,7 @@ impl ValueList {
                 list.iter()
                     .skip(start as usize)
                     .take(stop as usize - start as usize + 1)
+                    .map(|a| &a[..])
                     .collect::<Vec<_>>()
             }
         }
@@ -160,7 +167,7 @@ impl ValueList {
                     Err(_) => return Err(OperationError::OutOfBoundsError),
                 };
                 // this unwrap is safe because `i` is already validated to be inside the list
-                let el = list.iter_mut().skip(i).next().unwrap();
+                let el = list.iter_mut().nth(i).unwrap();
                 *el = newvalue;
                 Ok(())
             }
@@ -227,12 +234,12 @@ impl ValueList {
         let encoding = match *self {
             ValueList::Data(_) => "linkedlist",
         };
+
         format!(
             "Value at:0x0000000000 refcount:1 encoding:{} serializedlength:{} lru:0 \
              lru_seconds_idle:0",
             encoding, serialized
         )
-        .to_owned()
     }
 }
 

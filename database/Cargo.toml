@@ -4,14 +4,12 @@ name = "database"
 version = "0.1.0"
 
 [dependencies]
-crc64 = "0.2.2"
+crc64 = "0.2"
 rand = "0.3"
-rehashinghashmap = "0.1.0"
+rehashinghashmap = "0.1"
+skiplist = "0.3"
+basichll = "0.3"
 
-[dependencies.skiplist]
-skiplist = "0.3.0"
-[dependencies.basichll]
-basichll = "0.3.1"
 [dependencies.config]
 path = "../config"
 

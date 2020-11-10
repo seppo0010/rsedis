@@ -215,62 +215,60 @@ impl Logger {
             let mut output = output;
             let mut syslog_writer: Option<Box<syslog::Logger>> = None;
             thread::spawn(move || {
-                loop {
-                    let (_output, _level, _msg, _syslog_writer, _code) = match rx.recv() {
-                        Ok(m) => m,
-                        Err(_) => break,
-                    };
-                    if _msg.is_some() {
-                        let lvl = _level.unwrap();
-                        if level.contains(&lvl) {
-                            let msg = _msg.unwrap();
-                            match write!(output, "{}", format!("{}\n", msg)) {
-                                Ok(_) => (),
-                                Err(e) => {
-                                    // failing to log a message... will write straight to stderr
-                                    // if we cannot do that, we'll panic
-                                    write!(stderr(), "Failed to log {:?} {}", e, msg).unwrap();
-                                }
-                            };
-                            if let Some(ref mut w) = syslog_writer {
-                                match w.send_3164(
-                                    match lvl {
-                                        Level::Debug => syslog::Severity::LOG_DEBUG,
-                                        Level::Verbose => syslog::Severity::LOG_INFO,
-                                        Level::Notice => syslog::Severity::LOG_NOTICE,
-                                        Level::Warning => syslog::Severity::LOG_WARNING,
-                                    },
-                                    msg.clone(),
-                                ) {
+                while let Ok((out, lvl, msg, syslog, code)) = rx.recv() {
+                    match (out, lvl, msg, syslog) {
+                        (_, Some(lvl), Some(msg), _) => {
+                            if level.contains(&lvl) {
+                                match write!(output, "{}", format!("{}\n", msg)) {
                                     Ok(_) => (),
                                     Err(e) => {
                                         // failing to log a message... will write straight to stderr
                                         // if we cannot do that, we'll panic
-                                        write!(stderr(), "Failed to log {:?} {}", e, msg).unwrap();
+                                        eprint!("Failed to log {:?} {}", e, msg);
+                                    }
+                                };
+                                if let Some(ref mut w) = syslog_writer {
+                                    match w.send_3164(
+                                        match lvl {
+                                            Level::Debug => syslog::Severity::LOG_DEBUG,
+                                            Level::Verbose => syslog::Severity::LOG_INFO,
+                                            Level::Notice => syslog::Severity::LOG_NOTICE,
+                                            Level::Warning => syslog::Severity::LOG_WARNING,
+                                        },
+                                        msg.clone(),
+                                    ) {
+                                        Ok(_) => (),
+                                        Err(e) => {
+                                            // failing to log a message... will write straight to stderr
+                                            // if we cannot do that, we'll panic
+                                            eprint!("Failed to log {:?} {}", e, msg);
+                                        }
                                     }
                                 }
                             }
                         }
-                    } else if _level.is_some() {
-                        level = _level.unwrap();
-                    } else if _output.is_some() {
-                        output = _output.unwrap();
-                    } else if _syslog_writer.is_some() {
-                        syslog_writer = _syslog_writer.unwrap();
-                    } else {
-                        panic!(
-                            "Unknown message {:?}",
-                            (_output, _level, _msg, _syslog_writer.is_some())
-                        );
+                        (_, Some(lvl), _, _) => {
+                            level = lvl;
+                        }
+                        (Some(out), _, _, _) => {
+                            output = out;
+                        }
+                        (_, _, _, Some(syslog)) => {
+                            syslog_writer = syslog;
+                        }
+                        (out, lvl, msg, syslog) => {
+                            panic!("Unknown message {:?}", (out, lvl, msg, syslog.is_some()));
+                        }
                     }
-                    if let Some(code) = _code {
+
+                    if let Some(code) = code {
                         process::exit(code);
                     }
                 }
             });
         }
 
-        Logger { tx: tx }
+        Logger { tx }
     }
 
     #[cfg(not(unix))]
@@ -382,8 +380,8 @@ impl Logger {
 
     /// Enables syslog.
     #[cfg(unix)]
-    pub fn set_syslog(&mut self, ident: &String, facility: &String) {
-        let mut w = syslog::unix(match &*(&*facility.clone()).to_ascii_lowercase() {
+    pub fn set_syslog(&mut self, ident: &str, facility: &str) {
+        let mut w = syslog::unix(match &*facility.to_ascii_lowercase() {
             "local0" => syslog::Facility::LOG_LOCAL0,
             "local1" => syslog::Facility::LOG_LOCAL1,
             "local2" => syslog::Facility::LOG_LOCAL2,
@@ -395,14 +393,14 @@ impl Logger {
             _ => syslog::Facility::LOG_USER,
         })
         .unwrap();
-        w.set_process_name(ident.clone());
+        w.set_process_name(ident.to_owned());
         self.tx
             .send((None, None, None, Some(Some(w)), None))
             .unwrap();
     }
 
     #[cfg(not(unix))]
-    pub fn set_syslog(&mut self, _: &String, _: &String) {}
+    pub fn set_syslog(&mut self, _: &str, _: &str) {}
 
     /// Changes the output to be a file in `path`.
     pub fn set_logfile(&mut self, path: &str) -> io::Result<()> {
@@ -420,15 +418,13 @@ impl Logger {
     pub fn sender(&self) -> Sender<(Level, String)> {
         let (tx, rx) = channel();
         let tx2 = self.tx.clone();
-        thread::spawn(move || loop {
-            let (level, message) = match rx.recv() {
-                Ok(msg) => msg,
-                Err(_) => break,
-            };
-            match tx2.send((None, Some(level), Some(message), None, None)) {
-                Ok(_) => (),
-                Err(_) => break,
-            };
+        thread::spawn(move || {
+            while let Ok((level, message)) = rx.recv() {
+                match tx2.send((None, Some(level), Some(message), None, None)) {
+                    Ok(_) => (),
+                    Err(_) => break,
+                };
+            }
         });
         tx
     }

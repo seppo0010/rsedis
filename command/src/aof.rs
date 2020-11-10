@@ -5,9 +5,9 @@ use database::Database;
 use logger::Level;
 use parser::{ParseError, Parser};
 
-use command;
+use crate::command;
 
-const UNEXPECTED_END: &'static str =
+const UNEXPECTED_END: &str =
     "Unexpected end of file reading the append only file. You can: 1) Make a backup of your AOF \
      file, then use ./redis-check-aof --fix <filename>. 2) Alternatively you can set the \
      'aof-load-truncated' configuration option to yes and restart the server.";
@@ -34,7 +34,7 @@ pub fn load(db: &mut Database) {
             if len == 0 {
                 if parser.written > parser.position {
                     if !db.config.aof_load_truncated {
-                        log_and_exit!(db.config.logger, Warning, 1, "{}", UNEXPECTED_END);
+                        logger::log_and_exit!(db.config.logger, Warning, 1, "{}", UNEXPECTED_END);
                     }
                     aof.truncate(parser.position);
                 }
@@ -51,7 +51,7 @@ pub fn load(db: &mut Database) {
                     }
                     // TODO: break, continue, or panic?
                     ParseError::BadProtocol(s) => {
-                        log!(
+                        logger::log!(
                             db.config.logger,
                             Warning,
                             "Bad file format reading the append only file {:?}",
@@ -59,7 +59,7 @@ pub fn load(db: &mut Database) {
                         );
                         break;
                     }
-                    _ => panic!("Broken aof {:?}"),
+                    other => panic!("Broken aof {:?}", other),
                 }
             }
         };
@@ -67,7 +67,7 @@ pub fn load(db: &mut Database) {
         command::command(parsed_command, db, &mut client).unwrap();
     }
     if client.multi && !db.config.aof_load_truncated {
-        log_and_exit!(db.config.logger, Warning, 1, "{}", UNEXPECTED_END);
+        logger::log_and_exit!(db.config.logger, Warning, 1, "{}", UNEXPECTED_END);
     }
     db.aof = Some(aof);
     db.loading = false;

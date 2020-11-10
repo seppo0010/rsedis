@@ -115,10 +115,7 @@ impl OwnedParsedCommand {
 impl<'a> ParsedCommand<'a> {
     /// Creates a new parser with the data and arguments provided
     pub fn new(data: &[u8], argv: Vec<Argument>) -> ParsedCommand {
-        return ParsedCommand {
-            data,
-            argv,
-        };
+        ParsedCommand { data, argv }
     }
 
     /// Gets a `Bound` from a parameter.
@@ -150,6 +147,7 @@ impl<'a> ParsedCommand<'a> {
         if s == "inf" || s == "+inf" || s == "-inf" {
             return Ok(Bound::Unbounded);
         }
+
         if s.starts_with('(') {
             let f = s[1..].parse::<f64>()?;
             if f.is_nan() {
@@ -158,10 +156,12 @@ impl<'a> ParsedCommand<'a> {
             return Ok(Bound::Excluded(f));
         }
         let f = s.parse::<f64>()?;
+
         if f.is_nan() {
-            return Err(ParseError::InvalidArgument);
+            Err(ParseError::InvalidArgument)
+        } else {
+            Ok(Bound::Included(f))
         }
-        Ok(Bound::Included(f))
     }
 
     // TODO: get<T>
@@ -185,9 +185,10 @@ impl<'a> ParsedCommand<'a> {
         }
         let f = s.parse::<f64>()?;
         if f.is_nan() {
-            return Err(ParseError::InvalidArgument);
+            Err(ParseError::InvalidArgument)
+        } else {
+            Ok(f)
         }
-        Ok(f)
     }
 
     /// Gets an i64 from a parameter
@@ -201,6 +202,7 @@ impl<'a> ParsedCommand<'a> {
     /// ```
     pub fn get_i64(&self, pos: usize) -> Result<i64, ParseError> {
         let s = self.get_str(pos)?;
+
         Ok(s.parse::<i64>()?)
     }
 
@@ -311,6 +313,7 @@ fn parse_int(input: &[u8], len: usize, name: &str) -> Result<(Option<usize>, usi
             input[i] as char
         )));
     }
+
     Ok((argco, i + 1))
 }
 
@@ -386,10 +389,7 @@ pub fn parse(input: &[u8]) -> Result<(ParsedCommand, usize), ParseError> {
             return Err(ParseError::BadProtocol("invalid bulk length".to_owned()));
         }
         pos += arglenlen;
-        let arg = Argument {
-            pos: pos,
-            len: arglen,
-        };
+        let arg = Argument { pos, len: arglen };
         argv.push(arg);
         pos += arglen + 2;
         if pos > len || (pos == len && i != argc - 1) {
@@ -404,6 +404,12 @@ pub struct Parser {
     data: Vec<u8>,
     pub position: usize,
     pub written: usize,
+}
+
+impl Default for Parser {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Parser {
@@ -447,6 +453,7 @@ impl Parser {
         }
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> Result<ParsedCommand, ParseError> {
         let data = &(&*self.data)[self.position..self.written];
         let (r, len) = parse(data)?;
