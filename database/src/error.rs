@@ -15,22 +15,28 @@ pub enum OperationError {
     IOError(io::Error),
 }
 
+impl OperationError {
+    fn message(&self) -> &str {
+        match self {
+            OperationError::WrongTypeError => {
+                "WRONGTYPE Operation against a key holding the wrong kind of value"
+            }
+            OperationError::NotANumberError => "ERR resulting score is not a number (NaN)",
+            OperationError::ValueError(s) => s,
+            _ => "ERR",
+        }
+    }
+}
+
 impl fmt::Display for OperationError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.to_string().fmt(f)
+        self.message().fmt(f)
     }
 }
 
 impl Error for OperationError {
     fn description(&self) -> &str {
-        match *self {
-            OperationError::WrongTypeError => {
-                "WRONGTYPE Operation against a key holding the wrong kind of value"
-            }
-            OperationError::NotANumberError => "ERR resulting score is not a number (NaN)",
-            OperationError::ValueError(ref s) => &*s,
-            _ => "ERR",
-        }
+        self.message()
     }
 }
 

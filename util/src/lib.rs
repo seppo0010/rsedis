@@ -43,15 +43,15 @@ pub fn match_char(e1: &u8, e2: &u8, ignore_case: bool) -> bool {
 /// assert!(!glob_match(&b"fooba?".to_vec(), &b"foofoo".to_vec(), false));
 /// ```
 #[must_use]
-pub fn glob_match(pattern: &Vec<u8>, element: &Vec<u8>, ignore_case: bool) -> bool {
+pub fn glob_match(pattern: &[u8], element: &[u8], ignore_case: bool) -> bool {
     let mut patternpos = 0;
     let mut elementpos = 0;
 
-    let star = '*' as u8;
-    let question_mark = '?' as u8;
-    let backslash = '\\' as u8;
-    let open_bracket = '[' as u8;
-    let close_bracket = ']' as u8;
+    let star = b'*';
+    let question_mark = b'?';
+    let backslash = b'\\';
+    let open_bracket = b'[';
+    let close_bracket = b']';
 
     while patternpos < pattern.len() {
         match pattern[patternpos] {
@@ -91,7 +91,7 @@ pub fn glob_match(pattern: &Vec<u8>, element: &Vec<u8>, ignore_case: bool) -> bo
             }
             x if x == open_bracket => {
                 patternpos += 1;
-                let not = pattern[patternpos] == ('^' as u8);
+                let not = pattern[patternpos] == b'^';
                 if not {
                     patternpos += 1;
                 }
@@ -107,16 +107,12 @@ pub fn glob_match(pattern: &Vec<u8>, element: &Vec<u8>, ignore_case: bool) -> bo
                     } else if patternpos >= pattern.len() {
                         patternpos += 1;
                         break;
-                    } else if pattern.len() >= patternpos + 3
-                        && pattern[patternpos + 1] == ('-' as u8)
-                    {
+                    } else if pattern.len() >= patternpos + 3 && pattern[patternpos + 1] == b'-' {
                         let mut start = pattern[patternpos];
                         let mut end = pattern[patternpos + 2];
                         let mut c = element[elementpos];
                         if start > end {
-                            let t = start;
-                            start = end;
-                            end = t;
+                            std::mem::swap(&mut start, &mut end);
                         }
                         if ignore_case {
                             start = start.to_ascii_lowercase();
@@ -128,9 +124,9 @@ pub fn glob_match(pattern: &Vec<u8>, element: &Vec<u8>, ignore_case: bool) -> bo
                             matched = true;
                         }
                     } else if match_char(&pattern[patternpos], &element[elementpos], ignore_case) {
-                            matched = true;
+                        matched = true;
                     }
-                    
+
                     patternpos += 1;
                 }
                 if not {
@@ -153,8 +149,8 @@ pub fn glob_match(pattern: &Vec<u8>, element: &Vec<u8>, ignore_case: bool) -> bo
         }
         patternpos += 1;
         if elementpos == element.len() {
-            for p in patternpos..pattern.len() {
-                if pattern[p] != star {
+            for i in &pattern[patternpos..pattern.len()] {
+                if *i != star {
                     break;
                 }
             }
@@ -227,14 +223,14 @@ pub fn splitargs(args: &[u8]) -> Result<Vec<Vec<u8>>, ()> {
                 } else if p == '\\' && i + 1 < args.len() {
                     i += 1;
                     let c = match args[i] as char {
-                        'n' => '\n',
-                        'r' => '\r',
-                        't' => '\t',
+                        'n' => b'\n',
+                        'r' => b'\r',
+                        't' => b'\t',
                         // FIXME: Rust does not recognize '\a' and '\b'?
-                        'b' => 'b',
-                        'a' => 'a',
-                        c => c as char,
-                    } as u8;
+                        'b' => b'b',
+                        'a' => b'a',
+                        c => c as u8,
+                    };
                     current.push(c);
                 } else {
                     current.push(args[i]);
@@ -286,7 +282,7 @@ pub fn htonl(v: u32) -> [u8; 4] {
         ((v >> 24) & 0xFF) as u8,
         ((v >> 16) & 0xFF) as u8,
         ((v >> 8) & 0xFF) as u8,
-        ((v >> 0) & 0xFF) as u8,
+        (v & 0xFF) as u8,
     ]
 }
 

@@ -76,9 +76,9 @@ pub enum PubsubEvent {
 impl PubsubEvent {
     /// Serialize the event into a Response object.
     pub fn as_response(&self) -> Response {
-        match *self {
-            PubsubEvent::Message(ref channel, ref pattern, ref message) => match *pattern {
-                Some(ref pattern) => Response::Array(vec![
+        match self {
+            PubsubEvent::Message(channel, pattern, message) => match pattern {
+                Some(pattern) => Response::Array(vec![
                     Response::Data(b"pmessage".to_vec()),
                     Response::Data(pattern.clone()),
                     Response::Data(channel.clone()),
@@ -90,30 +90,26 @@ impl PubsubEvent {
                     Response::Data(message.clone()),
                 ]),
             },
-            PubsubEvent::Subscription(ref channel, ref subscriptions) => Response::Array(vec![
+            PubsubEvent::Subscription(channel, subscriptions) => Response::Array(vec![
                 Response::Data(b"subscribe".to_vec()),
                 Response::Data(channel.clone()),
-                Response::Integer(subscriptions.clone() as i64),
+                Response::Integer(*subscriptions as i64),
             ]),
-            PubsubEvent::Unsubscription(ref channel, ref subscriptions) => Response::Array(vec![
+            PubsubEvent::Unsubscription(channel, subscriptions) => Response::Array(vec![
                 Response::Data(b"unsubscribe".to_vec()),
                 Response::Data(channel.clone()),
-                Response::Integer(subscriptions.clone() as i64),
+                Response::Integer(*subscriptions as i64),
             ]),
-            PubsubEvent::PatternSubscription(ref pattern, ref subscriptions) => {
-                Response::Array(vec![
-                    Response::Data(b"psubscribe".to_vec()),
-                    Response::Data(pattern.clone()),
-                    Response::Integer(subscriptions.clone() as i64),
-                ])
-            }
-            PubsubEvent::PatternUnsubscription(ref pattern, ref subscriptions) => {
-                Response::Array(vec![
-                    Response::Data(b"punsubscribe".to_vec()),
-                    Response::Data(pattern.clone()),
-                    Response::Integer(subscriptions.clone() as i64),
-                ])
-            }
+            PubsubEvent::PatternSubscription(pattern, subscriptions) => Response::Array(vec![
+                Response::Data(b"psubscribe".to_vec()),
+                Response::Data(pattern.clone()),
+                Response::Integer(*subscriptions as i64),
+            ]),
+            PubsubEvent::PatternUnsubscription(pattern, subscriptions) => Response::Array(vec![
+                Response::Data(b"punsubscribe".to_vec()),
+                Response::Data(pattern.clone()),
+                Response::Integer(*subscriptions as i64),
+            ]),
         }
     }
 }
@@ -122,14 +118,14 @@ impl PubsubEvent {
 /// If a Value is nil, `default` is used.
 /// If any of the values is not a set, an error is returned instead.
 fn get_set_list<'a>(
-    set_values: &Vec<&'a Value>,
+    set_values: &[&'a Value],
     default: &'a ValueSet,
 ) -> Result<Vec<&'a ValueSet>, OperationError> {
     let mut sets = Vec::with_capacity(set_values.len());
     for value in set_values {
-        sets.push(match **value {
+        sets.push(match value {
             Value::Nil => default,
-            Value::Set(ref value) => value,
+            Value::Set(value) => value,
             _ => return Err(OperationError::WrongTypeError),
         });
     }
@@ -140,14 +136,14 @@ fn get_set_list<'a>(
 /// If a Value is nil, `default` is used.
 /// If any of the values is not a zset, an error is returned instead.
 fn get_zset_list<'a>(
-    zset_values: &Vec<&'a Value>,
+    zset_values: &[&'a Value],
     default: &'a ValueSortedSet,
 ) -> Result<Vec<&'a ValueSortedSet>, OperationError> {
     let mut zsets = Vec::with_capacity(zset_values.len());
     for value in zset_values {
-        zsets.push(match **value {
+        zsets.push(match value {
             Value::Nil => default,
-            Value::SortedSet(ref value) => value,
+            Value::SortedSet(value) => value,
             _ => return Err(OperationError::WrongTypeError),
         });
     }
@@ -166,7 +162,7 @@ impl Value {
     /// assert!(!Value::String(ValueString::Integer(1)).is_nil());
     /// ```
     pub fn is_nil(&self) -> bool {
-        match *self {
+        match self {
             Value::Nil => true,
             _ => false,
         }
@@ -183,7 +179,7 @@ impl Value {
     /// assert!(Value::String(ValueString::Integer(1)).is_string());
     /// ```
     pub fn is_string(&self) -> bool {
-        match *self {
+        match self {
             Value::String(_) => true,
             _ => false,
         }
@@ -200,7 +196,7 @@ impl Value {
     /// assert!(Value::List(ValueList::new()).is_list());
     /// ```
     pub fn is_list(&self) -> bool {
-        match *self {
+        match self {
             Value::List(_) => true,
             _ => false,
         }
@@ -217,7 +213,7 @@ impl Value {
     /// assert!(Value::Set(ValueSet::new()).is_set());
     /// ```
     pub fn is_set(&self) -> bool {
-        match *self {
+        match self {
             Value::Set(_) => true,
             _ => false,
         }
@@ -235,7 +231,8 @@ impl Value {
     /// ```
     pub fn set(&mut self, newvalue: Vec<u8>) -> Result<(), OperationError> {
         *self = Value::String(ValueString::new(newvalue));
-        return Ok(());
+
+        Ok(())
     }
 
     /// Gets the string value. Fails if the value is not a string.
@@ -257,9 +254,9 @@ impl Value {
     /// assert!(Value::List(ValueList::new()).get().is_err());
     /// ```
     pub fn get(&self) -> Result<Vec<u8>, OperationError> {
-        match *self {
+        match self {
             Value::Nil => Ok(vec![]),
-            Value::String(ref value) => Ok(value.to_vec()),
+            Value::String(value) => Ok(value.to_vec()),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -276,9 +273,9 @@ impl Value {
     /// assert_eq!(val.strlen().unwrap(), 3);
     /// ```
     pub fn strlen(&self) -> Result<usize, OperationError> {
-        match *self {
+        match self {
             Value::Nil => Ok(0),
-            Value::String(ref val) => Ok(val.strlen()),
+            Value::String(val) => Ok(val.strlen()),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -296,13 +293,13 @@ impl Value {
     /// assert_eq!(val.append(vec![4, 5, 6]).unwrap(), 6);
     /// ```
     pub fn append(&mut self, newvalue: Vec<u8>) -> Result<usize, OperationError> {
-        match *self {
+        match self {
             Value::Nil => {
                 let len = newvalue.len();
                 *self = Value::String(ValueString::new(newvalue));
                 Ok(len)
             }
-            Value::String(ref mut val) => {
+            Value::String(val) => {
                 val.append(newvalue);
                 Ok(val.strlen())
             }
@@ -323,13 +320,13 @@ impl Value {
     /// assert_eq!(val.get().unwrap(), b"6".to_vec());
     /// ```
     pub fn incr(&mut self, incr: i64) -> Result<i64, OperationError> {
-        match *self {
+        match self {
             Value::Nil => {
-                *self = Value::String(ValueString::Integer(incr.clone()));
-                return Ok(incr);
+                *self = Value::String(ValueString::Integer(incr));
+                Ok(incr)
             }
-            Value::String(ref mut value) => value.incr(incr),
-            _ => return Err(OperationError::WrongTypeError),
+            Value::String(value) => value.incr(incr),
+            _ => Err(OperationError::WrongTypeError),
         }
     }
 
@@ -346,13 +343,13 @@ impl Value {
     /// assert_eq!(val.get().unwrap(), b"6.6".to_vec());
     /// ```
     pub fn incrbyfloat(&mut self, incr: f64) -> Result<f64, OperationError> {
-        match *self {
+        match self {
             Value::Nil => {
                 *self = Value::String(ValueString::Data(format!("{}", incr).into_bytes()));
-                return Ok(incr);
+                Ok(incr)
             }
-            Value::String(ref mut value) => value.incrbyfloat(incr),
-            _ => return Err(OperationError::WrongTypeError),
+            Value::String(value) => value.incrbyfloat(incr),
+            _ => Err(OperationError::WrongTypeError),
         }
     }
 
@@ -372,9 +369,9 @@ impl Value {
     /// assert_eq!(val.getrange(10, 1).unwrap(), b"".to_vec());
     /// ```
     pub fn getrange(&self, start: i64, stop: i64) -> Result<Vec<u8>, OperationError> {
-        match *self {
+        match self {
             Value::Nil => Ok(Vec::new()),
-            Value::String(ref value) => Ok(value.getrange(start, stop)),
+            Value::String(value) => Ok(value.getrange(start, stop)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -393,14 +390,14 @@ impl Value {
     /// assert_eq!(val.get().unwrap(), vec![0, 1, 2]);
     /// ```
     pub fn setrange(&mut self, index: usize, data: Vec<u8>) -> Result<usize, OperationError> {
-        match *self {
+        match self {
             Value::Nil => *self = Value::String(ValueString::Data(Vec::new())),
             Value::String(_) => (),
             _ => return Err(OperationError::WrongTypeError),
         };
 
-        match *self {
-            Value::String(ref mut value) => Ok(value.setrange(index, data)),
+        match self {
+            Value::String(value) => Ok(value.setrange(index, data)),
             _ => panic!("Expected value to be a string"),
         }
     }
@@ -420,14 +417,14 @@ impl Value {
     /// assert_eq!(val.get().unwrap(), vec![128]);
     /// ```
     pub fn setbit(&mut self, bitoffset: usize, on: bool) -> Result<bool, OperationError> {
-        match *self {
+        match self {
             Value::Nil => *self = Value::String(ValueString::Data(Vec::new())),
             Value::String(_) => (),
             _ => return Err(OperationError::WrongTypeError),
         }
 
-        match *self {
-            Value::String(ref mut value) => Ok(value.setbit(bitoffset, on)),
+        match self {
+            Value::String(value) => Ok(value.setbit(bitoffset, on)),
             _ => panic!("Value must be a string"),
         }
     }
@@ -447,10 +444,10 @@ impl Value {
     /// assert_eq!(val.getbit(0).unwrap(), true);
     /// ```
     pub fn getbit(&self, bitoffset: usize) -> Result<bool, OperationError> {
-        match *self {
-            Value::Nil => return Ok(false),
-            Value::String(ref value) => Ok(value.getbit(bitoffset)),
-            _ => return Err(OperationError::WrongTypeError),
+        match self {
+            Value::Nil => Ok(false),
+            Value::String(value) => Ok(value.getbit(bitoffset)),
+            _ => Err(OperationError::WrongTypeError),
         }
     }
 
@@ -466,14 +463,14 @@ impl Value {
     /// assert_eq!(val.pfadd(vec![vec![1], vec![2], vec![3]]).unwrap(), false);
     /// ```
     pub fn pfadd(&mut self, data: Vec<Vec<u8>>) -> Result<bool, OperationError> {
-        match *self {
+        match self {
             Value::Nil => *self = Value::String(ValueString::Data(Vec::new())),
             Value::String(_) => (),
             _ => return Err(OperationError::WrongTypeError),
         };
 
-        match *self {
-            Value::String(ref mut value) => value.pfadd(data),
+        match self {
+            Value::String(value) => value.pfadd(data),
             _ => panic!("Expected value to be a string"),
         }
     }
@@ -489,9 +486,9 @@ impl Value {
     /// assert_eq!(val.pfcount().unwrap(), 3);
     /// ```
     pub fn pfcount(&self) -> Result<usize, OperationError> {
-        match *self {
+        match self {
             Value::Nil => Ok(0),
-            Value::String(ref s) => s.pfcount(),
+            Value::String(s) => s.pfcount(),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -514,25 +511,25 @@ impl Value {
     pub fn pfmerge(&mut self, values: Vec<&Value>) -> Result<(), OperationError> {
         let mut values_string = Vec::with_capacity(values.len());
         for v in values {
-            match *v {
+            match v {
                 Value::Nil => (),
-                Value::String(ref s) => values_string.push(s),
+                Value::String(s) => values_string.push(s),
                 _ => return Err(OperationError::WrongTypeError),
             }
         }
 
-        if values_string.len() == 0 {
+        if values_string.is_empty() {
             return Ok(());
         }
 
-        match *self {
+        match self {
             Value::Nil => *self = Value::String(ValueString::Data(Vec::new())),
             Value::String(_) => (),
             _ => return Err(OperationError::WrongTypeError),
         };
 
-        match *self {
-            Value::String(ref mut value) => value.pfmerge(values_string),
+        match self {
+            Value::String(value) => value.pfmerge(values_string),
             _ => panic!("Expected value to be a string"),
         }
     }
@@ -548,17 +545,17 @@ impl Value {
     /// assert_eq!(val.push(vec![1], true).unwrap(), 1);
     /// assert_eq!(val.push(vec![2], true).unwrap(), 2);
     /// assert_eq!(val.push(vec![0], false).unwrap(), 3);
-    /// assert_eq!(val.lrange(0, -1).unwrap(), vec![&vec![0], &vec![1], &vec![2]]);
+    /// assert_eq!(val.lrange(0, -1).unwrap(), vec![&[0][..], &[1][..], &[2][..]]);
     /// ```
     pub fn push(&mut self, el: Vec<u8>, right: bool) -> Result<usize, OperationError> {
-        Ok(match *self {
+        Ok(match self {
             Value::Nil => {
                 let mut list = ValueList::new();
                 list.push(el, right);
                 *self = Value::List(list);
                 1
             }
-            Value::List(ref mut list) => {
+            Value::List(list) => {
                 list.push(el, right);
                 list.llen()
             }
@@ -582,9 +579,9 @@ impl Value {
     /// assert_eq!(val.pop(true).unwrap(), None);
     /// ```
     pub fn pop(&mut self, right: bool) -> Result<Option<Vec<u8>>, OperationError> {
-        Ok(match *self {
+        Ok(match self {
             Value::Nil => None,
-            Value::List(ref mut list) => list.pop(right),
+            Value::List(list) => list.pop(right),
             _ => return Err(OperationError::WrongTypeError),
         })
     }
@@ -598,13 +595,13 @@ impl Value {
     /// let mut val = Value::Nil;
     /// val.push(vec![1], true).unwrap();
     /// val.push(vec![2], true).unwrap();
-    /// assert_eq!(val.lindex(0).unwrap(), Some(&vec![1]));
-    /// assert_eq!(val.lindex(1).unwrap(), Some(&vec![2]));
+    /// assert_eq!(val.lindex(0).unwrap(), Some(&[1][..]));
+    /// assert_eq!(val.lindex(1).unwrap(), Some(&[2][..]));
     /// assert_eq!(val.lindex(2).unwrap(), None);
     /// ```
-    pub fn lindex(&self, index: i64) -> Result<Option<&Vec<u8>>, OperationError> {
-        match *self {
-            Value::List(ref value) => Ok(value.lindex(index)),
+    pub fn lindex(&self, index: i64) -> Result<Option<&[u8]>, OperationError> {
+        match self {
+            Value::List(value) => Ok(value.lindex(index)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -621,7 +618,7 @@ impl Value {
     /// val.push(vec![3], true).unwrap();
     /// assert_eq!(val.linsert(true, vec![3], vec![2]).unwrap(), Some(3));
     /// assert_eq!(val.linsert(true, vec![5], vec![4]).unwrap(), None);
-    /// assert_eq!(val.lrange(0, -1).unwrap(), vec![&vec![1], &vec![2], &vec![3]]);
+    /// assert_eq!(val.lrange(0, -1).unwrap(), vec![&[1][..], &[2][..], &[3][..]]);
     /// ```
     pub fn linsert(
         &mut self,
@@ -629,9 +626,9 @@ impl Value {
         pivot: Vec<u8>,
         newvalue: Vec<u8>,
     ) -> Result<Option<usize>, OperationError> {
-        match *self {
+        match self {
             Value::Nil => Ok(None),
-            Value::List(ref mut value) => Ok(value.linsert(before, pivot, newvalue)),
+            Value::List(value) => Ok(value.linsert(before, pivot, newvalue)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -650,11 +647,11 @@ impl Value {
     /// assert_eq!(val.llen().unwrap(), 2);
     /// ```
     pub fn llen(&self) -> Result<usize, OperationError> {
-        return match *self {
+        match self {
             Value::Nil => Ok(0),
-            Value::List(ref value) => Ok(value.llen()),
+            Value::List(value) => Ok(value.llen()),
             _ => Err(OperationError::WrongTypeError),
-        };
+        }
     }
 
     /// Gets the elements in the list in a range.
@@ -667,13 +664,13 @@ impl Value {
     /// val.push(vec![1], true).unwrap();
     /// val.push(vec![2], true).unwrap();
     /// val.push(vec![3], true).unwrap();
-    /// assert_eq!(val.lrange(1, 1).unwrap(), vec![&vec![2]]);
-    /// assert_eq!(val.lrange(1, -1).unwrap(), vec![&vec![2], &vec![3]]);
+    /// assert_eq!(val.lrange(1, 1).unwrap(), vec![&[2][..]]);
+    /// assert_eq!(val.lrange(1, -1).unwrap(), vec![&[2][..], &[3][..]]);
     /// ```
-    pub fn lrange(&self, start: i64, stop: i64) -> Result<Vec<&Vec<u8>>, OperationError> {
-        match *self {
+    pub fn lrange(&self, start: i64, stop: i64) -> Result<Vec<&[u8]>, OperationError> {
+        match self {
             Value::Nil => Ok(Vec::new()),
-            Value::List(ref value) => Ok(value.lrange(start, stop)),
+            Value::List(value) => Ok(value.lrange(start, stop)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -695,11 +692,11 @@ impl Value {
     /// val.push(vec![3], true).unwrap();
     /// val.push(vec![3], true).unwrap();
     /// assert_eq!(val.lrem(false, 2, vec![3]).unwrap(), 2);
-    /// assert_eq!(val.lrange(0, -1).unwrap(), vec![&vec![2], &vec![3], &vec![2], &vec![1]]);
+    /// assert_eq!(val.lrange(0, -1).unwrap(), vec![&[2][..], &[3][..], &[2][..], &[1][..]]);
     /// assert_eq!(val.lrem(true, 1, vec![2]).unwrap(), 1);
-    /// assert_eq!(val.lrange(0, -1).unwrap(), vec![&vec![3], &vec![2], &vec![1]]);
+    /// assert_eq!(val.lrange(0, -1).unwrap(), vec![&[3][..], &[2][..], &[1][..]]);
     /// assert_eq!(val.lrem(true, 1, vec![4]).unwrap(), 0);
-    /// assert_eq!(val.lrange(0, -1).unwrap(), vec![&vec![3], &vec![2], &vec![1]]);
+    /// assert_eq!(val.lrange(0, -1).unwrap(), vec![&[3][..], &[2][..], &[1][..]]);
     /// ```
     pub fn lrem(
         &mut self,
@@ -707,9 +704,9 @@ impl Value {
         limit: usize,
         newvalue: Vec<u8>,
     ) -> Result<usize, OperationError> {
-        match *self {
+        match self {
             Value::Nil => Ok(0),
-            Value::List(ref mut value) => Ok(value.lrem(left, limit, newvalue)),
+            Value::List(value) => Ok(value.lrem(left, limit, newvalue)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -725,12 +722,12 @@ impl Value {
     /// val.push(vec![3], true).unwrap();
     /// val.push(vec![3], true).unwrap();
     /// val.lset(1, vec![2]).unwrap();
-    /// assert_eq!(val.lrange(0, -1).unwrap(), vec![&vec![1], &vec![2], &vec![3]]);
+    /// assert_eq!(val.lrange(0, -1).unwrap(), vec![&[1][..], &[2][..], &[3][..]]);
     /// ```
     pub fn lset(&mut self, index: i64, newvalue: Vec<u8>) -> Result<(), OperationError> {
-        match *self {
+        match self {
             Value::Nil => Err(OperationError::UnknownKeyError),
-            Value::List(ref mut value) => value.lset(index, newvalue),
+            Value::List(value) => value.lset(index, newvalue),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -747,12 +744,12 @@ impl Value {
     /// val.push(vec![3], true).unwrap();
     /// val.push(vec![4], true).unwrap();
     /// val.ltrim(1, -2).unwrap();
-    /// assert_eq!(val.lrange(0, -1).unwrap(), vec![&vec![2], &vec![3]]);
+    /// assert_eq!(val.lrange(0, -1).unwrap(), vec![&[2][..], &[3][..]]);
     /// ```
     pub fn ltrim(&mut self, start: i64, stop: i64) -> Result<(), OperationError> {
-        match *self {
-            Value::List(ref mut value) => value.ltrim(start, stop),
-            _ => return Err(OperationError::WrongTypeError),
+        match self {
+            Value::List(value) => value.ltrim(start, stop),
+            _ => Err(OperationError::WrongTypeError),
         }
     }
 
@@ -776,14 +773,14 @@ impl Value {
         el: Vec<u8>,
         set_max_intset_entries: usize,
     ) -> Result<bool, OperationError> {
-        match *self {
+        match self {
             Value::Nil => {
                 let mut value = ValueSet::new();
                 value.sadd(el, set_max_intset_entries);
                 *self = Value::Set(value);
                 Ok(true)
             }
-            Value::Set(ref mut value) => Ok(value.sadd(el, set_max_intset_entries)),
+            Value::Set(value) => Ok(value.sadd(el, set_max_intset_entries)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -804,10 +801,10 @@ impl Value {
     /// assert_eq!(val.srem(&vec![3]).unwrap(), false);
     /// assert_eq!(val.srem(&vec![4]).unwrap(), false);
     /// ```
-    pub fn srem(&mut self, el: &Vec<u8>) -> Result<bool, OperationError> {
-        match *self {
+    pub fn srem(&mut self, el: &[u8]) -> Result<bool, OperationError> {
+        match self {
             Value::Nil => Ok(false),
-            Value::Set(ref mut value) => Ok(value.srem(el)),
+            Value::Set(value) => Ok(value.srem(el)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -826,10 +823,10 @@ impl Value {
     /// assert_eq!(val.sismember(&vec![1]).unwrap(), true);
     /// assert_eq!(val.sismember(&vec![4]).unwrap(), false);
     /// ```
-    pub fn sismember(&self, el: &Vec<u8>) -> Result<bool, OperationError> {
-        match *self {
+    pub fn sismember(&self, el: &[u8]) -> Result<bool, OperationError> {
+        match self {
             Value::Nil => Ok(false),
-            Value::Set(ref value) => Ok(value.sismember(el)),
+            Value::Set(value) => Ok(value.sismember(el)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -848,9 +845,9 @@ impl Value {
     /// assert_eq!(val.scard().unwrap(), 2);
     /// ```
     pub fn scard(&self) -> Result<usize, OperationError> {
-        match *self {
+        match self {
             Value::Nil => Ok(0),
-            Value::Set(ref value) => Ok(value.scard()),
+            Value::Set(value) => Ok(value.scard()),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -871,9 +868,9 @@ impl Value {
     /// assert_eq!(set1, set2);
     /// ```
     pub fn smembers(&self) -> Result<Vec<Vec<u8>>, OperationError> {
-        match *self {
+        match self {
             Value::Nil => Ok(vec![]),
-            Value::Set(ref value) => Ok(value.smembers()),
+            Value::Set(value) => Ok(value.smembers()),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -912,9 +909,9 @@ impl Value {
         count: usize,
         allow_duplicates: bool,
     ) -> Result<Vec<Vec<u8>>, OperationError> {
-        match *self {
+        match self {
             Value::Nil => Ok(Vec::new()),
-            Value::Set(ref value) => Ok(value.srandmember(count, allow_duplicates)),
+            Value::Set(value) => Ok(value.srandmember(count, allow_duplicates)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -941,9 +938,9 @@ impl Value {
     /// assert_eq!(set1, set2);
     /// ```
     pub fn spop(&mut self, count: usize) -> Result<Vec<Vec<u8>>, OperationError> {
-        match *self {
+        match self {
             Value::Nil => Ok(Vec::new()),
-            Value::Set(ref mut value) => Ok(value.spop(count)),
+            Value::Set(value) => Ok(value.spop(count)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -966,10 +963,10 @@ impl Value {
     /// let set = vec![vec![3]].into_iter().collect::<HashSet<_>>();
     /// assert_eq!(val1.sdiff(&vec![&val2, &val3]).unwrap(), set);
     /// ```
-    pub fn sdiff(&self, set_values: &Vec<&Value>) -> Result<HashSet<Vec<u8>>, OperationError> {
-        match *self {
+    pub fn sdiff(&self, set_values: &[&Value]) -> Result<HashSet<Vec<u8>>, OperationError> {
+        match self {
             Value::Nil => Ok(HashSet::new()),
-            Value::Set(ref value) => {
+            Value::Set(value) => {
                 let emptyset = ValueSet::new();
                 let sets = get_set_list(set_values, &emptyset)?;
                 Ok(value.sdiff(sets))
@@ -998,10 +995,10 @@ impl Value {
     /// let set = vec![vec![1]].into_iter().collect::<HashSet<_>>();
     /// assert_eq!(val1.sinter(&vec![&val2, &val3]).unwrap(), set);
     /// ```
-    pub fn sinter(&self, set_values: &Vec<&Value>) -> Result<HashSet<Vec<u8>>, OperationError> {
-        match *self {
+    pub fn sinter(&self, set_values: &[&Value]) -> Result<HashSet<Vec<u8>>, OperationError> {
+        match self {
             Value::Nil => Ok(HashSet::new()),
-            Value::Set(ref value) => {
+            Value::Set(value) => {
                 let emptyset = ValueSet::new();
                 let sets = get_set_list(set_values, &emptyset)?;
                 Ok(value.sinter(sets))
@@ -1028,13 +1025,13 @@ impl Value {
     /// let set = vec![vec![1], vec![2], vec![3]].into_iter().collect::<HashSet<_>>();
     /// assert_eq!(val1.sunion(&vec![&val2, &val3]).unwrap(), set);
     /// ```
-    pub fn sunion(&self, set_values: &Vec<&Value>) -> Result<HashSet<Vec<u8>>, OperationError> {
+    pub fn sunion(&self, set_values: &[&Value]) -> Result<HashSet<Vec<u8>>, OperationError> {
         let emptyset = ValueSet::new();
         let sets = get_set_list(set_values, &emptyset)?;
 
-        match *self {
+        match self {
             Value::Nil => Ok(emptyset.sunion(sets)),
-            Value::Set(ref value) => Ok(value.sunion(sets)),
+            Value::Set(value) => Ok(value.sunion(sets)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -1070,9 +1067,9 @@ impl Value {
     /// assert_eq!(val.zcard().unwrap(), 2);
     /// ```
     pub fn zrem(&mut self, member: Vec<u8>) -> Result<bool, OperationError> {
-        match *self {
+        match self {
             Value::Nil => Ok(false),
-            Value::SortedSet(ref mut value) => Ok(value.zrem(member)),
+            Value::SortedSet(value) => Ok(value.zrem(member)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -1141,7 +1138,7 @@ impl Value {
         ch: bool,
         incr: bool,
     ) -> Result<bool, OperationError> {
-        match *self {
+        match self {
             Value::Nil => {
                 if xx {
                     return Ok(false);
@@ -1151,7 +1148,7 @@ impl Value {
                 *self = Value::SortedSet(value);
                 Ok(r)
             }
-            Value::SortedSet(ref mut value) => value.zadd(s, el, nx, xx, ch, incr, false),
+            Value::SortedSet(value) => value.zadd(s, el, nx, xx, ch, incr, false),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -1170,9 +1167,9 @@ impl Value {
     /// assert_eq!(val.zcard().unwrap(), 2);
     /// ```
     pub fn zcard(&self) -> Result<usize, OperationError> {
-        match *self {
+        match self {
             Value::Nil => Ok(0),
-            Value::SortedSet(ref value) => Ok(value.zcard()),
+            Value::SortedSet(value) => Ok(value.zcard()),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -1189,9 +1186,9 @@ impl Value {
     /// assert_eq!(val.zscore(vec![1]).unwrap(), Some(1.0));
     /// ```
     pub fn zscore(&self, element: Vec<u8>) -> Result<Option<f64>, OperationError> {
-        match *self {
+        match self {
             Value::Nil => Ok(None),
-            Value::SortedSet(ref value) => Ok(value.zscore(&element)),
+            Value::SortedSet(value) => Ok(value.zscore(&element)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -1208,12 +1205,12 @@ impl Value {
     /// assert_eq!(val.zincrby(1.0, vec![1]).unwrap(), 2.0);
     /// ```
     pub fn zincrby(&mut self, increment: f64, member: Vec<u8>) -> Result<f64, OperationError> {
-        match *self {
-            Value::Nil => match self.zadd(increment.clone(), member, false, false, false, false) {
+        match self {
+            Value::Nil => match self.zadd(increment, member, false, false, false, false) {
                 Ok(_) => Ok(increment),
                 Err(err) => Err(err),
             },
-            Value::SortedSet(ref mut value) => value.zincrby(increment, member),
+            Value::SortedSet(value) => value.zincrby(increment, member),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -1234,9 +1231,9 @@ impl Value {
     /// assert_eq!(val.zcount(Bound::Unbounded, Bound::Unbounded).unwrap(), 3);
     /// ```
     pub fn zcount(&self, min: Bound<f64>, max: Bound<f64>) -> Result<usize, OperationError> {
-        match *self {
+        match self {
             Value::Nil => Ok(0),
-            Value::SortedSet(ref value) => Ok(value.zcount(min, max)),
+            Value::SortedSet(value) => Ok(value.zcount(min, max)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -1261,9 +1258,9 @@ impl Value {
         min: Bound<Vec<u8>>,
         max: Bound<Vec<u8>>,
     ) -> Result<usize, OperationError> {
-        match *self {
+        match self {
             Value::Nil => Ok(0),
-            Value::SortedSet(ref value) => Ok(value.zlexcount(min, max)),
+            Value::SortedSet(value) => Ok(value.zlexcount(min, max)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -1308,9 +1305,9 @@ impl Value {
         withscores: bool,
         rev: bool,
     ) -> Result<Vec<Vec<u8>>, OperationError> {
-        match *self {
+        match self {
             Value::Nil => Ok(vec![]),
-            Value::SortedSet(ref value) => Ok(value.zrange(start, stop, withscores, rev)),
+            Value::SortedSet(value) => Ok(value.zrange(start, stop, withscores, rev)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -1350,9 +1347,9 @@ impl Value {
         count: usize,
         rev: bool,
     ) -> Result<Vec<Vec<u8>>, OperationError> {
-        match *self {
+        match self {
             Value::Nil => Ok(vec![]),
-            Value::SortedSet(ref value) => {
+            Value::SortedSet(value) => {
                 Ok(value.zrangebyscore(min, max, withscores, offset, count, rev))
             }
             _ => Err(OperationError::WrongTypeError),
@@ -1391,9 +1388,9 @@ impl Value {
         count: usize,
         rev: bool,
     ) -> Result<Vec<Vec<u8>>, OperationError> {
-        match *self {
+        match self {
             Value::Nil => Ok(vec![]),
-            Value::SortedSet(ref value) => Ok(value.zrangebylex(min, max, offset, count, rev)),
+            Value::SortedSet(value) => Ok(value.zrangebylex(min, max, offset, count, rev)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -1414,9 +1411,9 @@ impl Value {
     /// assert_eq!(val.zrank(vec![4]).unwrap(), None);
     /// ```
     pub fn zrank(&self, el: Vec<u8>) -> Result<Option<usize>, OperationError> {
-        match *self {
+        match self {
             Value::Nil => Ok(None),
-            Value::SortedSet(ref value) => Ok(value.zrank(el)),
+            Value::SortedSet(value) => Ok(value.zrank(el)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -1442,9 +1439,9 @@ impl Value {
         min: Bound<f64>,
         max: Bound<f64>,
     ) -> Result<usize, OperationError> {
-        match *self {
+        match self {
             Value::Nil => Ok(0),
-            Value::SortedSet(ref mut value) => Ok(value.zremrangebyscore(min, max)),
+            Value::SortedSet(value) => Ok(value.zremrangebyscore(min, max)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -1470,9 +1467,9 @@ impl Value {
         min: Bound<Vec<u8>>,
         max: Bound<Vec<u8>>,
     ) -> Result<usize, OperationError> {
-        match *self {
+        match self {
             Value::Nil => Ok(0),
-            Value::SortedSet(ref mut value) => Ok(value.zremrangebylex(min, max)),
+            Value::SortedSet(value) => Ok(value.zremrangebylex(min, max)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -1494,9 +1491,9 @@ impl Value {
     /// assert_eq!(val.zcard().unwrap(), 1);
     /// ```
     pub fn zremrangebyrank(&mut self, start: i64, stop: i64) -> Result<usize, OperationError> {
-        match *self {
+        match self {
             Value::Nil => Ok(0),
-            Value::SortedSet(ref mut value) => Ok(value.zremrangebyrank(start, stop)),
+            Value::SortedSet(value) => Ok(value.zremrangebyrank(start, stop)),
             _ => Err(OperationError::WrongTypeError),
         }
     }
@@ -1546,7 +1543,7 @@ impl Value {
     /// ```
     pub fn zunion(
         &self,
-        zset_values: &Vec<&Value>,
+        zset_values: &[&Value],
         weights: Option<Vec<f64>>,
         aggregate: zset::Aggregate,
     ) -> Result<Value, OperationError> {
@@ -1599,7 +1596,7 @@ impl Value {
     /// ```
     pub fn zinter(
         &self,
-        zset_values: &Vec<&Value>,
+        zset_values: &[&Value],
         weights: Option<Vec<f64>>,
         aggregate: zset::Aggregate,
     ) -> Result<Value, OperationError> {
@@ -1626,12 +1623,12 @@ impl Value {
     /// ```
     pub fn dump<T: Write>(&self, writer: &mut T) -> Result<usize, OperationError> {
         let mut data = vec![];
-        match *self {
+        match self {
             Value::Nil => return Ok(0), // maybe panic instead?
-            Value::String(ref s) => s.dump(&mut data)?,
-            Value::List(ref l) => l.dump(&mut data)?,
-            Value::Set(ref s) => s.dump(&mut data)?,
-            Value::SortedSet(ref s) => s.dump(&mut data)?,
+            Value::String(s) => s.dump(&mut data)?,
+            Value::List(l) => l.dump(&mut data)?,
+            Value::Set(s) => s.dump(&mut data)?,
+            Value::SortedSet(s) => s.dump(&mut data)?,
         };
         let crc = crc64(0, &*data);
         encode_u64_to_slice_u8(crc, &mut data).unwrap();
@@ -1639,31 +1636,35 @@ impl Value {
     }
 
     pub fn debug_object(&self) -> String {
-        match *self {
+        match self {
             Value::Nil => "Value at:0x0000000000 refcount:0 encoding:nil serializedlength:0 lru:0 \
                            lru_seconds_idle:0"
                 .to_owned(),
-            Value::String(ref s) => s.debug_object(),
-            Value::List(ref l) => l.debug_object().to_owned(),
-            Value::Set(ref s) => s.debug_object().to_owned(),
-            Value::SortedSet(ref s) => s.debug_object().to_owned(),
+            Value::String(s) => s.debug_object(),
+            Value::List(l) => l.debug_object(),
+            Value::Set(s) => s.debug_object(),
+            Value::SortedSet(s) => s.debug_object(),
         }
     }
 
     pub fn is_empty(&self) -> bool {
-        match *self {
+        match self {
             Value::Nil => true,
             Value::String(_) => false,
-            Value::List(ref l) => l.llen() == 0,
-            Value::Set(ref s) => s.scard() == 0,
-            Value::SortedSet(ref s) => s.zcard() == 0,
+            Value::List(l) => l.llen() == 0,
+            Value::Set(s) => s.scard() == 0,
+            Value::SortedSet(s) => s.zcard() == 0,
         }
     }
 }
 
+type SenderMap<T> = HashMap<usize, Sender<T>>;
+
 pub struct Database {
     pub config: Config,
+
     data: Vec<RehashingHashMap<Vec<u8>, Value>>,
+
     /// Maps a key to an expiration time. Expiration time is in milliseconds.
     data_expiration_ms: Vec<RehashingHashMap<Vec<u8>, i64>>,
     /// Maps a key to a collection of client identifiers.
@@ -1673,14 +1674,14 @@ pub struct Database {
     watched_keys: Vec<HashMap<Vec<u8>, HashSet<usize>>>,
     /// Maps a channel to a list of pubsub events listeners.
     /// The `usize` key is used as a client identifier.
-    subscribers: HashMap<Vec<u8>, HashMap<usize, Sender<Option<Response>>>>,
+    subscribers: HashMap<Vec<u8>, SenderMap<Option<Response>>>,
     /// Maps a pattern to a list of pubsub events listeners.
     /// The `usize` key is used as a client identifier.
-    pattern_subscribers: HashMap<Vec<u8>, HashMap<usize, Sender<Option<Response>>>>,
+    pattern_subscribers: HashMap<Vec<u8>, SenderMap<Option<Response>>>,
     /// Maps a pattern to a list of key listeners. When a key is modified a message
     /// with `true` is published.
     /// The `usize` key is used as a client identifier.
-    key_subscribers: Vec<RehashingHashMap<Vec<u8>, HashMap<usize, Sender<bool>>>>,
+    key_subscribers: Vec<RehashingHashMap<Vec<u8>, SenderMap<bool>>>,
     /// A unique identifier counter to assign to clients
     subscriber_id: usize,
     /// Which database to try to run the active expire cycle next
@@ -1722,7 +1723,7 @@ impl<'a> Iterator for Iter<'a> {
 
 macro_rules! random_key {
     ($dict: expr) => {{
-        let ref dict = $dict;
+        let dict = &$dict;
         let len = dict.len();
         let pos = rand::random::<usize>() % len;
         // FIXME: remove clone
@@ -1755,15 +1756,16 @@ impl Database {
         } else {
             None
         };
-        return Database {
-            config: config,
-            data: data,
-            data_expiration_ms: data_expiration_ms,
+
+        Database {
+            config,
+            data,
+            data_expiration_ms,
             subscribers: HashMap::new(),
             pattern_subscribers: HashMap::new(),
-            key_subscribers: key_subscribers,
+            key_subscribers,
             subscriber_id: 0,
-            watched_keys: watched_keys,
+            watched_keys,
             active_expire_cycle_db: 0,
             monitor_senders: Vec::new(),
             version: "0.0.1",
@@ -1772,16 +1774,16 @@ impl Database {
             git_dirty: true,
             run_id: get_random_hex_chars(40),
             start_mstime: mstime(),
-            aof: aof,
+            aof,
             loading: false,
-        };
+        }
     }
 
     pub fn uptime(&self) -> i64 {
         mstime() - self.start_mstime
     }
 
-    fn is_expired(&self, index: usize, key: &Vec<u8>) -> bool {
+    fn is_expired(&self, index: usize, key: &[u8]) -> bool {
         !self.loading
             && match self.data_expiration_ms[index].get(key) {
                 Some(t) => t <= &mstime(),
@@ -1827,7 +1829,7 @@ impl Database {
     ///
     /// assert_eq!(db.get(0, &vec![1]), Some(&value));
     /// ```
-    pub fn get(&self, index: usize, key: &Vec<u8>) -> Option<&Value> {
+    pub fn get(&self, index: usize, key: &[u8]) -> Option<&Value> {
         if self.is_expired(index, key) {
             None
         } else {
@@ -1848,7 +1850,7 @@ impl Database {
     /// db.get_or_create(0, &vec![1]).set(vec![1]).unwrap();
     /// db.get_mut(0, &vec![1]).unwrap().set(vec![2]);
     /// ```
-    pub fn get_mut(&mut self, index: usize, key: &Vec<u8>) -> Option<&mut Value> {
+    pub fn get_mut(&mut self, index: usize, key: &[u8]) -> Option<&mut Value> {
         if self.is_expired(index, key) {
             self.remove(index, key);
             None
@@ -1870,11 +1872,12 @@ impl Database {
     /// db.get_or_create(0, &vec![1]).set(vec![1]).unwrap();
     /// assert!(db.remove(0, &vec![1]).is_some());
     /// ```
-    pub fn remove(&mut self, index: usize, key: &Vec<u8>) -> Option<Value> {
+    pub fn remove(&mut self, index: usize, key: &[u8]) -> Option<Value> {
         let mut r = self.data[index].remove(key);
         if self.is_expired(index, key) {
             r = None;
         }
+
         self.data_expiration_ms[index].remove(key);
         if self.config.active_rehashing {
             if self.data[index].len() * 10 / 12 < self.data[index].capacity() {
@@ -1890,6 +1893,7 @@ impl Database {
                 self.key_subscribers[index].shrink_to_fit();
             }
         }
+
         r
     }
 
@@ -1900,12 +1904,12 @@ impl Database {
     }
 
     /// Gets a key expiration time, in milliseconds.
-    pub fn get_msexpiration(&mut self, index: usize, key: &Vec<u8>) -> Option<&i64> {
+    pub fn get_msexpiration(&mut self, index: usize, key: &[u8]) -> Option<&i64> {
         self.data_expiration_ms[index].get(key)
     }
 
     /// Removes a key expiration time.
-    pub fn remove_msexpiration(&mut self, index: usize, key: &Vec<u8>) -> Option<i64> {
+    pub fn remove_msexpiration(&mut self, index: usize, key: &[u8]) -> Option<i64> {
         self.data_expiration_ms[index].remove(key)
     }
 
@@ -1941,25 +1945,31 @@ impl Database {
     /// db.get_or_create(0, &vec![1]).append(vec![2]).unwrap();
     /// assert_eq!(db.get(0, &vec![1]).unwrap().strlen().unwrap(), 2);
     /// ```
-    pub fn get_or_create(&mut self, index: usize, key: &Vec<u8>) -> &mut Value {
-        if self.get(index, key).is_some() {
-            return self.get_mut(index, key).unwrap();
-        }
+    pub fn get_or_create(&mut self, index: usize, key: &[u8]) -> &mut Value {
+        use std::collections::hash_map::Entry;
+
         let val = Value::Nil;
-        self.remove_msexpiration(index, key);
-        self.data[index].entry(key.clone()).or_insert(val)
+
+        if self.is_expired(index, key) {
+            self.remove_msexpiration(index, key);
+        }
+
+        match self.data[index].entry(key.to_vec()) {
+            Entry::Occupied(entry) => entry.into_mut(),
+            Entry::Vacant(entry) => entry.insert(val),
+        }
     }
 
     /// Sets up the hashmap to subscribe clients to a key.
-    fn ensure_key_subscribers(&mut self, index: usize, key: &Vec<u8>) {
+    fn ensure_key_subscribers(&mut self, index: usize, key: &[u8]) {
         if !self.key_subscribers[index].contains_key(key) {
-            self.key_subscribers[index].insert(key.clone(), HashMap::new());
+            self.key_subscribers[index].insert(key.to_vec(), HashMap::new());
         }
     }
 
     /// Subscribes a callback to a key. When the key is modified the callback
     /// is called and automatically unsubscribe.
-    pub fn key_subscribe(&mut self, index: usize, key: &Vec<u8>, sender: Sender<bool>) -> usize {
+    pub fn key_subscribe(&mut self, index: usize, key: &[u8], sender: Sender<bool>) -> usize {
         self.ensure_key_subscribers(index, key);
         let key_subscribers = self.key_subscribers[index].get_mut(key).unwrap();
         let subscriber_id = self.subscriber_id;
@@ -1968,34 +1978,34 @@ impl Database {
         subscriber_id
     }
 
-    pub fn key_watch(&mut self, index: usize, key: &Vec<u8>, identifier: usize) {
+    pub fn key_watch(&mut self, index: usize, key: &[u8], identifier: usize) {
         match self.watched_keys[index].contains_key(key) {
             true => self.watched_keys[index]
                 .get_mut(key)
                 .unwrap()
                 .insert(identifier),
             false => self.watched_keys[index]
-                .insert(key.clone(), HashSet::from_iter(vec![identifier]))
+                .insert(key.to_vec(), HashSet::from_iter(vec![identifier]))
                 .is_some(),
         };
     }
 
-    pub fn key_unwatch(&mut self, index: usize, key: &Vec<u8>, identifier: usize) {
+    pub fn key_unwatch(&mut self, index: usize, key: &[u8], identifier: usize) {
         if let Some(s) = self.watched_keys[index].get_mut(key) {
             s.remove(&identifier);
         }
     }
 
-    pub fn key_watch_verify(&self, index: usize, key: &Vec<u8>, identifier: usize) -> bool {
+    pub fn key_watch_verify(&self, index: usize, key: &[u8], identifier: usize) -> bool {
         match self.watched_keys[index].get(key) {
-            Some(ref l) => l.contains(&identifier),
+            Some(l) => l.contains(&identifier),
             None => false,
         }
     }
 
     /// Publishes a `true` to all key listeners.
     /// If the value is now empty, it is removed.
-    pub fn key_updated(&mut self, index: usize, key: &Vec<u8>) {
+    pub fn key_updated(&mut self, index: usize, key: &[u8]) {
         if self.config.active_rehashing {
             self.data[index].rehash();
             self.data_expiration_ms[index].rehash();
@@ -2010,21 +2020,18 @@ impl Database {
             self.remove(index, key);
         }
 
-        match self.key_subscribers[index].remove(key) {
-            Some(callbacks) => {
-                for (_, sender) in callbacks.into_iter() {
-                    let _ = sender.send(true);
-                }
+        if let Some(callbacks) = self.key_subscribers[index].remove(key) {
+            for sender in callbacks.values() {
+                let _ = sender.send(true);
             }
-            None => (),
         }
         self.watched_keys[index].remove(key);
     }
 
     /// Sets up the hashmap to subscribe clients to a channel.
-    fn ensure_channel(&mut self, channel: &Vec<u8>) {
+    fn ensure_channel(&mut self, channel: &[u8]) {
         if !self.subscribers.contains_key(channel) {
-            self.subscribers.insert(channel.clone(), HashMap::new());
+            self.subscribers.insert(channel.to_vec(), HashMap::new());
         }
     }
 
@@ -2084,10 +2091,10 @@ impl Database {
     }
 
     /// Sets up the hashmap to subscribe clients to a pattern.
-    fn pensure_channel(&mut self, pattern: &Vec<u8>) {
+    fn pensure_channel(&mut self, pattern: &[u8]) {
         if !self.pattern_subscribers.contains_key(pattern) {
             self.pattern_subscribers
-                .insert(pattern.clone(), HashMap::new());
+                .insert(pattern.to_vec(), HashMap::new());
         }
     }
 
@@ -2133,35 +2140,37 @@ impl Database {
 
     /// Publishes a message to a channel and all patterns that match the channel name.
     /// Returns the number of recipients who receive the message.
-    pub fn publish(&self, channel_name: &Vec<u8>, message: &Vec<u8>) -> usize {
+    pub fn publish(&self, channel_name: &[u8], message: &[u8]) -> usize {
         let mut c = 0;
-        match self.subscribers.get(channel_name) {
-            Some(channels) => {
-                for (_, channel) in channels {
-                    match channel.send(Some(
-                        PubsubEvent::Message(channel_name.clone(), None, message.clone())
+        if let Some(channels) = self.subscribers.get(channel_name) {
+            for channel in channels.values() {
+                if channel
+                    .send(Some(
+                        PubsubEvent::Message(channel_name.to_vec(), None, message.to_vec())
                             .as_response(),
-                    )) {
-                        Ok(_) => c += 1,
-                        Err(_) => (),
-                    }
+                    ))
+                    .is_ok()
+                {
+                    c += 1;
                 }
             }
-            None => (),
         }
+
         for (pattern, channels) in self.pattern_subscribers.iter() {
-            if glob_match(&pattern, &channel_name, false) {
-                for (_, channel) in channels {
-                    match channel.send(Some(
-                        PubsubEvent::Message(
-                            channel_name.clone(),
-                            Some(pattern.clone()),
-                            message.clone(),
-                        )
-                        .as_response(),
-                    )) {
-                        Ok(_) => c += 1,
-                        Err(_) => (),
+            if glob_match(pattern, channel_name, false) {
+                for channel in channels.values() {
+                    if channel
+                        .send(Some(
+                            PubsubEvent::Message(
+                                channel_name.to_vec(),
+                                Some(pattern.to_vec()),
+                                message.to_vec(),
+                            )
+                            .as_response(),
+                        ))
+                        .is_ok()
+                    {
+                        c += 1;
                     }
                 }
             }
@@ -2206,13 +2215,13 @@ impl Database {
     /// assert_eq!(db.mapped_command(&"set".to_owned()), None);
     /// assert_eq!(db.mapped_command(&"del".to_owned()), Some("del".to_owned()));
     /// ```
-    pub fn mapped_command(&self, command: &String) -> Option<String> {
+    pub fn mapped_command(&self, command: &str) -> Option<String> {
         match self.config.rename_commands.get(command) {
-            Some(c) => match *c {
-                Some(ref s) => Some(s.clone()),
+            Some(c) => match c {
+                Some(s) => Some(s.clone()),
                 None => None,
             },
-            None => Some(command.clone()),
+            None => Some(command.to_owned()),
         }
     }
 
@@ -2224,7 +2233,7 @@ impl Database {
     }
 
     /// Collect all keys from a database matching a pattern.
-    pub fn keys(&self, dbindex: usize, pattern: &Vec<u8>) -> Vec<Vec<u8>> {
+    pub fn keys(&self, dbindex: usize, pattern: &[u8]) -> Vec<Vec<u8>> {
         let iter = self.iter_db(dbindex);
         let mut responses = Vec::with_capacity(iter.size_hint().1.unwrap_or(1));
         for (k, _) in iter {
@@ -2261,7 +2270,7 @@ impl Database {
                 }
 
                 let mut expired = 0;
-                while num > 0 && self.data_expiration_ms[dbindex].len() > 0 {
+                while num > 0 && !self.data_expiration_ms[dbindex].is_empty() {
                     num -= 1;
                     let key = random_key!(self.data_expiration_ms[dbindex]);
                     if self.get_mut(dbindex, &key).is_none() {
@@ -2299,20 +2308,16 @@ impl Database {
         self.monitor_senders = tmp;
         if write {
             let mut err = false;
-            match self.aof {
-                Some(ref mut w) => match w.write(dbindex, command) {
-                    Ok(_) => (),
-                    Err(e) => {
-                        log!(
-                            self.config.logger,
-                            Warning,
-                            "Error writing aof {:?}; stopped writing",
-                            e
-                        );
-                        err = true;
-                    }
-                },
-                None => (),
+            if let Some(w) = &mut self.aof {
+                if let Err(e) = w.write(dbindex, command) {
+                    log!(
+                        self.config.logger,
+                        Warning,
+                        "Error writing aof {:?}; stopped writing",
+                        e
+                    );
+                    err = true;
+                }
             }
             if err {
                 self.aof = None;
@@ -2350,10 +2355,8 @@ mod test_command {
 
         value.push(v1.clone(), false).unwrap();
         {
-            let list = match value {
-                Value::List(ref value) => match value {
-                    &ValueList::Data(ref l) => l,
-                },
+            let list = match &value {
+                Value::List(ValueList::Data(l)) => l,
                 _ => panic!("Expected list"),
             };
             assert_eq!(list.len(), 1);
@@ -2362,10 +2365,8 @@ mod test_command {
 
         value.push(v2.clone(), false).unwrap();
         {
-            let list = match value {
-                Value::List(ref value) => match value {
-                    &ValueList::Data(ref l) => l,
-                },
+            let list = match &value {
+                Value::List(ValueList::Data(l)) => l,
                 _ => panic!("Expected list"),
             };
             assert_eq!(list.len(), 2);
@@ -2394,12 +2395,12 @@ mod test_command {
         value.push(v1.clone(), false).unwrap();
         value.push(v2.clone(), false).unwrap();
 
-        assert_eq!(value.lindex(0).unwrap(), Some(&v2));
-        assert_eq!(value.lindex(1).unwrap(), Some(&v1));
+        assert_eq!(value.lindex(0).unwrap(), Some(&v2[..]));
+        assert_eq!(value.lindex(1).unwrap(), Some(&v1[..]));
         assert_eq!(value.lindex(2).unwrap(), None);
 
-        assert_eq!(value.lindex(-2).unwrap(), Some(&v2));
-        assert_eq!(value.lindex(-1).unwrap(), Some(&v1));
+        assert_eq!(value.lindex(-2).unwrap(), Some(&v2[..]));
+        assert_eq!(value.lindex(-1).unwrap(), Some(&v1[..]));
         assert_eq!(value.lindex(-3).unwrap(), None);
     }
 
@@ -2419,9 +2420,9 @@ mod test_command {
                 .unwrap(),
             3
         );
-        assert_eq!(value.lindex(0).unwrap(), Some(&v1));
-        assert_eq!(value.lindex(1).unwrap(), Some(&v3));
-        assert_eq!(value.lindex(2).unwrap(), Some(&v2));
+        assert_eq!(value.lindex(0).unwrap(), Some(&v1[..]));
+        assert_eq!(value.lindex(1).unwrap(), Some(&v3[..]));
+        assert_eq!(value.lindex(2).unwrap(), Some(&v2[..]));
 
         assert_eq!(value.linsert(true, vec![], v3.clone()).unwrap(), None);
     }
@@ -2450,10 +2451,13 @@ mod test_command {
         value.push(v2.clone(), true).unwrap();
         value.push(v3.clone(), true).unwrap();
 
-        assert_eq!(value.lrange(-100, 100).unwrap(), vec![&v1, &v2, &v3]);
-        assert_eq!(value.lrange(0, 1).unwrap(), vec![&v1, &v2]);
-        assert_eq!(value.lrange(0, 0).unwrap(), vec![&v1]);
-        assert_eq!(value.lrange(1, -1).unwrap(), vec![&v2, &v3]);
+        assert_eq!(
+            value.lrange(-100, 100).unwrap(),
+            vec![&v1[..], &v2[..], &v3[..]]
+        );
+        assert_eq!(value.lrange(0, 1).unwrap(), vec![&v1[..], &v2[..]]);
+        assert_eq!(value.lrange(0, 0).unwrap(), vec![&v1[..]]);
+        assert_eq!(value.lrange(1, -1).unwrap(), vec![&v2[..], &v3[..]]);
     }
 
     #[test]
@@ -2488,10 +2492,8 @@ mod test_command {
         assert_eq!(value.lrem(true, 3, v1.clone()).unwrap(), 3);
         assert_eq!(value.llen().unwrap(), 2);
         {
-            let list = match value {
-                Value::List(ref value) => match value {
-                    &ValueList::Data(ref l) => l,
-                },
+            let list = match &value {
+                Value::List(ValueList::Data(l)) => l,
                 _ => panic!("Expected list"),
             };
             assert_eq!(list.front().unwrap(), &v2);
@@ -2532,10 +2534,8 @@ mod test_command {
         assert_eq!(value.lrem(false, 3, v1.clone()).unwrap(), 3);
         assert_eq!(value.llen().unwrap(), 2);
         {
-            let list = match value {
-                Value::List(ref value) => match value {
-                    &ValueList::Data(ref l) => l,
-                },
+            let list = match &value {
+                Value::List(ValueList::Data(l)) => l,
                 _ => panic!("Expected list"),
             };
             assert_eq!(list.front().unwrap(), &v1);
@@ -2556,9 +2556,15 @@ mod test_command {
         value.push(v3.clone(), true).unwrap();
 
         assert_eq!(value.lset(1, v4.clone()).unwrap(), ());
-        assert_eq!(value.lrange(0, -1).unwrap(), vec![&v1, &v4, &v3]);
+        assert_eq!(
+            value.lrange(0, -1).unwrap(),
+            vec![&v1[..], &v4[..], &v3[..]]
+        );
         assert_eq!(value.lset(-1, v2.clone()).unwrap(), ());
-        assert_eq!(value.lrange(0, -1).unwrap(), vec![&v1, &v4, &v2]);
+        assert_eq!(
+            value.lrange(0, -1).unwrap(),
+            vec![&v1[..], &v4[..], &v2[..]]
+        );
     }
 
     #[test]
@@ -2575,7 +2581,7 @@ mod test_command {
 
         assert_eq!(value.ltrim(1, 2).unwrap(), ());
         assert_eq!(value.llen().unwrap(), 2);
-        assert_eq!(value.lrange(0, -1).unwrap(), vec![&v2, &v3]);
+        assert_eq!(value.lrange(0, -1).unwrap(), vec![&v2[..], &v3[..]]);
     }
 
     #[test]
@@ -4268,8 +4274,8 @@ mod test_command {
 
         assert_eq!(value.sadd(v1.clone(), 2).unwrap(), true);
         assert_eq!(value.sadd(v2.clone(), 2).unwrap(), true);
-        match value {
-            Value::Set(ref set) => match *set {
+        match &value {
+            Value::Set(set) => match set {
                 ValueSet::Integer(_) => (),
                 _ => panic!("Must be int set"),
             },
@@ -4277,7 +4283,7 @@ mod test_command {
         }
         assert_eq!(value.sadd(v3.clone(), 2).unwrap(), true);
         match value {
-            Value::Set(ref set) => match *set {
+            Value::Set(set) => match set {
                 ValueSet::Data(_) => (),
                 _ => panic!("Must be data set"),
             },

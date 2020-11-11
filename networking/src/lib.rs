@@ -1,37 +1,21 @@
-#[cfg(unix)]
-extern crate libc;
-#[cfg(unix)]
-extern crate unix_socket;
-#[macro_use(log, sendlog)]
-extern crate logger;
-extern crate command;
-extern crate config;
-extern crate database;
-extern crate net2;
-extern crate parser;
-extern crate response;
-extern crate util;
+use logger::{log, sendlog};
 
-use std::io;
-use std::io::{Read, Write};
-use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
-use std::sync::mpsc::{channel, Receiver, Sender};
-use std::sync::{Arc, Mutex, MutexGuard};
-use std::thread;
-use std::time::Duration;
+use std::{
+    io::{self, Read, Write},
+    net::{SocketAddr, TcpStream, ToSocketAddrs},
+    process,
+    sync::mpsc::{channel, Receiver, Sender},
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc, Mutex, MutexGuard,
+    },
+    thread,
+    time::Duration,
+};
 
-#[cfg(unix)]
-use std::fs::File;
-#[cfg(unix)]
-use std::path::Path;
-
-#[cfg(unix)]
-use libc::funcs::c95::stdlib::exit;
-#[cfg(unix)]
-use libc::funcs::posix88::unistd::fork;
-#[cfg(unix)]
-use libc::funcs::posix88::unistd::getpid;
 use net2::{TcpBuilder, TcpStreamExt};
+#[cfg(unix)]
+use std::{fs::File, path::Path};
 #[cfg(unix)]
 use unix_socket::{UnixListener, UnixStream};
 
@@ -57,25 +41,25 @@ enum Stream {
 impl Stream {
     /// Creates a new independently owned handle to the underlying socket.
     fn try_clone(&self) -> io::Result<Stream> {
-        match *self {
-            Stream::Tcp(ref s) => Ok(Stream::Tcp(s.try_clone()?)),
-            Stream::Unix(ref s) => Ok(Stream::Unix(s.try_clone()?)),
+        match self {
+            Stream::Tcp(s) => Ok(Stream::Tcp(s.try_clone()?)),
+            Stream::Unix(s) => Ok(Stream::Unix(s.try_clone()?)),
         }
     }
 
     /// Write a buffer into this object, returning how many bytes were written.
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        match *self {
-            Stream::Tcp(ref mut s) => s.write(buf),
-            Stream::Unix(ref mut s) => s.write(buf),
+        match self {
+            Stream::Tcp(s) => s.write(buf),
+            Stream::Unix(s) => s.write(buf),
         }
     }
 
     /// Sets the keepalive timeout to the timeout specified.
     /// It fails silently for UNIX sockets.
     fn set_keepalive(&self, duration: Option<Duration>) -> io::Result<()> {
-        match *self {
-            Stream::Tcp(ref s) => TcpStreamExt::set_keepalive(s, duration),
+        match self {
+            Stream::Tcp(s) => TcpStreamExt::set_keepalive(s, duration),
             Stream::Unix(_) => Ok(()),
         }
     }
@@ -83,8 +67,8 @@ impl Stream {
     /// Sets the write timeout to the timeout specified.
     /// It fails silently for UNIX sockets.
     fn set_write_timeout(&self, dur: Option<Duration>) -> io::Result<()> {
-        match *self {
-            Stream::Tcp(ref s) => s.set_write_timeout(dur),
+        match self {
+            Stream::Tcp(s) => s.set_write_timeout(dur),
             // TODO: couldn't figure out how to enable this in unix_socket
             Stream::Unix(_) => Ok(()),
         }
@@ -93,8 +77,8 @@ impl Stream {
     /// Sets the read timeout to the timeout specified.
     /// It fails silently for UNIX sockets.
     fn set_read_timeout(&self, dur: Option<Duration>) -> io::Result<()> {
-        match *self {
-            Stream::Tcp(ref s) => s.set_read_timeout(dur),
+        match self {
+            Stream::Tcp(s) => s.set_read_timeout(dur),
             // TODO: couldn't figure out how to enable this in unix_socket
             Stream::Unix(_) => Ok(()),
         }
@@ -106,9 +90,9 @@ impl Read for Stream {
     /// Pull some bytes from this source into the specified buffer,
     /// returning how many bytes were read.
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        match *self {
-            Stream::Tcp(ref mut s) => s.read(buf),
-            Stream::Unix(ref mut s) => s.read(buf),
+        match self {
+            Stream::Tcp(s) => s.read(buf),
+            Stream::Unix(s) => s.read(buf),
         }
     }
 }
@@ -117,39 +101,39 @@ impl Read for Stream {
 impl Stream {
     /// Creates a new independently owned handle to the underlying socket.
     fn try_clone(&self) -> io::Result<Stream> {
-        match *self {
-            Stream::Tcp(ref s) => Ok(Stream::Tcp(try!(s.try_clone()))),
+        match self {
+            Stream::Tcp(s) => Ok(Stream::Tcp(s.try_clone()?)),
         }
     }
 
     /// Write a buffer into this object, returning how many bytes were written.
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        match *self {
-            Stream::Tcp(ref mut s) => s.write(buf),
+        match self {
+            Stream::Tcp(s) => s.write(buf),
         }
     }
 
     /// Sets the keepalive timeout to the timeout specified.
     /// It fails silently for UNIX sockets.
     fn set_keepalive(&self, duration: Option<Duration>) -> io::Result<()> {
-        match *self {
-            Stream::Tcp(ref s) => TcpStreamExt::set_keepalive(s, duration),
+        match self {
+            Stream::Tcp(s) => TcpStreamExt::set_keepalive(s, duration),
         }
     }
 
     /// Sets the write timeout to the timeout specified.
     /// It fails silently for UNIX sockets.
     fn set_write_timeout(&self, dur: Option<Duration>) -> io::Result<()> {
-        match *self {
-            Stream::Tcp(ref s) => s.set_write_timeout(dur),
+        match self {
+            Stream::Tcp(s) => s.set_write_timeout(dur),
         }
     }
 
     /// Sets the read timeout to the timeout specified.
     /// It fails silently for UNIX sockets.
     fn set_read_timeout(&self, dur: Option<Duration>) -> io::Result<()> {
-        match *self {
-            Stream::Tcp(ref s) => s.set_read_timeout(dur),
+        match self {
+            Stream::Tcp(s) => s.set_read_timeout(dur),
         }
     }
 }
@@ -159,8 +143,8 @@ impl Read for Stream {
     /// Pull some bytes from this source into the specified buffer,
     /// returning how many bytes were read.
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        match *self {
-            Stream::Tcp(ref mut s) => s.read(buf),
+        match self {
+            Stream::Tcp(s) => s.read(buf),
         }
     }
 }
@@ -184,7 +168,7 @@ pub struct Server {
     /// A list of threads listening for incoming connections
     listener_threads: Vec<thread::JoinHandle<()>>,
     /// An incremental id for new clients
-    pub next_id: Arc<Mutex<usize>>,
+    pub next_id: Arc<AtomicUsize>,
     /// Sender to signal hz thread to stop
     hz_stop: Option<Sender<()>>,
 }
@@ -192,21 +176,21 @@ pub struct Server {
 impl Client {
     /// Creates a new TCP socket client
     pub fn tcp(stream: TcpStream, db: Arc<Mutex<Database>>, id: usize) -> Client {
-        return Client {
+        Client {
             stream: Stream::Tcp(stream),
-            db: db,
-            id: id,
-        };
+            db,
+            id,
+        }
     }
 
     /// Creates a new UNIX socket client
     #[cfg(unix)]
     pub fn unix(stream: UnixStream, db: Arc<Mutex<Database>>, id: usize) -> Client {
-        return Client {
+        Client {
             stream: Stream::Unix(stream),
-            db: db,
-            id: id,
-        };
+            db,
+            id,
+        }
     }
 
     /// Creates a thread that writes into the client stream each response received
@@ -216,26 +200,21 @@ impl Client {
         rx: Receiver<Option<Response>>,
     ) {
         let mut stream = self.stream.try_clone().unwrap();
-        thread::spawn(move || loop {
-            match rx.recv() {
-                Ok(m) => match m {
-                    Some(msg) => match stream.write(&*msg.as_bytes()) {
-                        Ok(_) => (),
-                        Err(e) => {
-                            sendlog!(sender, Warning, "Error writing to client: {:?}", e).unwrap()
-                        }
-                    },
-                    None => break,
-                },
-                Err(_) => break,
-            };
+        thread::spawn(move || {
+            while let Ok(Some(msg)) = rx.recv() {
+                match stream.write(&*msg.as_bytes()) {
+                    Ok(_) => (),
+                    Err(e) => {
+                        sendlog!(sender, Warning, "Error writing to client: {:?}", e).unwrap()
+                    }
+                }
+            }
         });
     }
 
     /// Runs all clients commands. The function loops until the client
     /// disconnects.
     pub fn run(&mut self, sender: Sender<(Level, String)>) {
-        #![allow(unused_must_use)]
         let (stream_tx, rx) = channel::<Option<Response>>();
         self.create_writer_thread(sender.clone(), rx);
 
@@ -256,7 +235,7 @@ impl Client {
                     match self.stream.read(&mut buffer[pos..]) {
                         Ok(r) => r,
                         Err(err) => {
-                            sendlog!(sender, Verbose, "Reading from client: {:?}", err);
+                            let _ = sendlog!(sender, Verbose, "Reading from client: {:?}", err);
                             break;
                         }
                     }
@@ -265,7 +244,7 @@ impl Client {
 
                 // client closed connection
                 if len == 0 {
-                    sendlog!(sender, Verbose, "Client closed connection");
+                    let _ = sendlog!(sender, Verbose, "Client closed connection");
                     break;
                 }
             }
@@ -277,8 +256,8 @@ impl Client {
             next_command = None;
 
             // try to parse received command
-            let parsed_command = match this_command {
-                Some(ref c) => c.get_command(),
+            let parsed_command = match &this_command {
+                Some(c) => c.get_command(),
                 None => {
                     match parser.next() {
                         Ok(p) => p,
@@ -293,7 +272,7 @@ impl Client {
                                     break;
                                 }
                                 _ => {
-                                    sendlog!(
+                                    let _ = sendlog!(
                                         sender,
                                         Verbose,
                                         "Protocol error from client: {:?}",
@@ -307,15 +286,15 @@ impl Client {
                 }
             };
 
-            let mut db = match self.db.lock() {
-                Ok(db) => db,
-                Err(_) => break,
-            };
+            let r = {
+                let mut db = match self.db.lock() {
+                    Ok(db) => db,
+                    Err(_) => break,
+                };
 
-            // execute the command
-            let r = command::command(parsed_command, &mut *db, &mut client);
-            // unlock the db
-            drop(db);
+                // execute the command
+                command::command(parsed_command, &mut *db, &mut client)
+            };
 
             // check out the response
             match r {
@@ -333,7 +312,7 @@ impl Client {
                         ResponseError::NoReply => (),
                         // We have to wait until a sender signals us back and then retry
                         // (Repeating the same command is actually wrong because of the timeout)
-                        ResponseError::Wait(ref receiver) => {
+                        ResponseError::Wait(receiver) => {
                             // if we receive a None, send a nil, otherwise execute the command
                             match receiver.recv().unwrap() {
                                 Some(cmd) => next_command = Some(cmd),
@@ -350,8 +329,11 @@ impl Client {
             // if something failed, let's shut down the client
             if error {
                 // kill threads
-                stream_tx.send(None);
-                client.rawsender.send(None);
+                stream_tx.send(None).expect("TODO: Ignore this error");
+                client
+                    .rawsender
+                    .send(None)
+                    .expect("TODO: Ignore this error");
                 break;
             }
         }
@@ -385,11 +367,8 @@ macro_rules! handle_listener {
                         sendlog!(sender, Verbose, "Accepted connection to {:?}", stream).unwrap();
                         let db1 = db.clone();
                         let mysender = sender.clone();
-                        let id = {
-                            let mut nid = next_id.lock().unwrap();
-                            *nid += 1;
-                            *nid - 1
-                        };
+                        let id = next_id.fetch_add(1, Ordering::Relaxed);
+
                         thread::spawn(move || {
                             let mut client = Client::$t(stream, db1, id);
                             client
@@ -432,16 +411,16 @@ impl Server {
     /// Creates a new server
     pub fn new(config: Config) -> Server {
         let db = Database::new(config);
-        return Server {
+        Server {
             db: Arc::new(Mutex::new(db)),
             listener_channels: Vec::new(),
             listener_threads: Vec::new(),
-            next_id: Arc::new(Mutex::new(0)),
+            next_id: Arc::new(AtomicUsize::default()),
             hz_stop: None,
-        };
+        }
     }
 
-    pub fn get_mut_db<'a>(&'a self) -> MutexGuard<'a, database::Database> {
+    pub fn get_mut_db(&self) -> MutexGuard<database::Database> {
         self.db.lock().unwrap()
     }
 
@@ -450,28 +429,22 @@ impl Server {
     pub fn run(&mut self) {
         let (daemonize, pidfile) = {
             let db = self.db.lock().unwrap();
-            (db.config.daemonize.clone(), db.config.pidfile.clone())
+            (db.config.daemonize, db.config.pidfile.clone())
         };
         if daemonize {
-            unsafe {
-                match fork() {
-                    -1 => panic!("Fork failed"),
-                    0 => {
-                        if let Ok(mut fp) = File::create(Path::new(&*pidfile)) {
-                            match write!(fp, "{}", getpid()) {
-                                Ok(_) => (),
-                                Err(e) => {
-                                    let db = self.db.lock().unwrap();
-                                    log!(db.config.logger, Warning, "Error writing pid: {}", e);
-                                }
-                            }
+            if let fork::Fork::Child = fork::daemon(true, true).expect("Fork failed") {
+                if let Ok(mut fp) = File::create(Path::new(&*pidfile)) {
+                    match write!(fp, "{}", process::id()) {
+                        Ok(_) => (),
+                        Err(e) => {
+                            let db = self.db.lock().unwrap();
+                            log!(db.config.logger, Warning, "Error writing pid: {}", e);
                         }
-                        self.start();
-                        self.join();
                     }
-                    _ => exit(0),
-                };
-            }
+                }
+                self.start();
+                self.join();
+            };
         } else {
             self.start();
             self.join();
@@ -505,9 +478,8 @@ impl Server {
 
     /// Join the listener threads.
     pub fn join(&mut self) {
-        #![allow(unused_must_use)]
-        while self.listener_threads.len() > 0 {
-            self.listener_threads.pop().unwrap().join();
+        while !self.listener_threads.is_empty() {
+            let _ = self.listener_threads.pop().unwrap().join();
         }
     }
 
@@ -551,10 +523,10 @@ impl Server {
         let (tcp_keepalive, timeout, addresses, tcp_backlog) = {
             let db = self.db.lock().unwrap();
             (
-                db.config.tcp_keepalive.clone(),
-                db.config.timeout.clone(),
-                db.config.addresses().clone(),
-                db.config.tcp_backlog.clone(),
+                db.config.tcp_keepalive,
+                db.config.timeout,
+                db.config.addresses(),
+                db.config.tcp_backlog,
             )
         };
         for (host, port) in addresses {
@@ -592,7 +564,7 @@ impl Server {
             thread::spawn(move || {
                 while hz_stop_rx.try_recv().is_err() {
                     let mut db = dblock.lock().unwrap();
-                    let hz = db.config.hz.clone();
+                    let hz = db.config.hz;
                     db.active_expire_cycle(10);
                     drop(db);
                     thread::sleep(Duration::from_millis(10000 / hz as u64));
@@ -609,7 +581,7 @@ impl Server {
     #[cfg(unix)]
     fn handle_unixsocket(&mut self) {
         let db = self.db.lock().unwrap();
-        if let Some(ref unixsocket) = db.config.unixsocket {
+        if let Some(unixsocket) = &db.config.unixsocket {
             let tcp_keepalive = db.config.tcp_keepalive;
             let timeout = db.config.timeout;
 
@@ -655,21 +627,17 @@ impl Server {
     /// Sends a kill signal to the listeners and connects to the incoming
     /// connections to break the listening loop.
     pub fn stop(&mut self) {
-        #![allow(unused_must_use)]
         for sender in self.listener_channels.iter() {
-            sender.send(0);
+            let _ = sender.send(0);
             let db = self.db.lock().unwrap();
             for (host, port) in db.config.addresses() {
                 for addrs in (&host[..], port).to_socket_addrs().unwrap() {
-                    TcpStream::connect(addrs);
+                    let _ = TcpStream::connect(addrs);
                 }
             }
         }
-        match self.hz_stop {
-            Some(ref t) => {
-                let _ = t.send(());
-            }
-            None => (),
+        if let Some(t) = &self.hz_stop {
+            let _ = t.send(());
         }
         self.join();
     }

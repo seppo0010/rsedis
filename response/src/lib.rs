@@ -35,8 +35,8 @@ pub enum ResponseError {
 impl Debug for ResponseError {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         match self {
-            &ResponseError::NoReply => write!(f, "NoReply"),
-            &ResponseError::Wait(_) => write!(f, "Wait"),
+            ResponseError::NoReply => write!(f, "NoReply"),
+            ResponseError::Wait(_) => write!(f, "Wait"),
         }
     }
 }
@@ -44,37 +44,32 @@ impl Debug for ResponseError {
 impl Response {
     /// Serializes the response into an array of bytes using Redis protocol.
     pub fn as_bytes(&self) -> Vec<u8> {
-        return match *self {
+        match self {
             Response::Nil => b"$-1\r\n".to_vec(),
-            Response::Data(ref d) => [
+            Response::Data(d) => [
                 &b"$"[..],
-                &format!("{}\r\n", d.len()).into_bytes()[..],
+                &d.len().to_string().into_bytes()[..],
+                b"\r\n",
                 &d[..],
-                &"\r\n".to_owned().into_bytes()[..],
+                b"\r\n",
             ]
             .concat(),
-            Response::Integer(ref i) => {
-                [&b":"[..], &format!("{}\r\n", i).into_bytes()[..]].concat()
-            }
-            Response::Error(ref d) => [
-                &b"-"[..],
-                (*d).as_bytes(),
-                &"\r\n".to_owned().into_bytes()[..],
-            ]
-            .concat(),
-            Response::Status(ref d) => [
+            Response::Integer(i) => [&b":"[..], &i.to_string().into_bytes()[..], b"\r\n"].concat(),
+            Response::Error(d) => [&b"-"[..], (*d).as_bytes(), b"\r\n"].concat(),
+            Response::Status(d) => [
                 &b"+"[..],
                 (*d).as_bytes(),
                 &"\r\n".to_owned().into_bytes()[..],
             ]
             .concat(),
-            Response::Array(ref a) => [
+            Response::Array(a) => [
                 &b"*"[..],
-                &format!("{}\r\n", a.len()).into_bytes()[..],
+                &a.len().to_string().into_bytes()[..],
+                b"\r\n",
                 &(a.iter().map(|el| el.as_bytes()).collect::<Vec<_>>()[..].concat())[..],
             ]
             .concat(),
-        };
+        }
     }
 
     /// Returns true if and only if the response is an error.

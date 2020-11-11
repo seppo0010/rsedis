@@ -2,9 +2,12 @@ use std::fs::File;
 use std::io::Write;
 use std::process::Command;
 use std::str::from_utf8;
+use std::{env, path};
 
 fn main() {
-    let mut f = File::create("src/release.rs").unwrap();
+    let path = path::Path::new(&env::var_os("OUT_DIR").unwrap()).join("release.rs");
+
+    let mut f = File::create(path).unwrap();
 
     {
         let hash = match Command::new("git")
@@ -22,12 +25,7 @@ fn main() {
             }
             Err(_) => String::from("00000000"),
         };
-        write!(
-            f,
-            "pub const GIT_SHA1: &'static str = \"{}\";\n",
-            &hash[0..8]
-        )
-        .unwrap();
+        writeln!(f, "pub const GIT_SHA1: &str = \"{}\";", &hash[0..8]).unwrap();
     }
 
     {
@@ -36,12 +34,12 @@ fn main() {
             .arg("--no-ext-diff")
             .output()
         {
-            Ok(o) => o.stdout.len() > 0,
+            Ok(o) => !o.stdout.is_empty(),
             Err(_) => true,
         };
-        write!(
+        writeln!(
             f,
-            "pub const GIT_DIRTY: bool = {};\n",
+            "pub const GIT_DIRTY: bool = {};",
             if dirty { "true" } else { "false " }
         )
         .unwrap();
@@ -52,11 +50,6 @@ fn main() {
             Ok(o) => String::from(from_utf8(&o.stdout).unwrap().trim()),
             Err(_) => String::new(),
         };
-        write!(
-            f,
-            "pub const RUSTC_VERSION: &'static str = {:?};\n",
-            version
-        )
-        .unwrap();
+        writeln!(f, "pub const RUSTC_VERSION: &str = {:?};", version).unwrap();
     }
 }

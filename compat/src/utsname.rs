@@ -27,9 +27,7 @@ pub struct UtsName {
     release: [c_char; UTSNAME_LEN],
     version: [c_char; UTSNAME_LEN],
     machine: [c_char; UTSNAME_LEN],
-    // ifdef _GNU_SOURCE
-    #[allow(dead_code)]
-    domainname: [c_char; UTSNAME_LEN],
+    _domainname: [c_char; UTSNAME_LEN],
 }
 
 // workaround for `derive(Clone)` not working for fixed-length arrays
@@ -40,32 +38,32 @@ impl Clone for UtsName {
 }
 
 impl UtsName {
-    pub fn sysname<'a>(&'a self) -> &'a str {
+    pub fn sysname(&self) -> &str {
         to_str(&(&self.sysname as *const c_char) as *const *const c_char)
     }
 
-    pub fn nodename<'a>(&'a self) -> &'a str {
+    pub fn nodename(&self) -> &str {
         to_str(&(&self.nodename as *const c_char) as *const *const c_char)
     }
 
-    pub fn release<'a>(&'a self) -> &'a str {
+    pub fn release(&self) -> &str {
         to_str(&(&self.release as *const c_char) as *const *const c_char)
     }
 
-    pub fn version<'a>(&'a self) -> &'a str {
+    pub fn version(&self) -> &str {
         to_str(&(&self.version as *const c_char) as *const *const c_char)
     }
 
-    pub fn machine<'a>(&'a self) -> &'a str {
+    pub fn machine(&self) -> &str {
         to_str(&(&self.machine as *const c_char) as *const *const c_char)
     }
 }
 
 pub fn uname() -> UtsName {
     unsafe {
-        let mut ret: UtsName = mem::MaybeUninit::uninit().assume_init();
-        ffi::uname(&mut ret as *mut UtsName);
-        ret
+        let mut ret = mem::MaybeUninit::uninit();
+        ffi::uname(ret.as_mut_ptr());
+        ret.assume_init()
     }
 }
 

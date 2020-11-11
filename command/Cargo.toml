@@ -2,24 +2,14 @@
 name = "command"
 version = "0.1.0"
 authors = ["Sebastian Waisbrot <seppo0010@gmail.com>"]
+edition = "2018"
 
-[dependencies.compat]
-path = "../compat"
-
-[dependencies.config]
-path = "../config"
-
-[dependencies.database]
-path = "../database"
-
-[dependencies.logger]
-path = "../logger"
-
-[dependencies.parser]
-path = "../parser"
-
-[dependencies.response]
-path = "../response"
-
-[dependencies.util]
-path = "../util"
+[dependencies]
+bitflags = "1.2"
+compat = { path = "../compat" }
+config = { path = "../config" }
+database = { path = "../database" }
+logger = { path = "../logger" }
+parser = { path = "../parser" }
+response = { path = "../response" }
+util = { path = "../util" }
