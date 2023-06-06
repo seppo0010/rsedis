@@ -271,6 +271,12 @@ fn dump(parser: &mut ParsedCommand, db: &mut Database, dbindex: usize) -> Respon
     }
 }
 
+fn echo(parser: &mut ParsedCommand) -> Response {
+    validate_arguments_exact!(parser, 2);
+    let msg = try_validate!(parser.get_str(1), "Syntax error");
+    Response::Data(msg.as_bytes().to_vec())
+}
+
 fn generic_expire(db: &mut Database, dbindex: usize, key: Vec<u8>, msexpiration: i64) -> Response {
     Response::Integer(match db.get(dbindex, &key) {
         Some(_) => {
@@ -2777,6 +2783,7 @@ fn execute_command(
         "pexpire" => pexpire(parser, db, dbindex),
         "expireat" => expireat(parser, db, dbindex),
         "expire" => expire(parser, db, dbindex),
+        "echo" => echo(parser),
         "ttl" => ttl(parser, db, dbindex),
         "pttl" => pttl(parser, db, dbindex),
         "persist" => persist(parser, db, dbindex),
